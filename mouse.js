@@ -122,20 +122,23 @@ function processCode(code) {
   setupMenuCheckbox();
 
   //lifted tileWidth from apple-snake
-  let tileWidth = code.match(/[$a-zA-Z0-9_]{0,6}\.x=[$a-zA-Z0-9_]{0,6}\.x\*a\.([$a-zA-Z0-9_]{0,6})\+a\.[$a-zA-Z0-9_]{0,6}\/2;[$a-zA-Z0-9_]{0,6}\.y=[$a-zA-Z0-9_]{0,6}\.y\*a\.[$a-zA-Z0-9_]{0,6}\+a\.[$a-zA-Z0-9_]{0,6}\/2;/)[1];//wa
+  //let tileWidth = code.match(/[$a-zA-Z0-9_]{0,6}\.x=[$a-zA-Z0-9_]{0,6}\.x\*a\.([$a-zA-Z0-9_]{0,6})\+a\.[$a-zA-Z0-9_]{0,6}\/2;[$a-zA-Z0-9_]{0,6}\.y=[$a-zA-Z0-9_]{0,6}\.y\*a\.[$a-zA-Z0-9_]{0,6}\+a\.[$a-zA-Z0-9_]{0,6}\/2;/)[1];//wa
+  let tileWidth = code.match(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];//wa
   
-  //Head pos, but not properly lerped. k9. Lifted from apple-snake
-  let blockyHeadCoord = code.match(/this\.[$a-zA-Z0-9_]{0,6}=this\.[$a-zA-Z0-9_]{0,6}\[2\];this\.[$a-zA-Z0-9_]{0,6}=this\.[$a-zA-Z0-9_]{0,6}\[2\];this\.([$a-zA-Z0-9_]{0,6})=this\.[$a-zA-Z0-9_]{0,6}\[0\];/)[1];
+  //Head pos, but not properly lerped. k9. Lifted from apple-snake. SnakeDetails contains lots of different properties of the snake.
+  let [,snakeDetails,blockyHeadCoord] = code.match(/[a-z]\.([$a-zA-Z0-9_]{0,6})\.([$a-zA-Z0-9_]{0,6})=[a-z]\.clone\(\),/);
+  //let blockyHeadCoord = code.match(/this\.[$a-zA-Z0-9_]{0,6}=this\.[$a-zA-Z0-9_]{0,6}\[2\];this\.[$a-zA-Z0-9_]{0,6}=this\.[$a-zA-Z0-9_]{0,6}\[2\];this\.([$a-zA-Z0-9_]{0,6})=this\.[$a-zA-Z0-9_]{0,6}\[0\];/)[1];
 
   let coordConstructor = code.match(/new ([$a-zA-Z0-9_]{0,6})\(1,1\)/)[1];
 
-  let bodyArray = code.match(/this\.([$a-zA-Z0-9_]{0,6})\.unshift\(a\);/)[1];
+  let bodyArray = code.match(/var [a-z]=[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6})\[0\]\.clone\(\);/)[1];
+  //let bodyArray = code.match(/this\.([$a-zA-Z0-9_]{0,6})\.unshift\(a\);/)[1];
 
   //Lifted from apple-snake
   let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[xy]\)\);a\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
 
   //Lifted update function from delete stuff mod
-  let funcWithEat = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.update=function\(\)$/,
+  let funcWithEat = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.tick=function\(\)$/,
   /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){[$a-zA-Z0-9_]{0,6}=[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=!0,[$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.play\(\)/,
   false);
 
@@ -194,13 +197,13 @@ function processCode(code) {
 
   let [,segmentCloserToHead,segmentFurtherFromHead] = funcWithBodyLines.match(/([a-z])=[a-z]\.clone\(\):([a-z])=[a-z]\.clone\(\)/);
 
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/(\*=a\.[$a-zA-Z0-9_]{0,6};)-1===[a-z]\.x-[a-z]\.x\|\|[^]*[a-z]\.y\+=a\.[$a-zA-Z0-9_]{0,6}\/2\);(if\(0===[a-z]\){)/,
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/(\*=a\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};)-1===[a-z]\.x-[a-z]\.x\|\|[^]*[a-z]\.y\+=a\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\/2\);(if\(0===[a-z]\){)/,
     `$1
     //First bit is ok, but needs a.wa/2's added
-    ${startPoint}.x += a.${tileWidth}/2;${startPoint}.y += a.${tileWidth}/2;${endPoint}.x +=a.${tileWidth}/2;${endPoint}.y += a.${tileWidth}/2; //added by me
+    ${startPoint}.x += a.${snakeDetails}.${tileWidth}/2;${startPoint}.y += a.${snakeDetails}.${tileWidth}/2;${endPoint}.x +=a.${snakeDetails}.${tileWidth}/2;${endPoint}.y += a.${snakeDetails}.${tileWidth}/2; //added by me
     //Turn n and l into coords space
-    let segmentCloserToHead = ${segmentCloserToHead}.clone(); segmentCloserToHead.x = segmentCloserToHead.x * a.${tileWidth} + a.${tileWidth}/2;segmentCloserToHead.y = segmentCloserToHead.y * a.${tileWidth} + a.${tileWidth}/2;
-    let segmentFurtherFromHead = ${segmentFurtherFromHead}.clone();segmentFurtherFromHead.x = segmentFurtherFromHead.x * a.${tileWidth} + a.${tileWidth}/2;segmentFurtherFromHead.y = segmentFurtherFromHead.y * a.${tileWidth} + a.${tileWidth}/2;
+    let segmentCloserToHead = ${segmentCloserToHead}.clone(); segmentCloserToHead.x = segmentCloserToHead.x * a.${snakeDetails}.${tileWidth} + a.${snakeDetails}.${tileWidth}/2;segmentCloserToHead.y = segmentCloserToHead.y * a.${snakeDetails}.${tileWidth} + a.${snakeDetails}.${tileWidth}/2;
+    let segmentFurtherFromHead = ${segmentFurtherFromHead}.clone();segmentFurtherFromHead.x = segmentFurtherFromHead.x * a.${snakeDetails}.${tileWidth} + a.${snakeDetails}.${tileWidth}/2;segmentFurtherFromHead.y = segmentFurtherFromHead.y * a.${snakeDetails}.${tileWidth} + a.${snakeDetails}.${tileWidth}/2;
     //t should be halfway between the control point and the point closer to the head
     ${endPoint}.x = ${endPoint}.x*0.49 + segmentCloserToHead.x*0.51;
     ${endPoint}.y = ${endPoint}.y*0.49 + segmentCloserToHead.y*0.51;
@@ -210,15 +213,14 @@ function processCode(code) {
   $2`);
 
   //Make it so that the head gets lerped in the direction that the snake is travelling in
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/(var [a-z]=a\.[$a-zA-Z0-9_]{0,6}\[0\]\.clone\(\);)[^]*&&\([a-z]\.y=0\)\)/,
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/(var [a-z]=a\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\]\.clone\(\);)[^]*&&\([a-z]\.y=0\)\)/,
     `
     $1
-    var ${segmentCloserToHead} = a.${bodyArray}[0].clone();
     if(aimTrainer) {
       ${segmentCloserToHead}.x += Math.cos(faceAngle);
       ${segmentCloserToHead}.y += Math.sin(faceAngle);
     } else{
-      updateFaceCoordsAndRotation(a.${blockyHeadCoord}, a.${tileWidth}, a.${bodyArray});
+      updateFaceCoordsAndRotation(a.${snakeDetails}.${blockyHeadCoord}, a.${snakeDetails}.${tileWidth}, a.${snakeDetails}.${bodyArray});
       ${segmentCloserToHead}.x = nextHeadX;
       ${segmentCloserToHead}.y = nextHeadY;
     }
@@ -244,7 +246,7 @@ function processCode(code) {
   eval(funcWithBodyParts);
 
   //Add warning if the game is started with a mode that is broken
-  let funcWithNewGame = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.[$a-zA-Z0-9_]{0,6}=function\(\)$/,
+  let funcWithNewGame = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(\)$/,
   /this\.reset\(\)/,
   false);
 
