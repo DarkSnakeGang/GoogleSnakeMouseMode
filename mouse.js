@@ -137,39 +137,6 @@ function processCode(code) {
   //Lifted from apple-snake
   let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[xy]\)\);a\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
 
-  //Lifted update function from delete stuff mod
-  let funcWithEat = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.tick=function\(\)$/,
-  /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){[$a-zA-Z0-9_]{0,6}=[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=!0,[$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.play\(\)/,
-  false);
-
-  funcWithEat = assertReplace(funcWithEat,/(if\([$a-zA-Z0-9_]{0,6}\(this.settings,12\)\|\|![$a-zA-Z0-9_]{0,6}\(this,)[a-z]\)\){this\.[$a-zA-Z0-9_]{0,6}\.unshift\([a-z]\);/,
-  `updateFaceCoordsAndRotation(this.${blockyHeadCoord}, this.${tileWidth}, this.${bodyArray});
-  let nextHead = new ${coordConstructor}(nextHeadX, nextHeadY);
-  $1 nextHead)) {
-  this.${bodyArray}.unshift(nextHead);`
-  );
-
-  //Check for apple collisions the same way that winged mode does.
-  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,6}\(this.settings,6\)\?\([a-z]=1>/,
-  'true || $&');
-
-  //Disable the code that affctes the head position based on whether left/right etc is pressed
-  funcWithEat = assertReplace(funcWithEat,'switch\(this\.direction\){',
-  `switch(false){`);
-
-  //check for key collisions the same way winged does. WingedCheck has a signature like wingedCheck(this, headCoord, targetCoord)
-  wingedCheck = funcWithEat.match(/[a-z]=1>([$a-zA-Z0-9_]{0,6})\(this,this\.[$a-zA-Z0-9_]{0,6}\[0\],[a-z]\.[$a-zA-Z0-9_]{0,6}\)/)[1];
-
-  //Apply wingedCheck $1 is headCoord, $2 is keyCoord, $3 check mode for yin yang, $4 is mirrored snake head coord.
-  funcWithEat = assertReplace(funcWithEat, /if\((this\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)\|\|([$a-zA-Z0-9_]{0,6}\(this.settings,7\))&&([$a-zA-Z0-9_]{0,6}\(this,0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,6}\)\)/,
-  `if(1 > ${wingedCheck}(this,$1,$2) || $3 && 1 > ${wingedCheck}(this,$4,$2))`);
-
-  //Make the swallowed apple go on the correct snake
-  funcWithEat = assertReplace(funcWithEat, /([$a-zA-Z0-9_]{0,6}):!(this\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
-  `$1: !${wingedCheck}(this,$2,$3)`);
-
-  eval(funcWithEat);
-
   //Twiddle the out of bounds hitreg to be slightly friendlier. Note the change to strict inequality to disallow -1. Perhaps it would've been better to make a new bounds checking function instead.
   let funcWithBoundsHitReg = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
   /return 0<=[a-z]\.x&&[a-z]\.x<[a-z]\.[$a-zA-Z0-9_]{0,6}\.width&&0<=[a-z]\.y&&[a-z]\.y<[a-z]\.[$a-zA-Z0-9_]{0,6}\.height/,
@@ -181,6 +148,60 @@ function processCode(code) {
 
   eval(funcWithBoundsHitReg);
 
+  //Lifted update function from delete stuff mod
+  let funcWithEat = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.tick=function\(\)$/,
+  /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){var [$a-zA-Z0-9_]{0,6}=[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=!0,[$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.play\(\)/,
+  false);
+
+  //Set the candidate coord for the next head here so that it gets used in the collision checks and then added to the head of the snake
+  funcWithEat = assertReplace(funcWithEat,/case "DOWN":([$a-zA-Z0-9_]{0,6})\.y\+=1,[$a-zA-Z0-9_]{0,6}&&[$a-zA-Z0-9_]{0,6}\.y>=this\.[$a-zA-Z0-9_]{0,6}\.height&&\([$a-zA-Z0-9_]{0,6}\.y=0\)}/,
+  `$&
+  updateFaceCoordsAndRotation(this.${blockyHeadCoord}, this.${tileWidth}, this.${bodyArray});
+  let nextHead = new ${coordConstructor}(nextHeadX, nextHeadY);
+  $1 = nextHead;
+  `
+  );
+  
+  //Check for apple collisions the same way that winged mode does.
+  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,6}\(this\.settings,6\)\){if\([$a-zA-Z0-9_]{0,6}=1>/,
+  'true || $&');
+
+  //Disable the code that affctes the head position based on whether left/right etc is pressed
+  funcWithEat = assertReplace(funcWithEat,'switch\(this\.direction\){',
+  `switch(false){`);
+  
+  //check for key collisions the same way winged does. WingedCheck has a signature like wingedCheck(this, headCoord, targetCoord)
+  wingedCheck = funcWithEat.match(/[$a-zA-Z0-9_]{0,6}=1>([$a-zA-Z0-9_]{0,6})\(this,this\.[$a-zA-Z0-9_]{0,6}\[0\],[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];
+  
+  //Apply wingedCheck $1 is headCoord, $2 is keyCoord, $3 check mode for yin yang, $4 is mirrored snake head coord.
+  /*funcWithEat = assertReplace(funcWithEat, /if\((this\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)\|\|([$a-zA-Z0-9_]{0,6}\(this.settings,7\))&&([$a-zA-Z0-9_]{0,6}\(this,0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,6}\)\)/,
+  `if(1 > ${wingedCheck}(this,$1,$2) || $3 && 1 > ${wingedCheck}(this,$4,$2))`);*/
+  
+  //Stop yin-yang etc crashing, by rounding invalid coords
+  let headCandidate = funcWithEat.match(/case "DOWN":([$a-zA-Z0-9_]{0,6})\.y\+=1,/)[1];
+  let yangHeadCandidate = funcWithEat.match(/var ([$a-zA-Z0-9_]{0,6})=new [$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6}\.width-1/)[1];
+  funcWithEat = assertReplaceAll(funcWithEat, new RegExp(`\\[((?:${yangHeadCandidate}|${headCandidate})\\.x)\\]`,'g'),`[roundClamp($1, this.${boardDimensions}.width)]`);
+  funcWithEat = assertReplaceAll(funcWithEat, new RegExp(`\\[((?:${yangHeadCandidate}|${headCandidate})\\.y)\\]`,'g'),`[roundClamp($1, this.${boardDimensions}.height)]`);
+
+  eval(funcWithEat);
+
+  funcWithKeyCheck = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a\)$/,
+  /a\.keys\.sort\(function/,
+  false);
+
+  //Apply wingedCheck $1 is headCoord, $2 is keyCoord, $3 check mode for yin yang, $4 is mirrored snake head coord.
+  funcWithKeyCheck = assertReplace(funcWithKeyCheck,/\(([a-z]\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)\|\|([$a-zA-Z0-9_]{0,6}\([a-z]\.settings,7\))&&([$a-zA-Z0-9_]{0,6}\([a-z],0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,6}\)\)/,
+  `(1 > ${wingedCheck}(this,$1,$2) || $3 && 1 > ${wingedCheck}(this,$4,$2))`);
+
+  eval(funcWithKeyCheck);
+  
+  //Make the swallowed apple go on the correct snake
+  //UNNEEDED?
+  /*funcWithEat = assertReplace(funcWithEat, /([$a-zA-Z0-9_]{0,6}):!(this\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
+  `$1: !${wingedCheck}(this,$2,$3)`);*/
+
+  /*
+  //UNNEEDED? Code moved to funcWithEat?
   //Stop yin yang (And some other modes) from crashing. Round coords for head etc when doing checks.
   let funcWithChecks = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
   /[a-z]=[a-z]\.[$a-zA-Z0-9_]{0,6}\[[a-z]\.y\]\[[a-z]\.x\]\.[$a-zA-Z0-9_]{0,6}\|\|![$a-zA-Z0-9_]{0,6}\([a-z].settings,11\),/,
@@ -190,6 +211,7 @@ function processCode(code) {
   funcWithChecks = assertReplaceAll(funcWithChecks, /\[([a-z]\.y)\]/g,`[roundClamp($1, a.${boardDimensions}.height)]`);
 
   eval(funcWithChecks);
+  */
 
   let funcWithBodyLines = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c\)$/,
     /quadraticCurveTo/,
@@ -231,11 +253,9 @@ function processCode(code) {
 
   eval(funcWithBodyLines);
 
-  //Function for body parts - lifted from delete stuff mod
-  let rightEyeRegex = /(\([$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}:[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)\.render\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6})(\),)/;
-  
+  //Function for body parts
   let funcWithBodyParts = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e\)$/,
-    rightEyeRegex,
+    /case "NONE":case "RIGHT":[a-z]=\n?0}Math\.abs\([a-z]-[a-z]\)/,
     false);
 
   //Find m,k
@@ -256,7 +276,7 @@ function processCode(code) {
 
   funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,6}\([a-z],13\)&&[$a-zA-Z0-9_]{0,6}\([a-z]\);/,
   `$&if(${modeCheck}(this.settings, 10)){
-    let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode can break snake. Infinity and sokoban are buggy.');
+    let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode can break snake. Wall+yin+key also crash, but I hope to fix. Infinity and sokoban are buggy.');
     if(!proceed){
       /*Also set mode back to classic to be safe*/
       this.${chosenMode} = 0;
