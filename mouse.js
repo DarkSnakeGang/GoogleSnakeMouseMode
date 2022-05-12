@@ -163,7 +163,7 @@ function processCode(code) {
   );
   
   //Check for apple collisions the same way that winged mode does.
-  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,6}\(this\.settings,6\)\){if\([$a-zA-Z0-9_]{0,6}=1>/,
+  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,6}\(this\.settings,6\)\){var [$a-zA-Z0-9_]{0,6}=1>/,
   'true || $&');
 
   //Disable the code that affctes the head position based on whether left/right etc is pressed
@@ -177,11 +177,14 @@ function processCode(code) {
   /*funcWithEat = assertReplace(funcWithEat, /if\((this\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)\|\|([$a-zA-Z0-9_]{0,6}\(this.settings,7\))&&([$a-zA-Z0-9_]{0,6}\(this,0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,6}\)\)/,
   `if(1 > ${wingedCheck}(this,$1,$2) || $3 && 1 > ${wingedCheck}(this,$4,$2))`);*/
   
+  /*
+  //UNNEEDED NOW? Check relies on map instead of array indexing
   //Stop yin-yang etc crashing, by rounding invalid coords
   let headCandidate = funcWithEat.match(/case "DOWN":([$a-zA-Z0-9_]{0,6})\.y\+=1,/)[1];
   let yangHeadCandidate = funcWithEat.match(/var ([$a-zA-Z0-9_]{0,6})=new [$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6}\.width-1/)[1];
   funcWithEat = assertReplaceAll(funcWithEat, new RegExp(`\\[((?:${yangHeadCandidate}|${headCandidate})\\.x)\\]`,'g'),`[roundClamp($1, this.${boardDimensions}.width)]`);
   funcWithEat = assertReplaceAll(funcWithEat, new RegExp(`\\[((?:${yangHeadCandidate}|${headCandidate})\\.y)\\]`,'g'),`[roundClamp($1, this.${boardDimensions}.height)]`);
+  */
 
   eval(funcWithEat);
 
@@ -191,9 +194,20 @@ function processCode(code) {
 
   //Apply wingedCheck $1 is headCoord, $2 is keyCoord, $3 check mode for yin yang, $4 is mirrored snake head coord.
   funcWithKeyCheck = assertReplace(funcWithKeyCheck,/\(([a-z]\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)\|\|([$a-zA-Z0-9_]{0,6}\([a-z]\.settings,7\))&&([$a-zA-Z0-9_]{0,6}\([a-z],0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,6}\)\)/,
-  `(1 > ${wingedCheck}(this,$1,$2) || $3 && 1 > ${wingedCheck}(this,$4,$2))`);
+  `(1 > ${wingedCheck}(a,$1,$2) || $3 && 1 > ${wingedCheck}(a,$4,$2))`);
 
   eval(funcWithKeyCheck);
+  
+  //Make the swallowed key go to correct place
+  let funcWithSwallowKey = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c\)$/,
+  /a\.keys\.splice\([a-z],1\)/,
+  false);
+
+  funcWithSwallowKey = assertReplace(funcWithSwallowKey,
+    /!([a-z]\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
+    `!(1 > ${wingedCheck}(a,$1,$2))`);
+
+  eval(funcWithSwallowKey);
   
   //Make the swallowed apple go on the correct snake
   //UNNEEDED?
