@@ -122,20 +122,21 @@ function processCode(code) {
   setupMenuCheckbox();
 
   //lifted tileWidth from apple-snake
-  //let tileWidth = code.match(/[$a-zA-Z0-9_]{0,6}\.x=[$a-zA-Z0-9_]{0,6}\.x\*a\.([$a-zA-Z0-9_]{0,6})\+a\.[$a-zA-Z0-9_]{0,6}\/2;[$a-zA-Z0-9_]{0,6}\.y=[$a-zA-Z0-9_]{0,6}\.y\*a\.[$a-zA-Z0-9_]{0,6}\+a\.[$a-zA-Z0-9_]{0,6}\/2;/)[1];//wa
-  let tileWidth = code.match(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];//wa
+  //let tileWidth = code.match(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];//wa
+  let tileWidth = code.match(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];//wa
   
   //Head pos, but not properly lerped. k9. Lifted from apple-snake. SnakeDetails contains lots of different properties of the snake.
-  let [,snakeDetails,blockyHeadCoord] = code.match(/[a-z]\.([$a-zA-Z0-9_]{0,6})\.([$a-zA-Z0-9_]{0,6})=[a-z]\.clone\(\),/);
+  let [,snakeDetails,blockyHeadCoord] = code.match(/this\.([$a-zA-Z0-9_]{0,6})\.([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6})=[a-z]\.clone\(\),/);
   //let blockyHeadCoord = code.match(/this\.[$a-zA-Z0-9_]{0,6}=this\.[$a-zA-Z0-9_]{0,6}\[2\];this\.[$a-zA-Z0-9_]{0,6}=this\.[$a-zA-Z0-9_]{0,6}\[2\];this\.([$a-zA-Z0-9_]{0,6})=this\.[$a-zA-Z0-9_]{0,6}\[0\];/)[1];
 
   let coordConstructor = code.match(/new ([$a-zA-Z0-9_]{0,6})\(1,1\)/)[1];
 
-  let bodyArray = code.match(/var [a-z]=[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6})\[0\]\.clone\(\);/)[1];
-  //let bodyArray = code.match(/this\.([$a-zA-Z0-9_]{0,6})\.unshift\(a\);/)[1];
+  //let bodyArray = code.match(/var [a-z]=[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6})\[0\]\.clone\(\);/)[1];
+  let bodyArray = code.match(/var [a-z]=this\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6})\[0\]\.clone\(\);/)[1];
 
   //Lifted from apple-snake
-  let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[xy]\)\);a\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
+  //let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[xy]\)\);a\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
+  let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[a-z]\)\);this\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
 
   //Twiddle the out of bounds hitreg to be slightly friendlier. Note the change to strict inequality to disallow -1. Perhaps it would've been better to make a new bounds checking function instead.
   let funcWithBoundsHitReg = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
@@ -154,7 +155,7 @@ function processCode(code) {
   false);
 
   //Set the candidate coord for the next head here so that it gets used in the collision checks and then added to the head of the snake
-  funcWithEat = assertReplace(funcWithEat,/case "DOWN":([$a-zA-Z0-9_]{0,6})\.y\+=1,[$a-zA-Z0-9_]{0,6}&&[$a-zA-Z0-9_]{0,6}\.y>=this\.[$a-zA-Z0-9_]{0,6}\.height&&\([$a-zA-Z0-9_]{0,6}\.y=0\)}/,
+  funcWithEat = assertReplace(funcWithEat,/case "DOWN":([$a-zA-Z0-9_]{0,6})\.y\+=1,[$a-zA-Z0-9_]{0,6}&&[$a-zA-Z0-9_]{0,6}\.y>=[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.height&&\([$a-zA-Z0-9_]{0,6}\.y=0\)}/,
   `$&
   updateFaceCoordsAndRotation(this.${blockyHeadCoord}, this.${tileWidth}, this.${bodyArray});
   let nextHead = new ${coordConstructor}(nextHeadX, nextHeadY);
@@ -167,11 +168,11 @@ function processCode(code) {
   'true || $&');
 
   //Disable the code that affctes the head position based on whether left/right etc is pressed
-  funcWithEat = assertReplace(funcWithEat,'switch\(this\.direction\){',
+  funcWithEat = assertReplace(funcWithEat,/switch\([$a-zA-Z0-9_]{0,6}\.direction\){/,
   `switch(false){`);
   
   //check for key collisions the same way winged does. WingedCheck has a signature like wingedCheck(this, headCoord, targetCoord)
-  wingedCheck = funcWithEat.match(/[$a-zA-Z0-9_]{0,6}=1>([$a-zA-Z0-9_]{0,6})\(this,this\.[$a-zA-Z0-9_]{0,6}\[0\],[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];
+  wingedCheck = funcWithEat.match(/[$a-zA-Z0-9_]{0,6}=1>([$a-zA-Z0-9_]{0,6})\(this\.[$a-zA-Z0-9_]{0,6},this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\],[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];
   
   //Apply wingedCheck $1 is headCoord, $2 is keyCoord, $3 check mode for yin yang, $4 is mirrored snake head coord.
   /*funcWithEat = assertReplace(funcWithEat, /if\((this\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)\|\|([$a-zA-Z0-9_]{0,6}\(this.settings,7\))&&([$a-zA-Z0-9_]{0,6}\(this,0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,6}\)\)/,
@@ -193,7 +194,7 @@ function processCode(code) {
   false);
 
   //Apply wingedCheck $1 is headCoord, $2 is keyCoord, $3 check mode for yin yang, $4 is mirrored snake head coord.
-  funcWithKeyCheck = assertReplace(funcWithKeyCheck,/\(([a-z]\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)\|\|([$a-zA-Z0-9_]{0,6}\([a-z]\.settings,7\))&&([$a-zA-Z0-9_]{0,6}\([a-z],0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,6}\)\)/,
+  funcWithKeyCheck = assertReplace(funcWithKeyCheck,/\(([a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)\|\|([$a-zA-Z0-9_]{0,6}\([a-z]\.settings,7\))&&([$a-zA-Z0-9_]{0,6}\([a-z]\.[$a-zA-Z0-9_]{0,6},0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,6}\)\)/,
   `(1 > ${wingedCheck}(a,$1,$2) || $3 && 1 > ${wingedCheck}(a,$4,$2))`);
 
   eval(funcWithKeyCheck);
@@ -204,7 +205,7 @@ function processCode(code) {
   false);
 
   funcWithSwallowKey = assertReplace(funcWithSwallowKey,
-    /!([a-z]\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
+    /!([a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
     `!(1 > ${wingedCheck}(a,$1,$2))`);
 
   eval(funcWithSwallowKey);
@@ -227,19 +228,19 @@ function processCode(code) {
   eval(funcWithChecks);
   */
 
-  let funcWithBodyLines = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c\)$/,
+  let funcWithBodyLines = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.render=function\(a,b,c,d\)$/,
     /quadraticCurveTo/,
     false);
 
-  let [,segmentCloserToHead,segmentFurtherFromHead] = funcWithBodyLines.match(/([a-z])=[a-z]\.clone\(\):([a-z])=[a-z]\.clone\(\)/);
+  let [,segmentCloserToHead,segmentFurtherFromHead] = funcWithBodyLines.match(/([a-z])=[a-z]\.clone\(\):\n?([a-z])=[a-z]\.clone\(\)/);
 
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/(\*=a\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};)-1===[a-z]\.x-[a-z]\.x\|\|[^]*[a-z]\.y\+=a\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\/2\);(if\(0===[a-z]\){)/,
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/(\*=this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};)-1===[a-z]\.x-[a-z]\.x\|\|[^]*[a-z]\.y\+=this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\/2\);(if\(0===[a-z]\){)/,
     `$1
     //First bit is ok, but needs a.wa/2's added
-    ${startPoint}.x += a.${snakeDetails}.${tileWidth}/2;${startPoint}.y += a.${snakeDetails}.${tileWidth}/2;${endPoint}.x +=a.${snakeDetails}.${tileWidth}/2;${endPoint}.y += a.${snakeDetails}.${tileWidth}/2; //added by me
+    ${startPoint}.x += this.${snakeDetails}.${tileWidth}/2;${startPoint}.y += this.${snakeDetails}.${tileWidth}/2;${endPoint}.x +=this.${snakeDetails}.${tileWidth}/2;${endPoint}.y += this.${snakeDetails}.${tileWidth}/2; //added by me
     //Turn n and l into coords space
-    let segmentCloserToHead = ${segmentCloserToHead}.clone(); segmentCloserToHead.x = segmentCloserToHead.x * a.${snakeDetails}.${tileWidth} + a.${snakeDetails}.${tileWidth}/2;segmentCloserToHead.y = segmentCloserToHead.y * a.${snakeDetails}.${tileWidth} + a.${snakeDetails}.${tileWidth}/2;
-    let segmentFurtherFromHead = ${segmentFurtherFromHead}.clone();segmentFurtherFromHead.x = segmentFurtherFromHead.x * a.${snakeDetails}.${tileWidth} + a.${snakeDetails}.${tileWidth}/2;segmentFurtherFromHead.y = segmentFurtherFromHead.y * a.${snakeDetails}.${tileWidth} + a.${snakeDetails}.${tileWidth}/2;
+    let segmentCloserToHead = ${segmentCloserToHead}.clone(); segmentCloserToHead.x = segmentCloserToHead.x * this.${snakeDetails}.${tileWidth} + this.${snakeDetails}.${tileWidth}/2;segmentCloserToHead.y = segmentCloserToHead.y * this.${snakeDetails}.${tileWidth} + this.${snakeDetails}.${tileWidth}/2;
+    let segmentFurtherFromHead = ${segmentFurtherFromHead}.clone();segmentFurtherFromHead.x = segmentFurtherFromHead.x * this.${snakeDetails}.${tileWidth} + this.${snakeDetails}.${tileWidth}/2;segmentFurtherFromHead.y = segmentFurtherFromHead.y * this.${snakeDetails}.${tileWidth} + this.${snakeDetails}.${tileWidth}/2;
     //t should be halfway between the control point and the point closer to the head
     ${endPoint}.x = ${endPoint}.x*0.49 + segmentCloserToHead.x*0.51;
     ${endPoint}.y = ${endPoint}.y*0.49 + segmentCloserToHead.y*0.51;
@@ -249,26 +250,26 @@ function processCode(code) {
   $2`);
 
   //Make it so that the head gets lerped in the direction that the snake is travelling in
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/(var [a-z]=a\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\]\.clone\(\);)[^]*&&\([a-z]\.y=0\)\)/,
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/(var [a-z]=this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\]\.clone\(\);)[^]*&&\([a-z]\.y=0\)\)/,
     `
     $1
     if(aimTrainer) {
       ${segmentCloserToHead}.x += Math.cos(faceAngle);
       ${segmentCloserToHead}.y += Math.sin(faceAngle);
     } else{
-      updateFaceCoordsAndRotation(a.${snakeDetails}.${blockyHeadCoord}, a.${snakeDetails}.${tileWidth}, a.${snakeDetails}.${bodyArray});
+      updateFaceCoordsAndRotation(this.${snakeDetails}.${blockyHeadCoord}, this.${snakeDetails}.${tileWidth}, this.${snakeDetails}.${bodyArray});
       ${segmentCloserToHead}.x = nextHeadX;
       ${segmentCloserToHead}.y = nextHeadY;
     }
   `);
 
   //Prevent wall mode crashing - disable check where animation pauses before bumping a wall.
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,6}\(a.settings,12\)\)/,'if(false)');
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,6}\(this.settings,13\)\)/,'if(false)');
 
   eval(funcWithBodyLines);
 
   //Function for body parts
-  let funcWithBodyParts = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e\)$/,
+  let funcWithBodyParts = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e,f\)$/,
     /case "NONE":case "RIGHT":[a-z]=\n?0}Math\.abs\([a-z]-[a-z]\)/,
     false);
 
@@ -284,11 +285,11 @@ function processCode(code) {
   /this\.reset\(\)/,
   false);
 
-  let modeCheck = funcWithNewGame.match(/([$a-zA-Z0-9_]{0,6})\(a,13\)/)[1];
+  let modeCheck = funcWithNewGame.match(/([$a-zA-Z0-9_]{0,6})\(a,14\)/)[1];
 
-  let chosenMode = code.match(/return 13===[a-z]\.([$a-zA-Z0-9_]{0,6})&&[a-z]\.[$a-zA-Z0-9_]{0,6}\.has\([a-z]\)\?!0/)[1];
+  let chosenMode = code.match(/return 14===[a-z]\.([$a-zA-Z0-9_]{0,6})&&[a-z]\.[$a-zA-Z0-9_]{0,6}\.has\([a-z]\)\?!0/)[1];
 
-  funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,6}\([a-z],13\)&&[$a-zA-Z0-9_]{0,6}\([a-z]\);/,
+  funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,6}\([a-z],14\)&&[$a-zA-Z0-9_]{0,6}\([a-z]\);/,
   `$&if(${modeCheck}(this.settings, 10)){
     let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode can break snake. Wall+yin+key also crash, but I hope to fix. Infinity and sokoban are buggy.');
     if(!proceed){
@@ -313,20 +314,25 @@ then put functionSignature = /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e\)$/
 somethingInsideFunction will be regex matching something in the function
 for example if we are trying to find a function like s_xD = function(a, b, c, d, e) {...a.Xa&&10!==a.Qb...}
 then put somethingInsideFunction = /a\.[$a-zA-Z0-9_]{0,6}&&10!==a\.[$a-zA-Z0-9_]{0,6}/
-
-levelsToGoUp tells us how many "layers" of curly brackets we need to go up before we get to our function
-
 */
 function findFunctionInCode(code, functionSignature, somethingInsideFunction, logging = false) {
+  let functionSignatureSource = functionSignature.source;
+  let functionSignatureFlags = functionSignature.flags;//Probably empty string
+
   /*Check functionSignature ends in $*/
-  if (functionSignature.toString()[functionSignature.toString().length - 2] !== "$") {
+  if (functionSignatureSource[functionSignatureSource.length - 1] !== "$") {
     throw new Error("functionSignature regex should end in $");
   }
+
+  /*Allow line breaks after commas or =. This is bit sketchy, but should be ok as findFunctionInCode is used in a quite limited way*/
+  functionSignatureSource.replaceAll(/,|=/g,'$&\\n?');
+  functionSignature = new RegExp(functionSignatureSource, functionSignatureFlags);
 
   /*get the position of somethingInsideFunction*/
   let indexWithinFunction = code.search(somethingInsideFunction);
   if (indexWithinFunction == -1) {
-    throw new Error("couldn't find a match for somethingInsideFunction");
+    console.log("%cCouldn't find a match for somethingInsideFunction", "color:red;");
+    diagnoseRegexError(code, somethingInsideFunction);
   }
 
   /*expand outwards from somethingInsideFunction until we get to the function signature, then count brackets
@@ -392,8 +398,9 @@ function assertReplace(baseText, regex, replacement) {
   }
   let outputText = baseText.replace(regex, replacement);
 
+  //Throw warning if nothing is replaced
   if (baseText === outputText) {
-    throw new Error('Failed to make any changes with replace');
+    diagnoseRegexError(baseText, regex);
   }
 
   return outputText;
@@ -408,11 +415,58 @@ function assertReplaceAll(baseText, regex, replacement) {
   }
   let outputText = baseText.replaceAll(regex, replacement);
 
+  //Throw warning if nothing is replaced
   if (baseText === outputText) {
-    throw new Error('Failed to make any changes with replace');
+    diagnoseRegexError(baseText, regex);
   }
 
   return outputText;
+}
+
+function diagnoseRegexError(baseText, regex) {  
+  if(!(regex instanceof RegExp)) {
+    throw new Error('Failed to find match using string argument. No more details available');
+  }
+
+  //see if removing line breaks works - in that case we can give a more useful error message
+  let oneLineText = baseText.replaceAll(/\n/g,'');
+  let res = regex.test(oneLineText);
+
+  //If line breaks don't solve the issue then throw a general error
+  if (!res) {
+    throw new Error('Failed to find match for regex.');
+  }
+
+  //Try to suggest correct regex to use for searching
+  let regexSource = regex.source;
+  let regexFlags = regex.flags;
+
+  //Look at all the spots where line breaks might occur and try adding \n? there to see if it makes a difference
+  //It might be easier to just crudely brute force putting \n? at each possible index?
+  for(let breakableChar of ["%","&","\\*","\\+",",","-","\\/",":",";","<","=",">","\\?","{","\\|","}"]) {
+    for(let pos = regexSource.indexOf(breakableChar); pos !== -1; pos = regexSource.indexOf(breakableChar, pos + 1)) {
+      //Remake the regex with a new line at the candidate position
+      let candidateRegexSource = `${regexSource.slice(0,pos + breakableChar.length)}\\n?${regexSource.slice(pos + breakableChar.length)}`;
+      let candidateRegex;
+      
+      try{
+        candidateRegex = new RegExp(candidateRegexSource, regexFlags);
+      } catch(err) {
+        continue;
+      }
+
+      //See if the new regex works
+      let testReplaceResult = candidateRegex.test(baseText);
+      if(testReplaceResult) {
+        //Success we found the working regex! Give descriptive error message to user and log suggested regex with new line in correct place
+        console.log(`Suggested regex improvement:
+${candidateRegex}`);
+        throw new Error('Suggested improvement found! Error with line break, failed to find match for regex. See logged output for regex to use instead that should hopefully fix this.');
+      }
+    }
+  }
+
+  throw new Error('Line break error! Failed to failed to find match for regex - most likely caused by a new line break. No suggestions provided');
 }
 
 snake.pythagoras();
