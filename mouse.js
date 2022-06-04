@@ -122,7 +122,6 @@ function processCode(code) {
   setupMenuCheckbox();
 
   //lifted tileWidth from apple-snake
-  //let tileWidth = code.match(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];//wa
   let tileWidth = code.match(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/)[1];//wa
   
   //Head pos, but not properly lerped. k9. Lifted from apple-snake. SnakeDetails contains lots of different properties of the snake.
@@ -189,7 +188,7 @@ function processCode(code) {
 
   eval(funcWithEat);
 
-  funcWithKeyCheck = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a\)$/,
+  funcWithKeyCheck = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
   /a\.keys\.sort\(function/,
   false);
 
@@ -200,13 +199,13 @@ function processCode(code) {
   eval(funcWithKeyCheck);
   
   //Make the swallowed key go to correct place
-  let funcWithSwallowKey = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c\)$/,
-  /a\.keys\.splice\([a-z],1\)/,
+  let funcWithSwallowKey = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
+  /this\.[$a-zA-Z0-9_]{0,6}\.keys\.splice\([a-z],1\)/,
   false);
 
   funcWithSwallowKey = assertReplace(funcWithSwallowKey,
-    /!([a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
-    `!(1 > ${wingedCheck}(a,$1,$2))`);
+    /!(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
+    `!(1 > ${wingedCheck}(this,$1,$2))`);
 
   eval(funcWithSwallowKey);
   
