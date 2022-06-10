@@ -144,13 +144,15 @@ function processCode(code) {
 
   let boardDimensions = funcWithBoundsHitReg.match(/[a-z]\.x<[a-z]\.([$a-zA-Z0-9_]{0,6})\.width/)[1];
 
+  let mainClass = code.match(/([$a-zA-Z0-9_]{0,6})=function\(a,b,c\){this\.settings=[a-z];this\.menu=[a-z];this\.header=[a-z];/)[1];
+
   funcWithBoundsHitReg = assertReplaceAll(funcWithBoundsHitReg, '0<=', '-1<');
 
   eval(funcWithBoundsHitReg);
 
   //Lifted update function from delete stuff mod
-  let funcWithEat = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.tick=function\(\)$/,
-  /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){var [$a-zA-Z0-9_]{0,6}=[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=!0,[$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.play\(\)/,
+  let funcWithEat = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.tick=function\(\)$/,
+  /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){var [$a-zA-Z0-9_]{0,6}=\n?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=!0,[$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.play\(\)/,
   false);
 
   //Set the candidate coord for the next head here so that it gets used in the collision checks and then added to the head of the snake
@@ -185,7 +187,7 @@ function processCode(code) {
   funcWithEat = assertReplaceAll(funcWithEat, new RegExp(`\\[((?:${yangHeadCandidate}|${headCandidate})\\.x)\\]`,'g'),`[roundClamp($1, this.${boardDimensions}.width)]`);
   funcWithEat = assertReplaceAll(funcWithEat, new RegExp(`\\[((?:${yangHeadCandidate}|${headCandidate})\\.y)\\]`,'g'),`[roundClamp($1, this.${boardDimensions}.height)]`);
   */
-
+  funcWithEat = swapInMainClassPrototype(mainClass, funcWithEat);debugger;
   eval(funcWithEat);
 
   funcWithKeyCheck = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
@@ -299,6 +301,11 @@ function processCode(code) {
   }`);
 
   eval(funcWithNewGame);
+}
+
+function swapInMainClassPrototype(mainClass, functionText) {
+  functionText = assertReplace(functionText, /^[$a-zA-Z0-9_]{0,6}/,`${mainClass}.prototype`);
+  return functionText;
 }
 
 /*
