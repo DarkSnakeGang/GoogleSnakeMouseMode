@@ -187,10 +187,10 @@ function processCode(code) {
   funcWithEat = assertReplaceAll(funcWithEat, new RegExp(`\\[((?:${yangHeadCandidate}|${headCandidate})\\.x)\\]`,'g'),`[roundClamp($1, this.${boardDimensions}.width)]`);
   funcWithEat = assertReplaceAll(funcWithEat, new RegExp(`\\[((?:${yangHeadCandidate}|${headCandidate})\\.y)\\]`,'g'),`[roundClamp($1, this.${boardDimensions}.height)]`);
   */
-  funcWithEat = swapInMainClassPrototype(mainClass, funcWithEat);debugger;
+  funcWithEat = swapInMainClassPrototype(mainClass, funcWithEat);
   eval(funcWithEat);
 
-  funcWithKeyCheck = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
+  funcWithKeyCheck = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a\)$/,
   /a\.keys\.sort\(function/,
   false);
 
@@ -201,13 +201,13 @@ function processCode(code) {
   eval(funcWithKeyCheck);
   
   //Make the swallowed key go to correct place
-  let funcWithSwallowKey = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
-  /this\.[$a-zA-Z0-9_]{0,6}\.keys\.splice\([a-z],1\)/,
+  let funcWithSwallowKey = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c\)$/,
+  /[a-z]\.keys\.splice\([a-z],1\)/,
   false);
 
   funcWithSwallowKey = assertReplace(funcWithSwallowKey,
-    /!(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
-    `!(1 > ${wingedCheck}(this,$1,$2))`);
+    /!([a-z])\.([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
+    `!(1 > ${wingedCheck}($1,$1.$2,$3))`);
 
   eval(funcWithSwallowKey);
   
@@ -229,7 +229,7 @@ function processCode(code) {
   eval(funcWithChecks);
   */
 
-  let funcWithBodyLines = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.render=function\(a,b,c,d\)$/,
+  let funcWithBodyLines = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.render=function\(a,b,c\)$/,
     /quadraticCurveTo/,
     false);
 
@@ -270,7 +270,7 @@ function processCode(code) {
   eval(funcWithBodyLines);
 
   //Function for body parts
-  let funcWithBodyParts = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e,f\)$/,
+  let funcWithBodyParts = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e\)$/,
     /case "NONE":case "RIGHT":[a-z]=\n?0}Math\.abs\([a-z]-[a-z]\)/,
     false);
 
