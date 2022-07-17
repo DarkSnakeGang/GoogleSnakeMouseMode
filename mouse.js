@@ -138,11 +138,11 @@ function processCode(code) {
   let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[a-z]\)\);this\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
 
   //Twiddle the out of bounds hitreg to be slightly friendlier. Note the change to strict inequality to disallow -1. Perhaps it would've been better to make a new bounds checking function instead.
-  let funcWithBoundsHitReg = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b\)$/,
-  /return 0<=[a-z]\.x&&[a-z]\.x<[a-z]\.[$a-zA-Z0-9_]{0,6}\.width&&0<=[a-z]\.y&&[a-z]\.y<[a-z]\.[$a-zA-Z0-9_]{0,6}\.height/,
+  let funcWithBoundsHitReg = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.[$a-zA-Z0-9_]{0,6}=function\(a\)$/,
+  /return 0<=[a-z]\.x&&[a-z]\.x<this\.[$a-zA-Z0-9_]{0,6}\.width&&0<=[a-z]\.y&&[a-z]\.y<this\.[$a-zA-Z0-9_]{0,6}\.height/,
   false);
 
-  let boardDimensions = funcWithBoundsHitReg.match(/[a-z]\.x<[a-z]\.([$a-zA-Z0-9_]{0,6})\.width/)[1];
+  let boardDimensions = funcWithBoundsHitReg.match(/[a-z]\.x<this\.([$a-zA-Z0-9_]{0,6})\.width/)[1];
 
   let mainClass = code.match(/([$a-zA-Z0-9_]{0,6})=function\(a,b,c\){this\.settings=[a-z];this\.menu=[a-z];this\.header=[a-z];/)[1];
 
