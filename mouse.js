@@ -134,8 +134,8 @@ function processCode(code) {
   let bodyArray = code.match(/var [a-z]=this\.[$a-zA-Z0-9_]{0,6}\.([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6})\[0\]\.clone\(\);/)[1];
 
   //Lifted from apple-snake
-  //let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[xy]\)\);a\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
-  let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[a-z]\)\);this\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
+  //let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.y\+\n?[a-z]\.y\)\/2\*\(1-[a-z]\)\);this\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)}/);//q,m,t 
+  let [, endPoint, controlPoint, startPoint] = code.match(/\(([a-z])\.x,[a-z]\.y\);[a-z]\?this\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([a-z])\.x,[a-z]\.y\)/);//q,m,t 
 
   //Twiddle the out of bounds hitreg to be slightly friendlier. Note the change to strict inequality to disallow -1. Perhaps it would've been better to make a new bounds checking function instead.
   let funcWithBoundsHitReg = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.[$a-zA-Z0-9_]{0,6}=function\(a\)$/,
@@ -152,7 +152,7 @@ function processCode(code) {
 
   //Lifted update function from delete stuff mod
   let funcWithEat = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.tick=function\(\)$/,
-  /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){var [$a-zA-Z0-9_]{0,6}=\n?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=!0,[$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.play\(\)/,
+  /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){var [$a-zA-Z0-9_]{0,6}=\n?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};\n?[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=\n?!0,[$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.play\(\)/,
   false);
 
   //Set the candidate coord for the next head here so that it gets used in the collision checks and then added to the head of the snake
@@ -200,9 +200,11 @@ function processCode(code) {
 
   eval(funcWithKeyCheck);
   
+  //Code disabled after lightmode update
+  /*
   //Make the swallowed key go to correct place
   let funcWithSwallowKey = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c\)$/,
-  /[a-z]\.keys\.splice\([a-z],1\)/,
+  /[a-z]\.keys\.splice\([a-z],\n?1\)/,
   false);
 
   funcWithSwallowKey = assertReplace(funcWithSwallowKey,
@@ -210,7 +212,8 @@ function processCode(code) {
     `!(1 > ${wingedCheck}($1,$1.$2,$3))`);
 
   eval(funcWithSwallowKey);
-  
+  */
+
   //Make the swallowed apple go on the correct snake
   //UNNEEDED?
   /*funcWithEat = assertReplace(funcWithEat, /([$a-zA-Z0-9_]{0,6}):!(this\.[$a-zA-Z0-9_]{0,6}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,6})\)/,
@@ -265,7 +268,7 @@ function processCode(code) {
   `);
 
   //Prevent wall mode crashing - disable check where animation pauses before bumping a wall.
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,6}\(this.settings,14\)\)/,'if(false)');
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,6}\(this.settings,15\)\)/,'if(false)');
 
   eval(funcWithBodyLines);
 
@@ -286,11 +289,11 @@ function processCode(code) {
   /this\.reset\(\)/,
   false);
 
-  let modeCheck = funcWithNewGame.match(/([$a-zA-Z0-9_]{0,6})\(a,15\)/)[1];
+  let modeCheck = funcWithNewGame.match(/([$a-zA-Z0-9_]{0,6})\(a,16\)/)[1];
 
-  let chosenMode = code.match(/return 15===[a-z]\.([$a-zA-Z0-9_]{0,6})&&[a-z]\.[$a-zA-Z0-9_]{0,6}\.has\([a-z]\)\?!0/)[1];
+  let chosenMode = code.match(/return 16===[a-z]\.([$a-zA-Z0-9_]{0,6})&&[a-z]\.[$a-zA-Z0-9_]{0,6}\.has\([a-z]\)\?!0/)[1];
 
-  funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,6}\([a-z],15\)&&[$a-zA-Z0-9_]{0,6}\([a-z]\);/,
+  funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,6}\([a-z],16\)&&[$a-zA-Z0-9_]{0,6}\([a-z]\);/,
   `$&if(${modeCheck}(this.settings, 10)){
     let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode can break snake. Wall+yin+key also crash, but I hope to fix. Infinity and sokoban are buggy.');
     if(!proceed){
