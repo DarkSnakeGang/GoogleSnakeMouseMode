@@ -214,7 +214,7 @@ window.mouseMode.alterSnakeCode = function(code) {
     let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode and statue mode can break snake. Infinity and sokoban are buggy.');
     if(!proceed){
       /*Also set mode back to classic to be safe*/
-      this.${chosenMode} = 0;
+      this.settings.${chosenMode} = 0;
       return;
     }
   }`);
