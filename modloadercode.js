@@ -210,8 +210,8 @@ window.mouseMode.alterSnakeCode = function(code) {
   let chosenMode = code.match(/return 16===[a-z]\.([$a-zA-Z0-9_]{0,6})&&[a-z]\.[$a-zA-Z0-9_]{0,6}\.has\([a-z]\)\?!0/)[1];
 
   funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,6}\([a-z],16\)&&[$a-zA-Z0-9_]{0,6}\([a-z]\);/,
-  `$&if(${modeCheck}(this.settings, 10)){
-    let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode can break snake. Wall+yin+key also crash, but I hope to fix. Infinity and sokoban are buggy.');
+  `$&if(${modeCheck}(this.settings, 10) || ${modeCheck}(this.settings, 13)){
+    let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode and statue mode can break snake. Infinity and sokoban are buggy.');
     if(!proceed){
       /*Also set mode back to classic to be safe*/
       this.${chosenMode} = 0;
