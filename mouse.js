@@ -3,8 +3,8 @@
 let messageBoxEl = document.createElement('div');
 let messageStyle = `
 background-color: #ebebebd9;
-    border-radius: 10px;
-    position: fixed;
+    border-radius: 1.5vh;
+    position: absolute;
     height: unset;
     z-index: 1000000;
     top: 30px;
@@ -41,6 +41,7 @@ let messageHtml = `
 <img src="https://github.com/DarkSnakeGang/GoogleSnakeModLoader/blob/main/docs/mod-loader-transparent-bg.png?raw=true" style="
     width: 345px;
     height: auto;
+    min-width: 65%;
     filter: drop-shadow(0px 0px 4px rgba(0,0,0,0.2));
 ">
 <br>
