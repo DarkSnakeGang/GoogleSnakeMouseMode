@@ -86,19 +86,22 @@ window.mouseMode.alterSnakeCode = function(code) {
   window.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];//wa
   
   //Head pos, but not properly lerped. k9. Lifted from apple-snake. SnakeDetails contains lots of different properties of the snake.
-  [,window.snakeDetails,window.blockyHeadCoord] = code.assertMatch(/this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})=[a-z]\.clone\(\),/);
+  [,window.snakeDetails,window.blockyHeadCoord] = code.assertMatch(/this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})=\n?[a-z]\.clone\(\),/);
 
-  window.coordConstructor = swapInSnakeGlobal(code.assertMatch(/new (_\.[$a-zA-Z0-9_]{0,8})\(1,1\)/)[1]);
+  window.coordConstructor = code.assertMatch(/new (_\.[$a-zA-Z0-9_]{0,8})\(1,1\)/)[1];
 
   window.bodyArray = code.assertMatch(/var [a-z]=this\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\);/)[1];
 
   //Lifted from apple-snake
-  [, window.endPoint, window.controlPoint, window.startPoint] = code.assertMatch(/\(([a-z])\.x,[a-z]\.y\);[a-z]\?this\.[$a-zA-Z0-9_]{0,8}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([$a-zA-Z0-9_]{0,8})\.x,[$a-zA-Z0-9_]{0,8}\.y\)/);//q,m,t 
+  [, window.endPoint, window.controlPoint, window.startPoint] = code.assertMatch(/\(([a-z])\.x,\n?[a-z]\.y\);[a-z]\?this\.[$a-zA-Z0-9_]{0,8}\.quadraticCurveTo\(([a-z])\.x,[a-z]\.y,([$a-zA-Z0-9_]{0,8})\.x,[$a-zA-Z0-9_]{0,8}\.y\)/);//q,m,t 
 
   //Twiddle the out of bounds hitreg to be slightly friendlier. Note the change to strict inequality to disallow -1. Perhaps it would've been better to make a new bounds checking function instead.
   let funcWithBoundsHitReg, funcWithBoundsHitRegOrig;
-  funcWithBoundsHitReg = funcWithBoundsHitRegOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.[$a-zA-Z0-9_]{0,8}=function\(a\)$/,
-  /return 0<=[a-z]\.x&&[a-z]\.x<this\.[$a-zA-Z0-9_]{0,8}\.width&&0<=[a-z]\.y&&[a-z]\.y<this\.[$a-zA-Z0-9_]{0,8}\.height/,
+  //IMPORTANT
+  funcWithBoundsHitReg = funcWithBoundsHitRegOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.[$a-zA-Z0-9_]{0,6}=function\(a\)$|[$a-zA-Z0-9_]{0,8}=function\(a,b\)$/,
+  //IMPORTANT - this regex has two different patterns separated by "|", this depends on whether they have the mute update. Same for the bit above
+  /return 0<=[a-z]\.x&&[a-z]\.x<this\.[$a-zA-Z0-9_]{0,6}\.width&&0<=[a-z]\.y&&[a-z]\.y<this\.[$a-zA-Z0-9_]{0,6}\.height|return 0<=[a-z]\.x&&[a-z]\.x<[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.width&&0<=[a-z]\.y&&[a-z]\.y<[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height/,
+  //IMPORTANT
   false);
 
   funcWithBoundsHitReg = assertReplaceAll(funcWithBoundsHitReg, '0<=', '-1<');
@@ -112,7 +115,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   false);
 
   //Set the candidate coord for the next head here so that it gets used in the collision checks and then added to the head of the snake
-  funcWithEat = assertReplace(funcWithEat,/case "DOWN":([$a-zA-Z0-9_]{0,8})\.y\+=1,[$a-zA-Z0-9_]{0,8}&&[$a-zA-Z0-9_]{0,8}\.y>=[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height&&\([$a-zA-Z0-9_]{0,8}\.y=\n?0\)}/,
+  funcWithEat = assertReplace(funcWithEat,/case "DOWN":([$a-zA-Z0-9_]{0,8})\.y\+=1,[$a-zA-Z0-9_]{0,8}&&[$a-zA-Z0-9_]{0,8}\.y>=[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height&&\n?\([$a-zA-Z0-9_]{0,8}\.y=\n?0\)}/,
   `$&
   updateFaceCoordsAndRotation(this.${blockyHeadCoord}, this.${tileWidth}, this.${bodyArray});
   let nextHead = new ${coordConstructor}(nextHeadX, nextHeadY);
@@ -121,7 +124,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   );
   
   //Check for apple collisions the same way that winged mode does.
-  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,8}\(this\.settings,6\)\){var [$a-zA-Z0-9_]{0,8}=1>/,
+  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},6\)\){var [$a-zA-Z0-9_]{0,8}=1>/,
   'true || $&');
 
   //Disable the code that affctes the head position based on whether left/right etc is pressed
@@ -139,7 +142,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   false);
 
   //Apply wingedCheck $1 is headCoord, $2 is keyCoord, $3 check mode for yin yang, $4 is mirrored snake head coord.
-  funcWithKeyCheck = assertReplace(funcWithKeyCheck,/\(([a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,8})\)\|\|([$a-zA-Z0-9_]{0,8}\([a-z]\.settings,7\))&&([$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,8}\)\)/,
+  funcWithKeyCheck = assertReplace(funcWithKeyCheck,/\(([a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,8})\)\|\|([$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},7\))&&([$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,8}\)\)/,
   `(1 > ${wingedCheck}(a,$1,$2) || $3 && 1 > ${wingedCheck}(a,$4,$2))`);
 
   code = code.replace(funcWithKeyCheckOrig, funcWithKeyCheck);
@@ -151,7 +154,7 @@ window.mouseMode.alterSnakeCode = function(code) {
 
   let [,segmentCloserToHead,segmentFurtherFromHead] = funcWithBodyLines.assertMatch(/([a-z])=[a-z]\.clone\(\):\n?([$a-zA-Z0-9_]{0,8})=[a-z]\.clone\(\)/);
 
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/(\*=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8};)-1===[a-z]\.x-[$a-zA-Z0-9_]{0,8}\.x\|\|[^]*[a-z]\.y\+=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\/2\);(if\(0===[a-z]\){)/,
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/(\*=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8};)-1===[a-z]\.x-[$a-zA-Z0-9_]{0,8}\.x\|\|[^]*[a-z]\.y\+=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\/2\);(if\(0===\n?[a-z]\){)/,
     `$1
     //First bit is ok, but needs a.wa/2's added
     ${startPoint}.x += this.${snakeDetails}.${tileWidth}/2;${startPoint}.y += this.${snakeDetails}.${tileWidth}/2;${endPoint}.x +=this.${snakeDetails}.${tileWidth}/2;${endPoint}.y += this.${snakeDetails}.${tileWidth}/2; //added by me
@@ -181,7 +184,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   `);
 
   //Prevent wall mode crashing - disable check where animation pauses before bumping a wall.
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,8}\(this.settings,15\)\)/,'if(false)');
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,8}\(this.[$a-zA-Z0-9_]{0,8},15\)\)/,'if(false)');
 
   code = code.replace(funcWithBodyLinesOrig, funcWithBodyLines);
 
@@ -204,16 +207,16 @@ window.mouseMode.alterSnakeCode = function(code) {
   /}\);this\.reset\(\)/,
   false);
 
-  let modeCheck = funcWithNewGame.assertMatch(/([$a-zA-Z0-9_]{0,8})\(a,16\)/)[1];
+  let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
 
   let chosenMode = code.assertMatch(/return 16===[a-z]\.([$a-zA-Z0-9_]{0,8})&&[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\)\?!0/)[1];
 
   funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,8}\([a-z],16\)&&[$a-zA-Z0-9_]{0,8}\([a-z]\);/,
-  `$&if(${modeCheck}(this.settings, 10) || ${modeCheck}(this.settings, 13)){
+  `$&if(${modeCheck}(a, 10) || ${modeCheck}(a, 13)){
     let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode and statue mode can break snake. Infinity and sokoban are buggy.');
     if(!proceed){
       /*Also set mode back to classic to be safe*/
-      this.settings.${chosenMode} = 0;
+      a.${chosenMode} = 0;
       return;
     }
   }`);
