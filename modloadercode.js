@@ -124,7 +124,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   );
   
   //Check for apple collisions the same way that winged mode does.
-  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},6\)\){var [$a-zA-Z0-9_]{0,8}=1>/,
+  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},6\)\){if\([$a-zA-Z0-9_]{0,8}=1>/,
   'true || $&');
 
   //Disable the code that affctes the head position based on whether left/right etc is pressed
