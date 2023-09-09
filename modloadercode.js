@@ -115,7 +115,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   false);
 
   //Set the candidate coord for the next head here so that it gets used in the collision checks and then added to the head of the snake
-  funcWithEat = assertReplace(funcWithEat,/case "DOWN":([$a-zA-Z0-9_]{0,8})\.y\+=1,[$a-zA-Z0-9_]{0,8}&&[$a-zA-Z0-9_]{0,8}\.y>=\n?[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height&&\n?\([$a-zA-Z0-9_]{0,8}\.y=\n?0\)}/,
+  funcWithEat = assertReplace(funcWithEat,/case "DOWN":([$a-zA-Z0-9_]{0,8})\.y\+=\n?1,[$a-zA-Z0-9_]{0,8}&&[$a-zA-Z0-9_]{0,8}\.y>=\n?[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height&&\n?\([$a-zA-Z0-9_]{0,8}\.y=\n?0\)}/,
   `$&
   updateFaceCoordsAndRotation(this.${blockyHeadCoord}, this.${tileWidth}, this.${bodyArray});
   let nextHead = new ${coordConstructor}(nextHeadX, nextHeadY);
