@@ -14,9 +14,23 @@ window.mouseMode.runCodeBefore = function() {
 
   window.updateMousePos = function(event) {
     let canvasRect = gameCanvasEl.getBoundingClientRect();
-    let offsetFromBorder = {x:26,y:26};
-    mouseX = event.clientX - canvasRect.left - offsetFromBorder.x;
-    mouseY = event.clientY - canvasRect.top - offsetFromBorder.y;
+    if(window.screen.orientation.angle === 0) {
+      const xOffsetFromBorder = globalThis.leftBorderWidth ?? 16;
+      const yOffsetFromBorder = globalThis.topBorderWidth ?? 16;
+  
+      mouseX = event.clientX - canvasRect.left - xOffsetFromBorder;
+      mouseY = event.clientY - canvasRect.top - yOffsetFromBorder;
+    } else {
+      //Assume window.screen.orientation.angle === 90, although it's possible this might not be the case?
+      //Whole screen is rotated 90 deg, so calculations are a bit different
+      const topOfGameOffsetFromBorder = globalThis.leftBorderWidth ?? 16;
+      const sidesOfGameOffsetFromBorder = globalThis.topBorderWidth ?? 16;
+  
+      mouseX = canvasRect.bottom - sidesOfGameOffsetFromBorder - event.clientY;
+      mouseY = event.clientX - canvasRect.left - topOfGameOffsetFromBorder;
+    }
+
+    return true; //Returns true as convenience for touchstart handling (so we can chain with &&)
   }
   
   //blockyHeadCoord = `this.${blockyHeadCoord}`
@@ -127,10 +141,10 @@ window.mouseMode.alterSnakeCode = function(code) {
   funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},6\)\){if\([$a-zA-Z0-9_]{0,8}=1>/,
   'true || $&');
 
-  //Disable the code that affctes the head position based on whether left/right etc is pressed
+  //Disable the code that affects the head position based on whether left/right etc is pressed
   funcWithEat = assertReplace(funcWithEat,/switch\([$a-zA-Z0-9_]{0,8}\.direction\){/,
   `switch(false){`);
-  
+
   //check for key collisions the same way winged does. WingedCheck has a signature like wingedCheck(this, headCoord, targetCoord)
   let wingedCheck = funcWithEat.assertMatch(/[$a-zA-Z0-9_]{0,8}=1>([$a-zA-Z0-9_]{0,8})\(this\.[$a-zA-Z0-9_]{0,8},this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\],[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
   
@@ -223,6 +237,68 @@ window.mouseMode.alterSnakeCode = function(code) {
 
   code = code.replace(funcWithNewGameOrig, funcWithNewGame);
 
+  //Make it work on mobile
+  /* (Commented out as misses first touch)
+  code = code.assertReplace(/break ([a-z]);var [a-z]=([a-z])\.clientX-[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x,[a-z]=[a-z]\.clientY-[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y;/,
+    `$& window.updateMousePos($2); break $1;`);
+  */
+
+  let touchEventProperty = code.assertMatch(/[a-z]\.preventDefault\(\);[a-z]=[a-z]\.([$a-zA-Z0-9_]{0,8})\.touches\[0\];/)[1];
+
+  //Update "mouse" position on touchmove
+  code = code.assertReplace(/([a-z])\.preventDefault\(\);[a-z]=[a-z]\.[$a-zA-Z0-9_]{0,8}\.touches\[0\];/,
+  `$& window.updateMousePos($1); return;`);
+    
+  //Update mouse position on touchstart, also try to start the game?
+  code = code.assertReplace(/([a-z])(\.target===\n?[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\(\))&&([a-z]\.preventDefault\(\))/,
+  `$1$2 && window.updateMousePos($1.${touchEventProperty}.touches[0]) && $3`);
+
+  //Set up megaWholeSnake
+  let funcWithResetState, funcWithResetStateOrig;
+  funcWithResetState = funcWithResetStateOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.resetState=function\(a\)$/,
+  /void 0===[a-z]\?!0:[a-z];this\.[$a-zA-Z0-9_]{0,8}\.reset\(a\);/);
+
+  funcWithResetState = assertReplace(funcWithResetState, '{', '{globalThis.megaWholeSnakeObject = this;');
+
+  code = code.replace(funcWithResetStateOrig, funcWithResetState);
+
+  //Function to start game. Slightly hacky. See varied.js line 112
+  let startGameFunc = code.match(/([$a-zA-Z0-9_]{0,8})\(this,"UP"\);/)[1];
+  
+  //Function to start game. Slightly hacky. See varied.js line 522
+  code = appendCodeWithinSnakeModule(code, `
+    globalThis.startGame = function() {
+      ${startGameFunc}(megaWholeSnakeObject, 'START');
+    }
+  `);
+
+  //Fix collisions with walls being slightly offset
+  code = code.assertReplace(/([a-z]=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.get\([$a-zA-Z0-9_]{0,8}\()([a-z])(\)\))/,
+  `$1{x: $2.x + 0.5, y: $2.y + 0.5}$3`);
+
+  //Prevent self-collisions
+  code = code.assertReplaceAll(/(\.equals\([a-z]\)&&![a-z])(&&\(this\.[$a-zA-Z0-9_]{0,8}\(\),)/g,
+  `$1 && false $2`);
+
+  //Offset stuff below is copied from level editor mod
+  //Find out how offset the board is from top left (used for calculating mouse positions)
+  code = code.assertReplace(
+    /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\)\/2\),([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.context\.canvas\.height-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\)\/2\);/,
+    "$&globalThis.leftBorderWidth = $1; globalThis.topBorderWidth = $2;"
+  );
+
+  //Also figure out offset if it's borderless
+  /*code = code.assertReplace(/var ([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\),([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/,
+  '$&;globalThis.leftBorderWidth = $1, globalThis.topBorderWidth = $2');*/
+  let [, infiniOffsetX, infiniOffsetY] = code.match(
+    /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\),([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/
+  );
+
+  code = code.assertReplace(
+    /var ([$a-zA-Z0-9_]{0,8})=\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\)\/2,([$a-zA-Z0-9_]{0,8})=\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\)\/2;/,
+    `$&;globalThis.leftBorderWidth = ${infiniOffsetX} - $1; globalThis.topBorderWidth = ${infiniOffsetY} - $2;`
+  );
+
   return code;
 }
 
@@ -232,7 +308,14 @@ window.mouseMode.alterSnakeCode = function(code) {
 
 window.mouseMode.runCodeAfter = function() {
   window.gameCanvasEl = document.getElementsByClassName('cer0Bd')[0];
-  gameCanvasEl.addEventListener('mousemove',updateMousePos);
+  document.body.addEventListener('mousemove',updateMousePos);
+  gameCanvasEl.addEventListener('click', startGame);
+  gameCanvasEl.addEventListener('touchstart', startGame);
+
+  //Hide keys/swipe "instructions" image as it gets in the way of clicking/touching the game
+  let keySwipeContainer = document.querySelector('[jsname="IoE5Ec"]');
+  keySwipeContainer.style.visibility = 'hidden';
+  keySwipeContainer.style.opacity = '0';
 
   setupMenuCheckbox();
 }
