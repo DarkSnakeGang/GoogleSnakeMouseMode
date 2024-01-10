@@ -210,7 +210,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   );
 
   //Prevent wall mode crashing - disable check where animation pauses before bumping a wall.
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,8}\(this.[$a-zA-Z0-9_]{0,8},16\)\)/,'if(false)');
+  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,8}\(this.[$a-zA-Z0-9_]{0,8},17\)\)/,'if(false)');
 
   code = code.replace(funcWithBodyLinesOrig, funcWithBodyLines);
 
@@ -235,11 +235,11 @@ window.mouseMode.alterSnakeCode = function(code) {
 
   let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
 
-  let chosenMode = code.assertMatch(/return 17===[a-z]\.([$a-zA-Z0-9_]{0,8})&&[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\)\?!0/)[1];
+  let chosenMode = code.assertMatch(/return 18===[a-z]\.([$a-zA-Z0-9_]{0,8})&&[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\)\?!0/)[1];
 
-  funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,8}\([a-z],17\)&&[$a-zA-Z0-9_]{0,8}\([a-z]\);/,
-  `$&if(${modeCheck}(a, 10) || ${modeCheck}(a, 13)){
-    let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode and statue mode can break snake. Infinity and sokoban are buggy.');
+  funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,8}\([a-z],18\)&&[$a-zA-Z0-9_]{0,8}\([a-z]\);/,
+  `$&if(${modeCheck}(a, 10) || ${modeCheck}(a, 13) || ${modeCheck}(a, 16)){
+    let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode and statue mode and arrow mode can break snake. Infinity and sokoban are buggy.');
     if(!proceed){
       /*Also set mode back to classic to be safe*/
       a.${chosenMode} = 0;
@@ -295,7 +295,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   //Offset stuff below is copied from level editor mod
   //Find out how offset the board is from top left (used for calculating mouse positions)
   code = code.assertReplace(
-    /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\)\/2\),([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.context\.canvas\.height-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\)\/2\);/,
+    /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\)\/2\),([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.context\.canvas\.height-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\)\/\n?2\);/,
     "$&globalThis.leftBorderWidth = $1; globalThis.topBorderWidth = $2;"
   );
 
