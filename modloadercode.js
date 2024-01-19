@@ -72,7 +72,7 @@ window.mouseMode.runCodeBefore = function() {
   window.setupMenuCheckbox = function() {
     let checkboxHtml = `
       <div id="mouse" style="text-align:center; top: 0px; cursor:default;">
-        <label class="form-check-label" for="aim-train" style="height:44px;line-height:44px;">Aim Trainer?</label>
+        <label class="form-check-label" for="aim-train" style="height:44px;line-height:44px;opacity:100%;">Aim Trainer?</label>
         <input id="aim-train" type="checkbox">
       </div>
     `;
