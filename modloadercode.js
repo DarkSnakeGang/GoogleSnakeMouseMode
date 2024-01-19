@@ -5,6 +5,8 @@ window.mouseMode = {};
 ////////////////////////////////////////////////////////////////////
 
 window.mouseMode.runCodeBefore = function() {
+  window.PuddingMod.runCodeBefore();
+
   window.mouseX = 176.1;
   window.mouseY = 240.1;
   window.faceAngle = 0;
@@ -70,7 +72,7 @@ window.mouseMode.runCodeBefore = function() {
   window.setupMenuCheckbox = function() {
     let checkboxHtml = `
       <div id="mouse" style="text-align:center; top: 0px; cursor:default;">
-        <label for="aim-train" style="line-height:44px;">Aim Trainer?</label>
+        <label class="form-check-label" for="aim-train" style="height:44px;line-height:44px;">Aim Trainer?</label>
         <input id="aim-train" type="checkbox">
       </div>
     `;
@@ -95,7 +97,7 @@ window.mouseMode.runCodeBefore = function() {
 ////////////////////////////////////////////////////////////////////
 
 window.mouseMode.alterSnakeCode = function(code) {
-
+  code = window.PuddingMod.alterSnakeCode(code);
   //lifted tileWidth from apple-snake
   window.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];//wa
   
@@ -230,7 +232,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   //Add warning if the game is started with a mode that is broken
   let funcWithNewGame, funcWithNewGameOrig;
   funcWithNewGame = funcWithNewGameOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(\)$/,
-  /}\);this\.reset\(\)/,
+  /;this\.reset\(\)/,
   false);
 
   let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
@@ -330,4 +332,10 @@ window.mouseMode.runCodeAfter = function() {
   keySwipeContainer.style.opacity = '0';
 
   setupMenuCheckbox();
+
+  let modIndicator = document.createElement('div');
+  modIndicator.style='position:absolute;font-family:roboto;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;';
+  modIndicator.textContent = 'Mouse Mod';
+  let canvasNode = document.getElementsByClassName('jNB0Ic')[0];
+  document.getElementsByClassName('EjCLSb')[0].insertBefore(modIndicator, canvasNode);
 }
