@@ -191,7 +191,7 @@ window.mouseMode.alterSnakeCode = function(code) {
     /([a-z]=\n?this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\]\.clone\(\),)[^]*&&\([a-z]\.y=0\)\)/,
     `
     $1
-    (aimTrainer ? 
+    (aimTrainer ?
       (${segmentCloserToHead}.x += Math.cos(faceAngle), ${segmentCloserToHead}.y += Math.sin(faceAngle)) : (
       updateFaceCoordsAndRotation(this.${snakeDetails}.${blockyHeadCoord}, this.${snakeDetails}.${tileWidth}, this.${snakeDetails}.${bodyArray}),
       ${segmentCloserToHead}.x = nextHeadX,
