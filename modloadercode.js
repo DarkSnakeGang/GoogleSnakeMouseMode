@@ -332,7 +332,7 @@ window.mouseMode.runCodeAfter = function() {
   keySwipeContainer.style.opacity = '0';
 
   setupMenuCheckbox();
-  
+
   if (localStorage.getItem('snakeChosenMod') === "mouseMode") {
     let modIndicator = document.createElement('div');
     modIndicator.style='position:absolute;font-family:roboto;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;';
