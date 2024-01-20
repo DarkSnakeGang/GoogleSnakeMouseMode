@@ -80,12 +80,12 @@ window.mouseMode.runCodeBefore = function() {
     checkboxContainer.className = 'e1XC2b';
     checkboxContainer.innerHTML = checkboxHtml;
     document.getElementsByClassName('sXu3u')[0].appendChild(checkboxContainer);
-  
+
     let snakePopup = document.getElementsByClassName('T7SB3d')[1];
     let popupHeight = window.getComputedStyle(snakePopup,'null').getPropertyValue('height').assertMatch(/\d+/)[0];
     popupHeight = (parseInt(popupHeight) + 44) + 'px';
     snakePopup.style.height = popupHeight;
-  
+
     document.getElementById('aim-train').onchange = function() {
       aimTrainer = this.checked;
     }
