@@ -414,13 +414,26 @@ window.Theme.alterCode = function (code) {
     window.real_topbar_color = real_top_bar;
     window.button_color = buttons_color;
 
-
     if (theme_name != "Globe") {
       window.snake.setCustomTheme(light_tiles, dark_tiles, shadow, border, key_block_sign_color, real_top_bar, endscreen_background)
     }
     else {
       window.snake.clearCustomTheme();
     }
+
+    if (localStorage.getItem('snakeChosenMod') === "VisibilityMod" || window.isVisi) {
+      document.getElementById('delete-stuff-draggable').style.backgroundColor = border;
+      document.getElementById('delete-stuff-draggable').style.borderColor = border;
+
+      document.getElementById('drag-handle').style.borderColor = real_top_bar;
+
+      document.getElementById('visi-title').style.backgroundColor = real_top_bar;
+      document.getElementById('visi-boxes').style.backgroundColor = real_top_bar;
+      document.getElementById('flash-snake-timing').style.backgroundColor = buttons_color;
+
+    }
+
+
   }
 
   window.getRandomThemeName = function getRandomThemeName() {
@@ -2872,6 +2885,7 @@ window.SpeedInfo.make = function () {
     window.SpeedInfoShow = function () {
         const speedinfoBox = document.getElementById('speedinfo-popup-pudding');
         speedinfoBox.style.display = 'block';
+        speedinfoBox.style.visibility = 'visible';
         window.pudding_settings.SpeedInfo = true;
 
         window.SpeedInfoUpdate();
@@ -2879,7 +2893,8 @@ window.SpeedInfo.make = function () {
 
     window.SpeedInfoHide = function () {
         const speedinfoBox = document.getElementById('speedinfo-popup-pudding');
-        speedinfoBox.style.display = 'none';
+        speedinfoBox.style.display = 'block';
+        speedinfoBox.style.visibility = 'hidden';
         window.pudding_settings.SpeedInfo = false;
         document.getElementById('AlwaysOnTimeKeeper').checked = false;
     }
@@ -3162,14 +3177,19 @@ window.InputDisplay.make = function () {
     {window.pudding_settings.InputDisplay = !window.pudding_settings.InputDisplay;}
     //console.log("hmmm");
     if (window.pudding_settings.InputDisplay) {
-
       document.getElementById('left-button-id').style.display = 'inline-block';
       document.getElementById('down-button-id').style.display = 'inline-block';
       document.getElementById('right-button-id').style.display = 'inline-block';
       document.getElementById('top-button-id').style.display = 'inline-block';
+
+      document.getElementById('left-button-id').style.visibility = 'visible';
+      document.getElementById('down-button-id').style.visibility = 'visible';
+      document.getElementById('right-button-id').style.visibility = 'visible';
+      document.getElementById('top-button-id').style.visibility = 'visible';
+      window.ToggleSpeedInfo();
+      window.ToggleSpeedInfo();
     }
     else {
-
       document.getElementById('left-button-id').style.display = 'none';
       document.getElementById('down-button-id').style.display = 'none';
       document.getElementById('right-button-id').style.display = 'none';
@@ -3360,7 +3380,7 @@ window.Timer = {
         editBox = document.createElement('div')
         editBox.id = 'edit-box'
         editBox.style = `
-          background-color: ${theme.bg_color ?? '#aaaaff'};
+          background-color: ${theme.real_top_bar ?? '#aaaaff'};
           border-radius: 0.5vw;
           position: absolute;
           height: 93vh;
@@ -4091,12 +4111,13 @@ window.BootstrapMenu.make = function () {
     window.BootstrapShow = function () {
         const settingsBox = document.getElementById('settings-popup-pudding');
         settingsBox.style.display = 'block';
+        settingsBox.style.visibility = 'visible';
         window.bootstrapVisible = true;
     }
 
     window.BootstrapHide = function () {
         const settingsBox = document.getElementById('settings-popup-pudding');
-        settingsBox.style.display = 'none';
+        settingsBox.style.visibility = 'hidden';
         if (window.bootstrapVisible && typeof window.getAllSrc != "undefined") {
             window.getAllSrc();
         }
@@ -4344,7 +4365,7 @@ window.BootstrapMenu.make = function () {
             document.body.style.overflow = '';
         }
 
-        if (localStorage.getItem('snakeChosenMod') === "PuddingMod") {
+        if (localStorage.getItem('snakeChosenMod') === "PuddingMod" || window.NepDebug) {
             EatThemeRandomizer.style.display = 'none';
             EatThemeRandomizer2.style.display = 'none';
             EatThemeRandomizer.checked = false;
@@ -4808,6 +4829,7 @@ window.PuddingMod = {};
 ////////////////////////////////////////////////////////////////////
 
 window.PuddingMod.runCodeBefore = function () {
+  window.isVisi = false;
 
   console.log("Thank you for loading Yarmiplay's Pudding Mod! Hope you enjoy :)");
   console.log("Please provide feedback and report bugs in #snake-modding in the Official Google Snake Discord");
@@ -4958,7 +4980,6 @@ window.PuddingMod.alterSnakeCode = function (code) {
 ////////////////////////////////////////////////////////////////////
 
 window.PuddingMod.runCodeAfter = function () {
-
   let modIndicator = document.createElement('div');
   modIndicator.style = 'position:absolute;font-family:Roboto,Arial,sans-serif;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;';
   modIndicator.textContent = 'Pudding Mod';
