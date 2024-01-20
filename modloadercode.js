@@ -19,7 +19,7 @@ window.mouseMode.runCodeBefore = function() {
     if(window.screen.orientation.angle === 0) {
       const xOffsetFromBorder = globalThis.leftBorderWidth ?? 16;
       const yOffsetFromBorder = globalThis.topBorderWidth ?? 16;
-  
+
       mouseX = event.clientX - canvasRect.left - xOffsetFromBorder;
       mouseY = event.clientY - canvasRect.top - yOffsetFromBorder;
     } else {
@@ -27,28 +27,28 @@ window.mouseMode.runCodeBefore = function() {
       //Whole screen is rotated 90 deg, so calculations are a bit different
       const topOfGameOffsetFromBorder = globalThis.leftBorderWidth ?? 16;
       const sidesOfGameOffsetFromBorder = globalThis.topBorderWidth ?? 16;
-  
+
       mouseX = canvasRect.bottom - sidesOfGameOffsetFromBorder - event.clientY;
       mouseY = event.clientX - canvasRect.left - topOfGameOffsetFromBorder;
     }
 
     return true; //Returns true as convenience for touchstart handling (so we can chain with &&)
   }
-  
+
   //blockyHeadCoord = `this.${blockyHeadCoord}`
   //tileWidth = `this.${tileWidth}`/*usually a.wa*/
   //bodyArray = `this.$1`/*Usually this.Ba*/
   window.updateFaceCoordsAndRotation = function(blockyHeadCoord, tileWidth, bodyArray) {
     let headToMouseOffset = {x:mouseX - blockyHeadCoord.x, y:mouseY - blockyHeadCoord.y};
-  
+
     let magnitude = Math.sqrt(headToMouseOffset.x**2 + headToMouseOffset.y**2);
-  
+
     faceAngle = Math.atan(headToMouseOffset.y/headToMouseOffset.x);
-  
+
     if(headToMouseOffset.x < 0) {
       faceAngle += Math.PI;
     }
-  
+
     if(!aimTrainer) {
       var xDelta = headToMouseOffset.x/magnitude;
       var yDelta = headToMouseOffset.y/magnitude;
@@ -56,11 +56,11 @@ window.mouseMode.runCodeBefore = function() {
       var xDelta = headToMouseOffset.x/tileWidth;
       var yDelta = headToMouseOffset.y/tileWidth;
     }
-  
+
     nextHeadX = bodyArray[0].x + xDelta;
     nextHeadY = bodyArray[0].y + yDelta;
   }
-  
+
   //Helper function for rounding and clamping with an upper bound of boardSideLength - 1 and a lower bound of 0.
   window.roundClamp = function(value, boardSideLength) {
     let res = Math.round(value);
@@ -68,7 +68,7 @@ window.mouseMode.runCodeBefore = function() {
     res = Math.max(res, 0);
     return res;
   }
-  
+
   window.setupMenuCheckbox = function() {
     let checkboxHtml = `
       <div id="mouse" style="text-align:center; top: 0px; cursor:default;">
@@ -85,7 +85,7 @@ window.mouseMode.runCodeBefore = function() {
     let popupHeight = window.getComputedStyle(snakePopup,'null').getPropertyValue('height').assertMatch(/\d+/)[0];
     popupHeight = (parseInt(popupHeight) + 44) + 'px';
     snakePopup.style.height = popupHeight;
-    
+  
     document.getElementById('aim-train').onchange = function() {
       aimTrainer = this.checked;
     }
@@ -100,7 +100,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   code = window.PuddingMod.alterSnakeCode(code);
   //lifted tileWidth from apple-snake
   window.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];//wa
-  
+
   //Head pos, but not properly lerped. k9. Lifted from apple-snake. SnakeDetails contains lots of different properties of the snake.
   [,window.snakeDetails,window.blockyHeadCoord] = code.assertMatch(/this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})=\n?[$a-zA-Z0-9_]{0,8}\.clone\(\),/);
 
@@ -138,7 +138,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   $1 = nextHead;
   `
   );
-  
+
   //Check for apple collisions the same way that winged mode does.
   funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},6\)\){if\([$a-zA-Z0-9_]{0,8}=1>/,
   'true || $&');
@@ -149,7 +149,7 @@ window.mouseMode.alterSnakeCode = function(code) {
 
   //check for key collisions the same way winged does. WingedCheck has a signature like wingedCheck(this, headCoord, targetCoord)
   let wingedCheck = funcWithEat.assertMatch(/[$a-zA-Z0-9_]{0,8}=1>([$a-zA-Z0-9_]{0,8})\(this\.[$a-zA-Z0-9_]{0,8},this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\],[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
-  
+
   code = code.replace(funcWithEatOrig, funcWithEat);
 
   let funcWithKeyCheck, funcWithKeyCheckOrig;
@@ -262,7 +262,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   //Update "mouse" position on touchmove
   code = code.assertReplace(/([a-z])\.preventDefault\(\);[a-z]=[a-z]\.[$a-zA-Z0-9_]{0,8}\.touches\[0\];/,
   `$& window.updateMousePos($1); return;`);
-    
+  
   //Update mouse position on touchstart, also try to start the game?
   code = code.assertReplace(/([a-z])(\.target===\n?[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\(\))&&([a-z]\.preventDefault\(\))/,
   `$1$2 && window.updateMousePos($1.${touchEventProperty}.touches[0]) && $3`);
@@ -278,7 +278,7 @@ window.mouseMode.alterSnakeCode = function(code) {
 
   //Function to start game. Slightly hacky. See varied.js line 112
   let startGameFunc = code.match(/([$a-zA-Z0-9_]{0,8})\(this,"UP"\);/)[1];
-  
+
   //Function to start game. Slightly hacky. See varied.js line 522
   code = appendCodeWithinSnakeModule(code, `
     globalThis.startGame = function() {
