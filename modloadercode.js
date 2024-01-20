@@ -341,4 +341,4 @@ window.mouseMode.runCodeAfter = function() {
     document.getElementsByClassName('EjCLSb')[0].insertBefore(modIndicator, canvasNode);
   }
 
-}
+};
