@@ -262,7 +262,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   //Update "mouse" position on touchmove
   code = code.assertReplace(/([a-z])\.preventDefault\(\);[a-z]=[a-z]\.[$a-zA-Z0-9_]{0,8}\.touches\[0\];/,
   `$& window.updateMousePos($1); return;`);
-  
+
   //Update mouse position on touchstart, also try to start the game?
   code = code.assertReplace(/([a-z])(\.target===\n?[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\(\))&&([a-z]\.preventDefault\(\))/,
   `$1$2 && window.updateMousePos($1.${touchEventProperty}.touches[0]) && $3`);
