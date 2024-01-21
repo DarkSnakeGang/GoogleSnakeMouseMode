@@ -739,15 +739,28 @@ window.Counter.make = function () {
                 plays: {
                     session: 0,
                     lifetime: 0
+                },
+                apples: {
+                    session: 0,
+                    lifetime: 0
                 }
             };
         } else {
             stats = JSON.parse(stats);
         }
+
+        if (typeof stats.apples === 'undefined') {
+            stats.apples = {
+                session: 0,
+                lifetime: 0
+            }
+        }
+
         //Make sure these get reset
         stats.inputs.game = 0;
         stats.inputs.session = 0;
         stats.plays.session = 0;
+        stats.apples.session = 0;
         stats.visible = true;
 
         stats.walls = {
@@ -772,6 +785,8 @@ window.Counter.make = function () {
             typeof stats.inputs.lifetime !== 'undefined' &&
             typeof stats.plays.session !== 'undefined' &&
             typeof stats.plays.lifetime !== 'undefined' &&
+            typeof stats.apples.session !== 'undefined' &&
+            typeof stats.apples.lifetime !== 'undefined' &&
             typeof stats.visible !== 'undefined'
         ) {
             localStorage.setItem('inputCounterMod', JSON.stringify(stats));
@@ -796,6 +811,10 @@ window.Counter.make = function () {
                 plays: {
                     session: 0,
                     lifetime: 0
+                },
+                apples: {
+                    session: 0,
+                    lifetime: 0
                 }
             };
             saveStatistics();
@@ -805,6 +824,7 @@ window.Counter.make = function () {
             alert('Did not reset all stats');
         }
     }
+
     window.promptToEditStatCount = function () {
         if (stats.statShown === 'hide' || stats.statShown === 'walls') {
             alert(`Not changing stat for "hide" or "walls"`)
@@ -823,13 +843,18 @@ window.Counter.make = function () {
     }
 
     window.getStatIconImageSrc = function () {
-        if (stats.statShown === 'hide') {
-            return "https://i.postimg.cc/bNFfLPCn/Empty.png"
+        switch (stats.statShown) {
+            case 'hide':
+                return "https://i.postimg.cc/bNFfLPCn/Empty.png"
+            case 'walls':
+                return "https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_01.png"
+            case 'apples':
+                return "https://www.google.com/logos/fnbx/snake_arcade/v3/apple_00.png"
+            case 'plays':
+                return "https://fonts.gstatic.com/s/i/googlematerialicons/play_arrow/v6/white-24dp/2x/gm_play_arrow_white_24dp.png"
+            default:
+                return "https://www.google.com/logos/fnbx/snake_arcade/keys.svg"
         }
-        if (stats.statShown === 'walls') {
-            return "https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_01.png"
-        }
-        return stats.statShown === 'plays' ? 'https://fonts.gstatic.com/s/i/googlematerialicons/play_arrow/v6/white-24dp/2x/gm_play_arrow_white_24dp.png' : 'https://www.google.com/logos/fnbx/snake_arcade/keys.svg';
     }
 
     window.setCounter = function () {
@@ -949,6 +974,9 @@ window.TimeKeeper.make = function () {
     window.timeKeeper.debug = false;
     //called on every apple
     window.timeKeeper.gotApple = function (time, score) {
+        stats.apples.session++;
+        stats.apples.lifetime++;
+        updateCounterDisplay();
         if (window.pudding_settings.randomizeThemeApple) {
             window.setTheme(window.getRandomThemeName());
         }
@@ -4226,8 +4254,10 @@ window.BootstrapMenu.make = function () {
         <option value="inputLifetime">Count lifetime inputs</option>
         <option value="playsSession">Count session resets</option>
         <option value="playsLifetime">Count lifetime resets</option>
+        <option value="applesSession">Count fruit session</option>
+        <option value="applesLifetime">Count fruit lifetime</option>
         <option value="wallsGame">Count walls</option>
-        <option value="hideCount">Counter hidden</option>
+        <option value="hideCount">Hide counter</option>
     </select>
 
   <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="edit-stat">Edit stat</button>
@@ -4400,6 +4430,10 @@ window.BootstrapMenu.make = function () {
                 session: 'playsSession',
                 lifetime: 'playsLifetime'
             },
+            apples: {
+                session: 'applesSession',
+                lifetime: 'applesLifetime'
+            },
             walls: {
                 game: 'wallsGame'
             },
@@ -4414,6 +4448,8 @@ window.BootstrapMenu.make = function () {
             inputLifetime: { stat: 'inputs', duration: 'lifetime' },
             playsSession: { stat: 'plays', duration: 'session' },
             playsLifetime: { stat: 'plays', duration: 'lifetime' },
+            applesSession: { stat: 'apples', duration: 'session' },
+            applesLifetime: { stat: 'apples', duration: 'lifetime' },
             wallsGame: { stat: 'walls', duration: 'game' },
             hideCount: { stat: 'hide', duration: 'count' },
         }
