@@ -448,7 +448,7 @@ window.Theme.alterCode = function (code) {
   else{window.randomTheme = true;window.setTheme(window.getRandomThemeName());};
   `)
 
-  reset_regex = new RegExp(/;this\.reset\(\)/)
+  reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
   set_on_reset = `;
   if(window.randomTheme){window.setTheme(window.getRandomThemeName());}
@@ -628,7 +628,7 @@ nothing =` if(window.pudding_settings.SokoGoals && a.${last_path}.path.includes(
     }
     ${code.match(keep_running)[0]}`)
 */
-    reset_regex = new RegExp(/;this\.reset\(\)/)
+    reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
     set_on_reset = `;
     if (window.pudding_settings.SokoGoals) {
@@ -875,7 +875,7 @@ window.Counter.make = function () {
 
 window.Counter.alterCode = function (code) {
 
-    reset_regex = new RegExp(/;this\.reset\(\)/)
+    reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
     counter_reset_code = `;stats.inputs.game = 0;
     stats.walls.game = 0;
@@ -890,7 +890,8 @@ window.Counter.alterCode = function (code) {
         stats.visible = false;
     }
     window.setCounter();
-    updateCounterDisplay();this.reset();`
+    updateCounterDisplay();
+    $&`
 
     catchError(reset_regex, code)
     code = code.assertReplace(reset_regex, counter_reset_code);
@@ -1546,8 +1547,8 @@ window.TimeKeeper.alterCode = function (code) {
     //modeFunc = modeFunc.substring(modeFunc.indexOf("(") + 1, modeFunc.lastIndexOf("("));
     //modeFunc = modeFunc.split('(')[0];
     //scoreFunc = func.match(/25\!\=\=this.[a-zA-Z0-9$]{1,4}/)[0]; // Need to figure this out
-    scoreFuncVar = func.match(/25\=\=\=[a-zA-Z0-9$]{1,4}/)[0].split('=')[3]; // Assuming he wanted just the "this.score"
-    scoreFunc = func.match(`${window.escapeRegex(scoreFuncVar)}=this.[a-zA-Z0-9$]{1,6}`)[0].split('=')[1]
+    scoreFuncVar = func.match(/25\=\=\=\n?[a-zA-Z0-9$]{1,4}/)[0].split('=')[3]; // Assuming he wanted just the "this.score"
+    scoreFunc = func.match(`${window.escapeRegex(scoreFuncVar.replace('\n', ''))}=this.[a-zA-Z0-9$]{1,6}`)[0].split('=')[1]
     ////console.log(scoreFunc)
     //scoreFunc = scoreFunc.substring(scoreFunc.indexOf("this."),scoreFunc.size);
     //timeFunc = func.match(/this.[a-zA-Z0-9$]{1,6}\*this.[a-zA-Z0-9$]{1,6}/)[0];
@@ -2045,7 +2046,6 @@ window.TopBar.make = function () {
   }
 
  // window.topbar_icons = true;
-  window.is_muted = false;
   window.count_setting = 0;
   window.speed_setting = 0;
 
@@ -2061,9 +2061,6 @@ window.TopBar.alterCode = function (code) {
   count_var = "window.count_setting"
   speed_var = "window.speed_setting"
 
-  muted_img = "volume_off_white_24dp.png"
-  unmuted_img = "volume_up_white_24dp.png"
-
   window.count_img_arr = Array.from(document.querySelector('#count').children).map(el=>el.src);
   window.speed_img_arr = Array.from(document.querySelector('#speed').children).map(el=>el.src);
 
@@ -2073,46 +2070,47 @@ window.TopBar.alterCode = function (code) {
   set_count_code = `$&${count_var}=`
   set_speed_code = `$&${speed_var}=`
 
-  fruit_jsname = document.querySelector('img[src$="apple_00.png"]').getAttribute("jsname")
-  fruit_src = `document.querySelector('img[jsname="${fruit_jsname}"]').src `
-  try {
-    mute_jsname = document.querySelector(`img[src$="${unmuted_img}"`).getAttribute("jsname")
-    window.is_muted = false;
-  } catch (error) {
-    if (window.NepDebug) {
-      console.log("Noticed it's muted, adjusting.")
-    }
-    mute_jsname = document.querySelector(`img[src$="${muted_img}"`).getAttribute("jsname")
-    window.is_muted = true;
-  }
-  mute_src = `document.querySelector('img[jsname="${mute_jsname}"]').src `
+  fruit_jsname = document.querySelector('[src$="apple_00.png"]').getAttribute("jsname")
+  fruit_src = `document.querySelector('[jsname="${fruit_jsname}"]').src `
 
-  muted_img = "https://i.postimg.cc/dQdCRwyH/volume-off-white-24dp.png"
-  unmuted_img = "https://i.postimg.cc/HsgyBR0p/volume-up-white-24dp.png"
+  window.mute_divs = document.querySelectorAll('[aria-label="Mute"]');
+  window.mute_default_innerHTML = [window.mute_divs[0].innerHTML, window.mute_divs[1].innerHTML]
+  window.mute_speed_element = document.createElement('img');
+  window.mute_speed_element.classList.add('EFcTud')
+  window.mute_speed_element.src = "https://www.google.com/logos/fnbx/snake_arcade/v3/speed_00.png"
+  window.mute_speed_element.style.padding = '0px';
+  window.mute_speed_copy = window.mute_speed_element.cloneNode(true);
+
+  window.control_mute_img = function control_mute_img(TopBar, SpeedSrc) {
+    if (TopBar) {
+      for (let index = 0; index < window.mute_divs.length; index++) {
+        const element = window.mute_divs[index];
+        element.innerHTML = ''
+      }
+      window.mute_speed_element.src = SpeedSrc
+      window.mute_speed_copy.src = SpeedSrc
+      window.mute_divs[0].appendChild(window.mute_speed_element)
+      window.mute_divs[1].appendChild(window.mute_speed_copy)
+      return;
+    }
+    for (let index = 0; index < window.mute_divs.length; index++) {
+      const element = window.mute_divs[index];
+      element.innerHTML = window.mute_default_innerHTML[index]
+    }
+  }
 
   code = code.assertReplace(count_regex, set_count_code);
   code = code.assertReplace(speed_regex, set_speed_code);
 
-  reset_regex = new RegExp(/;this\.reset\(\)/)
+  reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
   set_on_reset = `;
   if (window.pudding_settings.TopBar) {
-    ${mute_src} = window.speed_img_arr[${speed_var}]
     ${fruit_src} = window.count_img_arr[${count_var}]
   }
-  else {
-    ${mute_src} = window.is_muted ? "${muted_img}" : "${unmuted_img}";
-  }
+  window.control_mute_img(window.pudding_settings.TopBar, window.speed_img_arr[${speed_var}])
   $&`
   code = code.assertReplace(reset_regex, set_on_reset)
-
-  volume_regex = new RegExp(/this\.[a-zA-Z0-9_$]{1,8}\?\"\/\/www\.gstatic\.com\/images\/icons\/material\/system\/2x\/volume_off_white_24dp.png\"\:\"\/\/www\.gstatic\.com\/images\/icons\/material\/system\/2x\/volume_up_white_24dp\.png\"\;/)
-  disable_mute = `$&
-  if (window.pudding_settings.TopBar) {
-    ${mute_src} = window.speed_img_arr[${speed_var}]
-  }
-  `
-  code = code.assertReplace(volume_regex, disable_mute)
 
   return code;
 }
@@ -2311,17 +2309,16 @@ window.SnakeColor.alterCode = function (code) {
     ${code.match(rainbow_usage_regex)[0].split('{')[1]}
     `
 
+    code = code.assertReplace(rainbow_usage_regex, rainbow_code)
+
     // https://www.google.com/logos/fnbx/snake_arcade/v5/color_10.png
 
-
-
-    snake_face_regex = new RegExp(/[a-zA-Z0-9_$]{1,6}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,6}\)[a-zA-Z0-9_$]{1,6}\.[a-zA-Z0-9_$]{1,6}=[a-zA-Z0-9_$]{1,6}\[0\]\[0\]/)
+    snake_face_regex = new RegExp(/[a-zA-Z0-9_$]{1,6}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,6}\?\([a-zA-Z0-9_$]{1,6}\.[a-zA-Z0-9_$]{1,6}=[a-zA-Z0-9_$]{1,6}\[0\]\[0\]/)
     catchError(snake_face_regex, code)
     snake_face_code = code.match(snake_face_regex)[0]
-    snake_face_code = `${code.match(snake_face_regex)[0].split('=')[0]}=10===${code.match(snake_face_regex)[0].split(')')[0]}? window.rainbowAlts[window.snakeRainbowOverride].set[0] : ${code.match(snake_face_regex)[0].split('=')[1]}`
+    snake_face_code = `${code.match(snake_face_regex)[0].split('=')[0]}=10===${code.match(snake_face_regex)[0].split('?')[0]}? window.rainbowAlts[window.snakeRainbowOverride].set[0] : ${code.match(snake_face_regex)[0].split('=')[1]}`
 
     //console.log(snake_face_code)
-    code = code.assertReplace(rainbow_usage_regex, rainbow_code)
     code = code.assertReplace(snake_face_regex, snake_face_code)
     //code = code.assertReplace(/a\.Yd=qN\[0\]\[1\];/, `a.Yd=10 === a.settings.Aa ? window.rainbowAlts[window.snakeRainbowOverride].set[0] : qN[0][1];`)
     //code = code.assertReplace(code.match(`${default_rainbow_array}\\\[0\\\]`)[0], `window.rainbowAlts[window.snakeRainbowOverride].set[0]`)
@@ -2441,10 +2438,11 @@ window.SettingsSaver.alterCode = function (code) {
     window.PopulateOptions();
     window.PopulateDropdowns();
 
-    reset_regex = new RegExp(/;this\.reset\(\)/)
+    reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
     settings_reset_code = `
-    saveSettings();this.reset();`
+    saveSettings();
+    $&`
 
     catchError(reset_regex, code)
     code = code.assertReplace(reset_regex, settings_reset_code);
@@ -2482,8 +2480,8 @@ window.SpeedInfo.make = function () {
         }
         url += "id=" + new Date().getTime()
         if (window.NepDebug) {
-            console.log(url);
-            console.log("Getting runs..." + window.requestsMade);
+            //console.log(url);
+            //console.log("Getting runs..." + window.requestsMade);
         }
 
         let request = new XMLHttpRequest();
@@ -2542,9 +2540,8 @@ window.SpeedInfo.make = function () {
         13: { name: "Statue" },
         14: { name: "Light" },
         15: { name: "Shield" },
-        16: { name: "Arrow" },
-        17: { name: "Peaceful" },
-        18: { name: "Blender" },
+        16: { name: "Peaceful" },
+        17: { name: "Blender" },
     }
 
     window.countToTxt = {
@@ -2601,9 +2598,8 @@ window.SpeedInfo.make = function () {
         STATUE = 13
         LIGHT = 14
         SHIELD = 15
-        ARROW = 16
-        PEACEFUL = 17
-        BLENDER = 18
+        PEACEFUL = 16
+        BLENDER = 17
 
         // Speed list
         DEFAULT_SPEED = 0
@@ -2637,10 +2633,10 @@ window.SpeedInfo.make = function () {
             HandleHighscore("Empty")
             return;
         }
-        //if (mode == STATUE && level == "H" && speed == SLOW) {
-        //    HandleHighscore("Empty")
-        //    return; // Statue isn't highscore on slow (yet?)
-        //}
+        if (mode == STATUE && level == "H" && speed == SLOW) {
+            HandleHighscore("Empty")
+            return; // Statue isn't highscore on slow (yet?)
+        }
 
         gameID = speed == SLOW ? gameIDs[1] : gameIDs[0]; // Set gameID to CE if Slow
 
@@ -2704,8 +2700,8 @@ window.SpeedInfo.make = function () {
             }
 
             if (window.NepDebug) {
-                console.log("https://www.speedrun.com/api/v1/leaderboards/" + gameID +
-                    "/category/" + Highscore_ID + "?top=1&" + catch_multi + catch_speed + catch_size)
+                //console.log("https://www.speedrun.com/api/v1/leaderboards/" + gameID +
+                //    "/category/" + Highscore_ID + "?top=1&" + catch_multi + catch_speed + catch_size)
             }
 
             makeAPIrequest("https://www.speedrun.com/api/v1/leaderboards/" + gameID +
@@ -2736,7 +2732,7 @@ window.SpeedInfo.make = function () {
         src_link_stuff = "https://www.speedrun.com/api/v1/leaderboards/" + gameID + "/level/"
 
         if (window.NepDebug) {
-            console.log(src_link_stuff + level_ID + "/" + category_ID + "?top=1&" + catch_multi + catch_size)
+            //console.log(src_link_stuff + level_ID + "/" + category_ID + "?top=1&" + catch_multi + catch_size)
         }
         switch (level) {
             case "25":
@@ -2764,10 +2760,6 @@ window.SpeedInfo.make = function () {
         }
 
 
-    }
-
-    function printMe(response) {
-        console.log(response);
     }
 
     //window.getRecordSRC("H");
@@ -2804,7 +2796,7 @@ window.SpeedInfo.make = function () {
 
         //document.getElementById('Hsrc').href = response["data"]["runs"][0]["run"].weblink
         if (window.NepDebug) {
-            console.log("Found 25 apples " + world_record + " " + response["data"]["runs"][0]["run"].weblink)
+            //console.log("Found 25 apples " + world_record + " " + response["data"]["runs"][0]["run"].weblink)
         }
     }
     function Handle50(response) {
@@ -2868,7 +2860,7 @@ window.SpeedInfo.make = function () {
         document.getElementById('Hsrc').innerHTML = `Highscore: <a target="_blank" style="text-decoration: none;color:#ADD8E6 !important;" href="` + response["data"]["runs"][0]["run"].weblink + `">` + world_record + `</a>`
         //document.getElementById('Hsrc').href = response["data"]["runs"][0]["run"].weblink
         if (window.NepDebug) {
-            console.log("Found highscore " + highscore + " " + response["data"]["runs"][0]["run"].weblink)
+            //console.log("Found highscore " + highscore + " " + response["data"]["runs"][0]["run"].weblink)
         }
     }
 
@@ -3010,12 +3002,12 @@ window.SpeedInfo.make = function () {
 
     //Listeners to hide/show speedinfo box
     const backButton = 'p17HVe';
-    document.querySelector("img[class^=\"" + backButton + "\"]").addEventListener("click", (e) => {
+    document.querySelector("[class^=\"" + backButton + "\"]").addEventListener("click", (e) => {
         window.SpeedInfoUpdate();
     });
 
     const playButton = 'NSjDf';
-    document.querySelector("div[jsname^=\"" + playButton + "\"]").addEventListener("click", (e) => {
+    document.querySelector("[jsname^=\"" + playButton + "\"]").addEventListener("click", (e) => {
         window.SpeedInfoUpdate();
     });
 
@@ -3032,6 +3024,7 @@ window.SpeedInfo.make = function () {
         var gamemode = "";
         for (t of modeStr) {
             if (t == 1) {
+
                 switch (counter) {
                     case 0: gamemode += "Wall, "; break;
                     case 1: gamemode += "Portal, "; break;
@@ -3048,8 +3041,7 @@ window.SpeedInfo.make = function () {
                     case 12: gamemode += "Statue, "; break;
                     case 13: gamemode += "Light, "; break;
                     case 14: gamemode += "Shield, "; break;
-                    case 15: gamemode += "Arrow, "; break;
-                    case 16: gamemode += "Peaceful, "; break;
+                    case 15: gamemode += "Peaceful, "; break;
                     default: gamemode += "Unknown, "; break;
                 }
             }
@@ -3130,11 +3122,11 @@ window.SpeedInfo.make = function () {
 }
 
 window.SpeedInfo.alterCode = function (code) {
-    reset_regex = new RegExp(/;this\.reset\(\)/)
+    reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
     speedinfo_reset = `;window.SpeedInfoUpdate();
     if(window.first_time_call){window.getAllSrc();window.first_time_call=false;}
-    ;this.reset();`
+    ;$&`
 
 
     catchError(reset_regex, code)
@@ -4015,7 +4007,7 @@ window.Timer = {
 
 
     const splitStuff = code.match(
-      /if\(25===[a-zA-Z0-9_$]{1,8}\|\|50===[a-zA-Z0-9_$]{1,8}\|\|100===[a-zA-Z0-9_$]{1,8}\)/
+      /if\(25===\n?[a-zA-Z0-9_$]{1,8}\|\|50===[a-zA-Z0-9_$]{1,8}\|\|100===[a-zA-Z0-9_$]{1,8}\)/
     )[0]
 
     code = code.replace(
@@ -4521,7 +4513,7 @@ window.BootstrapMenu.make = function () {
     });
 
     const backButton = 'p17HVe';
-    document.querySelector("img[class^=\"" + backButton + "\"]").addEventListener("click", (e) => {
+    document.querySelector("[class^=\"" + backButton + "\"]").addEventListener("click", (e) => {
         window.BootstrapHide();
         if (window.isSnakeMobileVersion) {
             if (localStorage.getItem('snakeChosenMod') === "VisibilityMod") {
@@ -4531,7 +4523,7 @@ window.BootstrapMenu.make = function () {
     });
 
     const playButton = 'NSjDf';
-    document.querySelector("div[jsname^=\"" + playButton + "\"]").addEventListener("click", (e) => {
+    document.querySelector("[jsname^=\"" + playButton + "\"]").addEventListener("click", (e) => {
         window.BootstrapHide();
         if (window.isSnakeMobileVersion) {
             if (localStorage.getItem('snakeChosenMod') === "VisibilityMod") {
@@ -4794,9 +4786,10 @@ window.CustomPortalPairs.alterCode = function (code) {
 
     window.custom_pair_call_counter = 0; // Reset every new game
 
-    reset_regex = new RegExp(/;this\.reset\(\)/)
+    reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
-    counter_reset_code = `window.custom_pair_call_counter = 0;this.reset();`
+    counter_reset_code = `window.custom_pair_call_counter = 0;
+    $&`
 
     code = code.assertReplace(reset_regex, counter_reset_code);
     portal_pairs_regex = new RegExp(/this\.[a-zA-Z0-9_$]{1,8}\[[a-zA-Z0-9_$]{1,8}\]\.[a-zA-Z0-9_$]{1,8}=[a-zA-Z0-9_$]{1,8}\(this\)/)
