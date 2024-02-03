@@ -302,7 +302,6 @@ window.Theme.make = function () {
       endscreen_background: advancedSettings.themeCol7 ?? '#000000',
       sep_color: '#7eccfa',
       topbar_color: '#3a91bb',
-      real_top_bar: '#4a752c',
       buttons_color: '#1155CC',
       bg_color: '#4dc1f9',
       bottom_color: '#4dc1f9'
@@ -983,6 +982,9 @@ window.TimeKeeper.make = function () {
         if (window.timeKeeper.debug) {
             //console.log("got Apple %s, %s", time, score);
         }
+        if (localStorage.getItem('snakeChosenMod') != "PuddingMod"){
+            return;
+        }
         window.timeKeeper.lastAppleDate = new Date();
         window.timeKeeper.lastAppleTime = time;
         //save time
@@ -999,6 +1001,9 @@ window.TimeKeeper.make = function () {
         if (window.timeKeeper.debug) {
             //console.log("got All %s, %s", time, score);
         }
+        if (localStorage.getItem('snakeChosenMod') != "PuddingMod"){
+            return;
+        }
         window.timeKeeper.savePB(time, "ALL", window.timeKeeper.mode, window.timeKeeper.count, window.timeKeeper.speed, window.timeKeeper.size);
     }
 
@@ -1006,6 +1011,9 @@ window.TimeKeeper.make = function () {
     window.timeKeeper.death = function (time, score) {
         if (window.timeKeeper.debug) {
             //console.log("death %s, %s", time, score);
+        }
+        if (localStorage.getItem('snakeChosenMod') != "PuddingMod"){
+            return;
         }
         if (window.timeKeeper.playing) {
             window.timeKeeper.playing = false;
@@ -3423,135 +3431,133 @@ window.Timer = {
           border: 1px solid ${theme.topbar_color ?? '#4444dd'};
           font-size: 2.5vh;
           color: #ffffff;
-          width: 70vw;
-          font-family: Consolas;
+          width: 50vw;
+          font-family: Roboto,Arial,sans-serif;
           overflow-y: auto;
         `
         editBox.innerHTML = `
-          <span id="close-box" style="
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            cursor: pointer;
-            color: #ffffff;
-            font-size: 0.9em;
-          ">&#x2715</span>
+        <span id="close-box" style="
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        cursor: pointer;
+        color: #ffffff;
+        font-size: 0.9em;
+      ">&#x2715</span>
+</br>
+<label class="form-check-label" style="font-size: 3.5vh">
+        Custom Timer/Splits Settings
+      </label> </br>
+</br>
 
-          <h1 style="font-size: 3.5vh">
-            Edit PB/Comparison
-          </h1>
+<div id="edit-mode">
+  <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_00.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_01.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_02.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_03.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_04.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_05.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_06.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_07.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_08.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_09.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_10.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_11.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_12.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_13.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_14.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/trophy_15.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/trophy_16.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_15.png" />
+</div>
+<br/>
+<div id="edit-count">
+  <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_00.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_01.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_02.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_03.png" />
+</div>
+<br/>
+<div id="edit-speed">
+  <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_00.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_01.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_02.png" />
+</div>
+<br/>
+<div id="edit-size">
+  <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_00.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_01.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_02.png" />
+</div>
+<br/>
 
-          <div id="edit-mode">
-            <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_00.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_01.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_02.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_03.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_04.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_05.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_06.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_07.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_08.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_09.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_10.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_11.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_12.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_13.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_14.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/trophy_15.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/trophy_16.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_15.png"/>
-          </div>
-          <br/>
-          <div id="edit-count">
-            <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_00.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_01.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_02.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_03.png"/>
-          </div>
-          <br/>
-          <div id="edit-speed">
-            <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_00.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_01.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_02.png"/>
-          </div>
-          <br/>
-          <div id="edit-size">
-            <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_00.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_01.png"/>
-            <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_02.png"/>
-          </div>
-          <br/>
+<div id="edit-cat">
+  <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/d1R1Y648/25.png" />
+  <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/7hmZC6vh/50.png" />
+  <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/qqk7MK5W/100.png" />
+  <img class="sel" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/52j6Cw2V/all.png" />
+</div>
 
-          <div id="edit-cat">
-            <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/d1R1Y648/25.png" />
-            <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/7hmZC6vh/50.png" />
-            <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/qqk7MK5W/100.png"/>
-            <img class="sel" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/52j6Cw2V/all.png"/>
-          </div>
+<br/>
+<div id="edit-times" style="left:0px;">
+  <div>
+      <label class="form-check-label" for="edit-25"> 25</label>
+      <input class="text-input" size="9" name="edit-25" id="edit-25" type="text" style="font-family:Consolas;" />
+  </div>
+  <div>
+      <label class="form-check-label" for="edit-50"> 50</label>
+      <input class="text-input" size="9" name="edit-50" id="edit-50" type="text" style="font-family:Consolas;" />
+  </div>
+  <div>
+      <label class="form-check-label" for="edit-100">100</label>
+      <input class="text-input" size="9" name="edit-100" id="edit-100" type="text" style="font-family:Consolas;" />
+  </div>
+  <div>
+      <label class="form-check-label" for="edit-ALL">ALL</label>
+      <input class="text-input" size="9" name="edit-ALL" id="edit-ALL" type="text" style="font-family:Consolas;" />
+  </div>
+</div>
 
-          <br/>
-          <div id="edit-times" style="left:0px;">
+<div id="edit-customsplit" style="border-top:0px solid black">
 
-            <div>
-              <label for="edit-25"> 25</label>
-              <input size="9" name="edit-25" id="edit-25" type="text" style="font-family:Consolas;font-size:1.5vh"/>
-            </div>
-            <div>
-              <label for="edit-50"> 50</label>
-              <input size="9" name="edit-50" id="edit-50" type="text" style="font-family:Consolas;font-size:1.5vh"/>
-            </div>
-            <div>
-              <label for="edit-100">100</label>
-              <input size="9" name="edit-100" id="edit-100" type="text" style="font-family:Consolas;font-size:1.5vh"/>
-            </div>
-            <div>
-              <label for="edit-ALL">ALL</label>
-              <input size="9" name="edit-ALL" id="edit-ALL" type="text" style="font-family:Consolas;font-size:1.5vh"/>
-            </div>
-          </div>
+</div>
 
-          <div id="edit-customsplit" style="border-top:1px solid black">
+<div id="edit-split">
+  <label class="form-check-label" for="edit-splitscore">New Split</label>
+  <input class="text-input" size="6" name="edit-splitscore" id="edit-splitscore" type="number" placeholder="Score" />
+  <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="edit-addsplit">Add</button>
+</div>
+<div id="edit-customsplit" style="border-top:0px solid black">
+</br>
+<label class="form-check-label" style="flex:center;">Timer Format</label>
+<select class="form-control" id="edit-format" style="flex:center;">
+    <option value="0">0:00:00:000</option>
+    <option value="1">  00:00:000</option>
+    <option value="2">   0:00:000</option>
+    <option value="3">     00:000</option>
+    <option value="4">      0:000</option>
+    <option value="5">0:00:00.000</option>
+    <option value="6">  00:00.000</option>
+    <option value="7">   0:00.000</option>
+    <option value="8">     00.000</option>
+    <option value="9">      0.000</option>
+  </select>
+<br/>
+<input class="form-check-input" style="width: 1.5em; height: 1.5em;" type="checkbox" checked="true" name="edit-delta" id="edit-delta" />
+<label class="form-check-label" for="edit-delta">Show Delta</label>
+<br/>
+<br/>
+<label class="form-check-label" for="edit-aheadg">Ahead (gaining time)</label>
+<input class="text-input" style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-aheadg" id="edit-aheadg" type="color" />
+<label class="form-check-label" for="edit-aheadl">Ahead (losing time)</label>
+<input class="text-input" style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-aheadl" id="edit-aheadl" type="color" />
+<br/>
+<label class="form-check-label" for="edit-behindg">Behind (gaining time)</label>
+<input class="text-input" style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-behindg" id="edit-behindg" type="color" />
+<label class="form-check-label" for="edit-behindl">Behind (losing time)</label>
+<input class="text-input" style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-behindl" id="edit-behindl" type="color" />
 
-          </div>
-
-          <div id="edit-split">
-            <label for="edit-splitscore">New Split</label>
-            <input style="font-family:Consolas;font-size:1.5vh" size="6" name="edit-splitscore" id="edit-splitscore" type="number" placeholder="Score"/>
-            <button style="font-family:Consolas;font-size:1.5vh;" id="edit-addsplit">Add</button>
-          </div>
-
-          <div id="edit-layout" style="border-top:1px solid black;">
-            Timer Format
-            <select id="edit-format" style="font-family: Consolas; font-size: 1.5vh">
-              <option value="0">0:00:00:000</option>
-              <option value="1">  00:00:000</option>
-              <option value="2">   0:00:000</option>
-              <option value="3">     00:000</option>
-              <option value="4">      0:000</option>
-              <option value="5">0:00:00.000</option>
-              <option value="6">  00:00.000</option>
-              <option value="7">   0:00.000</option>
-              <option value="8">     00.000</option>
-              <option value="9">      0.000</option>
-            </select>
-            <br/>
-            <input style="width: 1.5vh; height: 1.5vh;" type="checkbox" checked="true" name="edit-delta" id="edit-delta"/>
-            <label for="edit-delta">Show Delta</label>
-            <br/>
-            <label for="edit-aheadg">Ahead  (gaining time)</label>
-            <input style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-aheadg" id="edit-aheadg" type="color"/>
-               
-            <label for="edit-aheadl">Ahead  (losing  time)</label>
-            <input style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-aheadl" id="edit-aheadl" type="color"/>
-            <br/>
-            <label for="edit-behindg">Behind (gaining time)</label>
-            <input style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-behindg" id="edit-behindg" type="color"/>
-               
-            <label for="edit-behindl">Behind (losing  time)</label>
-            <input style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-behindl" id="edit-behindl" type="color"/>
-
-
-          </div>
+</div>
         `
         document.body.appendChild(editBox)
         document.getElementById('close-box').addEventListener('click', function() { document.getElementById('edit-box').remove() })
@@ -3600,15 +3606,15 @@ window.Timer = {
           splitLabel.innerText = splitScore.toString().padStart(3, ' ') + ' '
 
           const splitInput = document.createElement('input')
+          splitInput.className = 'text-input'
           splitInput.id = splitInput.name = splitName
           splitInput.size = 9
           splitInput.type = 'text'
-          splitInput.style.fontSize = '1.5vh'
 
 
           const splitDeleteButton = document.createElement('button')
-          splitDeleteButton.style.fontSize = '1.5vh'
           splitDeleteButton.innerText = 'Delete'
+          splitDeleteButton.className = 'btn'
           splitDeleteButton.addEventListener('click', function() {
             splitDiv.remove()
 
@@ -3638,7 +3644,7 @@ window.Timer = {
 
 
             const key = splitInput.name.replace('edit-', '')
-
+            splitInput.className = 'text-input'
 
             const _mode  = getSelected('#edit-mode',  'sel')
             const _count = getSelected('#edit-count', 'sel')
@@ -3778,13 +3784,13 @@ window.Timer = {
               splitInput.id = splitInput.name = splitName
               splitInput.size = 9
               splitInput.type = 'text'
-              splitInput.style.fontSize = '1.5vh'
+              splitInput.className = 'text-input'
               splitInput.value = +_splitTime ? _splitTime.timeFormat() : ''
 
               const splitDeleteButton = document.createElement('button')
               // splitDeleteButton.id = `delete-${splitName}`
-              splitDeleteButton.style.fontSize = '1.5vh'
               splitDeleteButton.innerText = 'Delete'
+              splitDeleteButton.className = 'btn'
               splitDeleteButton.addEventListener('click', function() {
                 splitDiv.remove()
                 delete time[_splitName]
@@ -4248,7 +4254,7 @@ window.BootstrapMenu.make = function () {
 
         <span style="color:white;font-family:Roboto,Arial,sans-serif;display:flex; justify-content: center; align-items: center; text-align: center;">Pudding Mod Settings</span>
 
-    <select style="margin:3px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display:flex; justify-content: center; align-items: center; text-align: center;" id="stat-chooser" class="form-control">
+    <select style="margin-top:3px;margin-bottom:3px;margin-left: auto; margin-right: auto;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display:flex; justify-content: center; align-items: center; text-align: center; align:center;" id="stat-chooser" class="form-control">
         <option value="inputGame">Count game inputs</option>
         <option value="inputSession">Count session inputs</option>
         <option value="inputLifetime">Count lifetime inputs</option>
@@ -5007,7 +5013,9 @@ window.mouseMode = {};
 ////////////////////////////////////////////////////////////////////
 
 window.mouseMode.runCodeBefore = function() {
-  window.PuddingMod.runCodeBefore();
+  if(window.PuddingMod) {
+    window.PuddingMod.runCodeBefore();
+  }
 
   window.mouseX = 176.1;
   window.mouseY = 240.1;
@@ -5099,7 +5107,9 @@ window.mouseMode.runCodeBefore = function() {
 ////////////////////////////////////////////////////////////////////
 
 window.mouseMode.alterSnakeCode = function(code) {
-  code = window.PuddingMod.alterSnakeCode(code);
+  if(window.PuddingMod) {
+    code = window.PuddingMod.alterSnakeCode(code);
+  }
   //lifted tileWidth from apple-snake
   window.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];//wa
 
@@ -5152,7 +5162,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   //check for key collisions the same way winged does. WingedCheck has a signature like wingedCheck(this, headCoord, targetCoord)
   let wingedCheck = funcWithEat.assertMatch(/[$a-zA-Z0-9_]{0,8}=1>([$a-zA-Z0-9_]{0,8})\(this\.[$a-zA-Z0-9_]{0,8},this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\],[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
 
-  code = code.replace(funcWithEatOrig, funcWithEat);
+  code = code.replace(funcWithEatOrig, function() {return funcWithEat});
 
   let funcWithKeyCheck, funcWithKeyCheckOrig;
   funcWithKeyCheck = funcWithKeyCheckOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a\)$/,
@@ -5234,12 +5244,12 @@ window.mouseMode.alterSnakeCode = function(code) {
   //Add warning if the game is started with a mode that is broken
   let funcWithNewGame, funcWithNewGameOrig;
   funcWithNewGame = funcWithNewGameOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(\)$/,
-  /;this\.reset\(\)/,
+  /}\);this\.reset\(\)/,
   false);
 
   let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
 
-  let chosenMode = code.assertMatch(/return 18===[a-z]\.([$a-zA-Z0-9_]{0,8})&&[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\)\?!0/)[1];
+  let chosenMode = code.assertMatch(/return [a-z]\.[$a-zA-Z0-9_]{0,8}\?[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\):18===[a-z]\.([$a-zA-Z0-9_]{0,8})&&[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\)\?!0/)[1];
 
   funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,8}\([a-z],18\)&&[$a-zA-Z0-9_]{0,8}\([a-z]\);/,
   `$&if(${modeCheck}(a, 10) || ${modeCheck}(a, 13) || ${modeCheck}(a, 16)){
