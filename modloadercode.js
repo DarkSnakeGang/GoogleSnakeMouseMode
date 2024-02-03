@@ -5,7 +5,9 @@ window.mouseMode = {};
 ////////////////////////////////////////////////////////////////////
 
 window.mouseMode.runCodeBefore = function() {
-  window.PuddingMod.runCodeBefore();
+  if(window.PuddingMod) {
+    window.PuddingMod.runCodeBefore();
+  }
 
   window.mouseX = 176.1;
   window.mouseY = 240.1;
@@ -97,7 +99,9 @@ window.mouseMode.runCodeBefore = function() {
 ////////////////////////////////////////////////////////////////////
 
 window.mouseMode.alterSnakeCode = function(code) {
-  code = window.PuddingMod.alterSnakeCode(code);
+  if(window.PuddingMod) {
+    code = window.PuddingMod.alterSnakeCode(code);
+  }
   //lifted tileWidth from apple-snake
   window.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];//wa
 
@@ -150,7 +154,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   //check for key collisions the same way winged does. WingedCheck has a signature like wingedCheck(this, headCoord, targetCoord)
   let wingedCheck = funcWithEat.assertMatch(/[$a-zA-Z0-9_]{0,8}=1>([$a-zA-Z0-9_]{0,8})\(this\.[$a-zA-Z0-9_]{0,8},this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\],[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
 
-  code = code.replace(funcWithEatOrig, funcWithEat);
+  code = code.replace(funcWithEatOrig, function() {return funcWithEat});
 
   let funcWithKeyCheck, funcWithKeyCheckOrig;
   funcWithKeyCheck = funcWithKeyCheckOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a\)$/,
@@ -232,12 +236,12 @@ window.mouseMode.alterSnakeCode = function(code) {
   //Add warning if the game is started with a mode that is broken
   let funcWithNewGame, funcWithNewGameOrig;
   funcWithNewGame = funcWithNewGameOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(\)$/,
-  /;this\.reset\(\)/,
+  /}\);this\.reset\(\)/,
   false);
 
   let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
 
-  let chosenMode = code.assertMatch(/return 18===[a-z]\.([$a-zA-Z0-9_]{0,8})&&[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\)\?!0/)[1];
+  let chosenMode = code.assertMatch(/return [a-z]\.[$a-zA-Z0-9_]{0,8}\?[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\):18===[a-z]\.([$a-zA-Z0-9_]{0,8})&&[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\)\?!0/)[1];
 
   funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,8}\([a-z],18\)&&[$a-zA-Z0-9_]{0,8}\([a-z]\);/,
   `$&if(${modeCheck}(a, 10) || ${modeCheck}(a, 13) || ${modeCheck}(a, 16)){
