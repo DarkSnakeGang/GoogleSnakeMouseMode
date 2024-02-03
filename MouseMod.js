@@ -5235,7 +5235,7 @@ window.mouseMode.alterSnakeCode = function(code) {
   //Add warning if the game is started with a mode that is broken
   let funcWithNewGame, funcWithNewGameOrig;
   funcWithNewGame = funcWithNewGameOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(\)$/,
-  /}\);this\.reset\(\)/,
+  /this\.reset\(\)\}\}/,
   false);
 
   let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
