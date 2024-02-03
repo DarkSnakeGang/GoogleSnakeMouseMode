@@ -1487,8 +1487,6 @@ window.TimeKeeper.make = function () {
         div.insertBefore(dialog, div.firstChild)
     };
 
-
-
     //Function to find the snake code, and apply changes.
     window.timeKeeper.setup = function () {
         //just make storage, this used to also alter snake code
