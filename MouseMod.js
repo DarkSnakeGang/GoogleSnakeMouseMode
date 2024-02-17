@@ -2622,7 +2622,7 @@ window.SpeedInfo.make = function () {
       });
 
     window.getRecordSRC = function (level) {
-        debugger
+
         if(window.daily_challenge){
 
             EmptyAll();
