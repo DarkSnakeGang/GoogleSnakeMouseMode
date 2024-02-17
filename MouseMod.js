@@ -6,9 +6,8 @@ window.Core.make = function () {
     window.uiImage = function (src) {
         let img = new Image();
         img.src = src;
-        img.width = 40;
-        img.height = 40;
-        img.class = 'DqMRee SsAred'; // Hardcoded, need to figure out what this is and how to make it dynamic or something.
+        img.classList.add('DqMRee');
+        img.classList.add('SsAred'); // Hardcoded, need to figure out what this is and how to make it dynamic or something.
         return img;
     };
 
@@ -19,6 +18,35 @@ window.Core.make = function () {
     }
 
     window.graphics_selected = 0;
+
+    daily_button = document.querySelector('[jsname="Prvkrf"]');
+    window.daily_challenge = false
+
+    // Options for the Intersection Observer
+    var options = {
+        root: null, // Use the viewport as the root
+        threshold: 0.5 // Trigger when 50% of the element is visible
+    };
+
+    // Callback function to handle intersection changes
+    function handleIntersection(entries, observer) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                // The element is now visible
+                window.daily_challenge = false;
+            }
+        });
+    }
+
+    // Create an Intersection Observer
+    var observer = new IntersectionObserver(handleIntersection, options);
+
+    // Start observing the button
+    observer.observe(daily_button);
+
+    daily_button.addEventListener("click", function() {
+        window.daily_challenge = true;
+      });
 
 }
 
@@ -980,6 +1008,9 @@ window.TimeKeeper.make = function () {
         if (window.pudding_settings.randomizeThemeApple) {
             window.setTheme(window.getRandomThemeName());
         }
+        if(window.daily_challenge) {
+            return;
+        }
         if (window.timeKeeper.debug) {
             //console.log("got Apple %s, %s", time, score);
         }
@@ -1094,6 +1125,11 @@ window.TimeKeeper.make = function () {
             }
             return 0;
         }
+
+        if(name != 'trophy'){
+            return eval(window[name + '_var'])
+        }
+
         return getSelectedIndex(name);
     }
 
@@ -1829,6 +1865,13 @@ window.Fruit.alterCode = function (code) {
     settings_src = code.match(settings_src_regex)[0].split('.')[2].split('&')[0] // This is the [] part in a.settings.[] - which has an src link to an image in it
     // ${settings_itself}
 
+    get_graphics = new RegExp(/case "graphics":/);
+    code = code.assertReplace(get_graphics, "$& window.graphics_selected=")
+    get_fruit = new RegExp(/case "apple":/);
+    code = code.assertReplace(get_fruit, "$& window.fruit_selected=")
+    fruit_image = code.match(/\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}="/gm)[0].split('(')[1].split('=')[0]
+    // Very poorly coded, get back here using this: "https://www.google.com/logos/fnbx/"+(1===
+    /*
     // Full function that sets the current fruit icon
     realism_load_image = new RegExp(/if\("apple"===[a-zA-Z0-9_$]{1,8}\|\|"graphics"===[a-zA-Z0-9_$]{1,8}\).*;if/);
     realism_image_code = code.match(realism_load_image)[0];
@@ -1839,42 +1882,35 @@ window.Fruit.alterCode = function (code) {
     graphics_selected_code = realism_image_code.split(',')[1];
 
     fruit_image = realism_image_code.split('{')[1].split('=')[0]
+    */
 
     new_realism_code = `
-    window.graphics_selected = ${graphics_selected_code};
-    if(${selected_fruit_num} >= ${last_fruit_num + 1}){
-        fruit_index = ${selected_fruit_num} - ${last_fruit_num + 1};
+    if(window.fruit_selected >= ${last_fruit_num + 1}){
+        fruit_index = window.fruit_selected - ${last_fruit_num + 1};
         switch (window.graphics_selected) {
             default:
             case 0:
-                d = window.new_fruit[fruit_index].Normal;
+                window.current_fruit_img = window.new_fruit[fruit_index].Normal;
                 break;
             case 1:
-                d = window.new_fruit[fruit_index].Pixel;
+                window.current_fruit_img = window.new_fruit[fruit_index].Pixel;
                 break;
             case 2:
-                d = window.new_fruit[fruit_index].Real;
+                window.current_fruit_img = window.new_fruit[fruit_index].Real;
         }
-        ${fruit_image} = d;
+        ${fruit_image} = window.current_fruit_img;
     }
     `
 
-    //final_realism_code = realism_image_code.split('}')[0] + '}' + realism_image_code.split('}')[1] + ';' + new_realism_code
+    rude_insert = new RegExp(/"\.png"\)\)}/gm)
+    code = code.assertReplace(rude_insert, `".png")); ${new_realism_code} }`);
 
-    //final_realism_test = `;; debugger ;;`
+    daily_fruit_deathscreen = code.match(/[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.src/)[0]
 
-    final_realism_code = `
-${realism_image_code.split('}')[0]};
-        ${new_realism_code}
-    }
-    ${realism_image_code.split('}')[1]}
-    `
 
-    //console.log(final_realism_code)
-
-    //code = code.assertReplace(code.match(realism_load_image)[0], final_realism_test + '$&');
-    code = code.assertReplace(code.match(realism_load_image)[0], final_realism_code);
-
+    rude_insert2 = code.match(/0,[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\)}/)[0]
+    code = code.assertReplace(rude_insert2,
+        `${rude_insert2.split('}')[0]} ${new_realism_code.replace(fruit_image, daily_fruit_deathscreen)} }`);
     /*
     load_image_func = new RegExp(/if\("apple"===[a-zA-Z0-9_$]{1,8}\|\|"graphics"===[a-zA-Z0-9_$]{1,8}\)[a-zA-Z0-9_$]{1,8}=[a-zA-Z0-9_$]{1,8}\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}\),\n?[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}="https:\/\/www\.google\.com\/logos\/fnbx\/"\+\(1===[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}\?"snake_arcade\/pixel\/[a-zA-Z0-9_$]{1,8}\/px_apple_"\+[a-zA-Z0-9_$]{1,8}\+"\.png":"snake_arcade\/[a-zA-Z0-9_$]{1,8}\/apple_"\+[a-zA-Z0-9_$]{1,8}\+"\.png"\);/)
 
@@ -1999,10 +2035,10 @@ ${realism_image_code.split('}')[0]};
     code = code.assertReplace(shh_grabber, new_shh_line);
 
     // Gets the settings value that hold the src for count and apple, also the var it's held in is the same for both.
-    get_count_val1 = code.match(/case "count":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[0].split(':')[1]
-    get_count_val2 = code.match(/case "count":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
-    get_apple_val2 = code.match(/case "apple":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
-    get_speed_val2 = code.match(/case "speed":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
+    //get_count_val1 = code.match(/case "count":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[0].split(':')[1]
+    //get_count_val2 = code.match(/case "count":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
+    //get_apple_val2 = code.match(/case "apple":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
+    //get_speed_val2 = code.match(/case "speed":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
 
     // Endscreen related image loading for new fruit - pudding. Keep this last
     // Since it effect load_image_func in a way that would break the other code that relies on it !!
@@ -2055,18 +2091,31 @@ window.TopBar.make = function () {
 
 window.TopBar.alterCode = function (code) {
 
-  // Code to alter snake code here
-  count_var = "window.count_setting"
-  speed_var = "window.speed_setting"
-
   window.count_img_arr = Array.from(document.querySelector('#count').children).map(el=>el.src);
   window.speed_img_arr = Array.from(document.querySelector('#speed').children).map(el=>el.src);
 
-  count_regex = new RegExp(/case "count"\:/)
-  speed_regex = new RegExp(/case "speed"\:/)
+  count_regex = new RegExp(/case "count"\:[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/)
+  speed_regex = new RegExp(/case "speed"\:[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/)
+  size_regex = new RegExp(/case "size"\:[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/)
 
-  set_count_code = `$&${count_var}=`
-  set_speed_code = `$&${speed_var}=`
+  count_ref = code.match(count_regex)[0].split('.')[2]
+  speed_ref = code.match(speed_regex)[0].split('.')[2]
+  size_ref = code.match(speed_regex)[0].split('.')[2]
+
+  settings_reference = code.match(count_regex)[0].split(':')[1].split('.')[0] + '.' + code.match(count_regex)[0].split('.')[1]
+
+  //set_count_code = `$&${count_var}=`
+  //set_speed_code = `$&${speed_var}=`
+
+  code = code.assertReplace(/switch\(b\){case "apple"\:/, `window.set_ref = ${settings_reference}; $&`);
+
+  count_var = `window.set_ref.${count_ref}`
+  speed_var = `window.set_ref.${speed_ref}`
+  size_var = `window.set_ref.${size_ref}`
+
+
+  //code = code.assertReplace(count_regex, set_count_code);
+  //code = code.assertReplace(speed_regex, set_speed_code);
 
   fruit_jsname = document.querySelector('[src$="apple_00.png"]').getAttribute("jsname")
   fruit_src = `document.querySelector('[jsname="${fruit_jsname}"]').src `
@@ -2097,18 +2146,23 @@ window.TopBar.alterCode = function (code) {
     }
   }
 
-  code = code.assertReplace(count_regex, set_count_code);
-  code = code.assertReplace(speed_regex, set_speed_code);
-
   reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
   set_on_reset = `;
-  if (window.pudding_settings.TopBar) {
+  if (window.pudding_settings.TopBar && !window.daily_challenge) {
     ${fruit_src} = window.count_img_arr[${count_var}]
   }
   window.control_mute_img(window.pudding_settings.TopBar, window.speed_img_arr[${speed_var}])
+  if(window.daily_challenge){
+    window.control_mute_img(false, window.speed_img_arr[${speed_var}])
+  }
   $&`
   code = code.assertReplace(reset_regex, set_on_reset)
+
+  window.set_ref = {};
+  eval(speed_var + `=0`)
+  eval(count_var + `=0`)
+  eval(size_var + `=0`)
 
   return code;
 }
@@ -2538,8 +2592,9 @@ window.SpeedInfo.make = function () {
         13: { name: "Statue" },
         14: { name: "Light" },
         15: { name: "Shield" },
-        16: { name: "Peaceful" },
-        17: { name: "Blender" },
+        16: { name: "Arrow" },
+        17: { name: "Peaceful" },
+        18: { name: "Blender" },
     }
 
     window.countToTxt = {
@@ -2561,7 +2616,18 @@ window.SpeedInfo.make = function () {
         2: { name: "Slow" },
     }
 
+    daily_button.addEventListener("click", function() {
+        SpeedInfoUpdate()
+        EmptyAll()
+      });
+
     window.getRecordSRC = function (level) {
+        debugger
+        if(window.daily_challenge){
+
+            EmptyAll();
+            return;
+        }
 
         if (!window.pudding_settings.SpeedInfo) {
             // For those that don't want to see speedrun info, to keep the game stable without api calls
@@ -2976,7 +3042,9 @@ window.SpeedInfo.make = function () {
 
         tempID = "time-keeper"; // Inspect element on Timer and take jsname from it
         document.querySelector("button[jsname^=\"" + tempID + "\"]").addEventListener("click", (e) => {
-            window.timeKeeper.toggleDialog();
+            if(!window.daily_challenge){
+                window.timeKeeper.toggleDialog();
+            }
         });
 
         //debugger
@@ -3039,7 +3107,8 @@ window.SpeedInfo.make = function () {
                     case 12: gamemode += "Statue, "; break;
                     case 13: gamemode += "Light, "; break;
                     case 14: gamemode += "Shield, "; break;
-                    case 15: gamemode += "Peaceful, "; break;
+                    case 15: gamemode += "Arrow, "; break;
+                    case 16: gamemode += "Peaceful, "; break;
                     default: gamemode += "Unknown, "; break;
                 }
             }
@@ -3060,6 +3129,10 @@ window.SpeedInfo.make = function () {
         for (let score of ["att", "25", "50", "100", "ALL", "H"]) {
             let name = score + "-" + modeStr + "-" + count + "-" + speed + "-" + size;
             bold = document.getElementById(score);
+            if(window.daily_challenge) {
+                bold.innerHTML = '';
+                continue;
+            }
 
             if (typeof (storage[name]) != "undefined") {
 
@@ -3086,6 +3159,11 @@ window.SpeedInfo.make = function () {
             else {
                 bold.innerHTML = "";
             }
+        }
+
+        if(window.daily_challenge) {
+            mode_label.innerHTML = 'Daily Challenge'
+            mode_label2.innerHTML = '(TimeKeeper disabled)'
         }
 
     }
