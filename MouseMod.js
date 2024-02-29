@@ -3967,7 +3967,7 @@ window.Timer = {
 
   },
   alterCode: function(code) {
-    debugger
+
     code = code.replace('"--:--:---"', 'localStorage._snake_null_split')
     code = code.replace('"25"', 'Math.min(25, ...(window._splits.length === 0 ? [25] : window._splits)) || 25')
 
