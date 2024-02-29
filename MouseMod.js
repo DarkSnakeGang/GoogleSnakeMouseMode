@@ -46,6 +46,7 @@ window.Core.make = function () {
 
     daily_button.addEventListener("click", function() {
         window.daily_challenge = true;
+        window.first_time_call = true;
       });
 
 }
@@ -1030,6 +1031,9 @@ window.TimeKeeper.make = function () {
 
     //called when you get all apples
     window.timeKeeper.gotAll = function (time, score) {
+        if(window.daily_challenge) {
+            return;
+        }
         if (window.timeKeeper.debug) {
             //console.log("got All %s, %s", time, score);
         }
@@ -1303,7 +1307,7 @@ window.TimeKeeper.make = function () {
                 old_pbs = JSON.parse(old_pbs);
                 //console.log("Converting local storage to new storage type");
                 for (mode = 0; mode < 16; mode++) {
-                    modeStr = "0000000000000000".split("");
+                    modeStr = "00000000000000000".split("");
                     if (mode != 0) {
                         modeStr[mode - 1] = '1';
                     }
@@ -1582,7 +1586,7 @@ window.TimeKeeper.alterCode = function (code) {
     //modeFunc = modeFunc.split('(')[0];
     //scoreFunc = func.match(/25\!\=\=this.[a-zA-Z0-9$]{1,4}/)[0]; // Need to figure this out
     scoreFuncVar = func.match(/25\=\=\=\n?[a-zA-Z0-9$]{1,4}/)[0].split('=')[3]; // Assuming he wanted just the "this.score"
-    scoreFunc = func.match(`${window.escapeRegex(scoreFuncVar.replace('\n', ''))}=this.[a-zA-Z0-9$]{1,6}`)[0].split('=')[1]
+    scoreFunc = func.match(`${window.escapeRegex(scoreFuncVar.replace('\n', ''))}=\n?this.[a-zA-Z0-9$]{1,6}`)[0].split('=')[1]
     ////console.log(scoreFunc)
     //scoreFunc = scoreFunc.substring(scoreFunc.indexOf("this."),scoreFunc.size);
     //timeFunc = func.match(/this.[a-zA-Z0-9$]{1,6}\*this.[a-zA-Z0-9$]{1,6}/)[0];
@@ -2100,7 +2104,7 @@ window.TopBar.alterCode = function (code) {
 
   count_ref = code.match(count_regex)[0].split('.')[2]
   speed_ref = code.match(speed_regex)[0].split('.')[2]
-  size_ref = code.match(speed_regex)[0].split('.')[2]
+  size_ref = code.match(size_regex)[0].split('.')[2]
 
   settings_reference = code.match(count_regex)[0].split(':')[1].split('.')[0] + '.' + code.match(count_regex)[0].split('.')[1]
 
@@ -2179,7 +2183,7 @@ window.SnakeColor.alterCode = function (code) {
 
     // Code to alter snake code here
     snake_colors_regex = new RegExp(/[a-zA-Z0-9_$]{1,6}[^]?=[^]?\[\["#4E7CF6","#17439F"\][^]*?\]\]/);
-    yinyang_colors_regex = new RegExp(/\[5,4,7,7,1,2,0,3,9,8,0,14,15,15,11,12,17,16\]/)
+    yinyang_colors_regex = new RegExp(/\[5,4,7,7,1,2,0,3,9,8,0,14,15,15,11,\n?12,17,16\]/)
 
     snake_colors = [];
 
@@ -3963,7 +3967,7 @@ window.Timer = {
 
   },
   alterCode: function(code) {
-
+    debugger
     code = code.replace('"--:--:---"', 'localStorage._snake_null_split')
     code = code.replace('"25"', 'Math.min(25, ...(window._splits.length === 0 ? [25] : window._splits)) || 25')
 
@@ -4074,9 +4078,9 @@ window.Timer = {
     )
 
     const stuffBlock = code.match(
-      /[a-zA-Z0-9_$]{1,8}=this\.header,[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8},[a-zA-Z0-9_$]{1,8}=this\.ticks,[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8};/
+      /[a-zA-Z0-9_$]{1,8}=this\.header,[a-zA-Z0-9_$]{1,8}=\n?this\.[a-zA-Z0-9_$]{1,8},[a-zA-Z0-9_$]{1,8}=this\.ticks,[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8};/
     )[0]
-    const score = stuffBlock.match(/header,[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8}/)[0].replace(/header,[a-zA-Z0-9_$]{1,8}=/,'')
+    const score = stuffBlock.match(/header,[a-zA-Z0-9_$]{1,8}=\n?this\.[a-zA-Z0-9_$]{1,8}/)[0].replace(/header,[a-zA-Z0-9_$]{1,8}=/,'')
     const ticks = stuffBlock.match(/[a-zA-Z0-9_$]{1,8}=this\.ticks/)[0].replace(/[a-zA-Z0-9_$]{1,8}=/,'')
     const dt    = stuffBlock.match(/ticks,[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8}/)[0].replace(/ticks,[a-zA-Z0-9_$]{1,8}=/,'')
 
