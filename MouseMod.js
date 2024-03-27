@@ -1824,7 +1824,18 @@ window.Fruit.make = function () {
         "Real": "https://i.postimg.cc/FsHrz2vr/santa-rtx.png",
         "Poison_values": 'b,\'#ff3f3f\',\'#909090\',100',
     });
-
+    new_fruit.push({ // Cabbage
+        "Normal": 'https://i.postimg.cc/j59z8v1m/cabbage.png',
+        "Pixel": 'https://i.postimg.cc/FR1ygwT0/cabbage-px.png',
+        "Real": "https://i.postimg.cc/yd1GyLFv/cabbage-real.png",
+        "Poison_values": 'b,\'#ff3f3f\',\'#909090\',20',
+    });
+    new_fruit.push({ // Heart
+        "Normal": 'https://i.postimg.cc/8PGLRXCb/heart.png',
+        "Pixel": 'https://i.postimg.cc/v8fW6wGB/pixel-heart.png',
+        "Real": "https://i.postimg.cc/3NXmMmtp/real-heart.png",
+        "Poison_values": 'b,\'#ff3f3f\',\'#909090\',20',
+    });
 
     last_fruit_num = document.querySelector('#apple').children.length - 1;
     // Add fruit to menu
@@ -1839,10 +1850,10 @@ window.Fruit.make = function () {
         "Real": "https://i.postimg.cc/764WBzhL/golden-real.png",
         "Poison_values": 'b,\'#eaca23\',\'#909090\',20',
     });
-    new_fruit.push({ // Cabbage
-        "Normal": 'https://i.postimg.cc/j59z8v1m/cabbage.png',
-        "Pixel": 'https://i.postimg.cc/FR1ygwT0/cabbage-px.png',
-        "Real": "https://i.postimg.cc/yd1GyLFv/cabbage-real.png",
+    new_fruit.push({ // Golden Strawberry
+        "Normal": 'https://i.postimg.cc/CxLDtZkB/golden-strawberry.png',
+        "Pixel": 'https://i.postimg.cc/9Q8TjWYx/px-golden-strawberry.png',
+        "Real": "https://i.postimg.cc/tCzW2dZG/real-golden-strawberry.png",
         "Poison_values": 'b,\'#ff3f3f\',\'#909090\',20',
     });
 
@@ -4714,7 +4725,10 @@ window.CustomPortalPairs.make = function () {
         47: { name: "Red Pudding", image: "https://i.postimg.cc/15kNH2Y5/pudding-red.png" },
         48: { name: "Dirt Block", image: "https://i.postimg.cc/7ZvhtHKK/mc-dirt-px.png" },
         49: { name: "Bread", image: "https://i.postimg.cc/YSMVtPr1/bread.png" },
-        50: { name: "Santa", image: "https://i.postimg.cc/kgV7FKDL/santa.png" }
+        50: { name: "Santa", image: "https://i.postimg.cc/kgV7FKDL/santa.png" },
+        51: { name: "Cabbage", image: "https://i.postimg.cc/j59z8v1m/cabbage.png" },
+        52: { name: "Heart", image: "https://i.postimg.cc/8PGLRXCb/heart.png" }
+
     };
 
 
