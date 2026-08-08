@@ -11254,7 +11254,16 @@ window.mouseMode.runCodeBefore = function () {
   window.setupMenuCheckbox = function () {
     const inject = function () {
       try {
-        if (document.getElementById("AimTrainer")) return true;
+        const existing = document.getElementById("mouse-aim-trainer-settings");
+        if (existing) {
+          const parent = existing.parentElement;
+          const nested =
+            parent &&
+            parent.classList &&
+            parent.classList.contains("form-check");
+          if (!nested) return true;
+          existing.remove();
+        }
         const panel = document.getElementById("settings-popup-pudding");
         if (!panel) return false;
 
@@ -11262,19 +11271,28 @@ window.mouseMode.runCodeBefore = function () {
           window.aimTrainer = !!window.pudding_settings.AimTrainer;
         }
 
+        // Clean up a lone AimTrainer input from a prior bad inject.
+        const stale = document.getElementById("AimTrainer");
+        if (stale) stale.remove();
+
         const row = document.createElement("div");
         row.className = "form-check form-check-inline";
         row.id = "mouse-aim-trainer-settings";
-        row.innerHTML = `
-          <input class="form-check-input" type="checkbox" role="switch" id="AimTrainer">
-          <label class="form-check-label" for="AimTrainer" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Aim Trainer</label>`;
+        row.innerHTML =
+          '<input class="form-check-input" type="checkbox" role="switch" id="AimTrainer">' +
+          '<label class="form-check-label" for="AimTrainer" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Aim Trainer</label>';
 
-        const anchor =
+        // Anchor is the INPUT id — insert after its whole .form-check row, not inside it.
+        const anchorInput =
+          document.getElementById("DisableRandom") ||
           document.getElementById("RemoveScrollbar") ||
           document.getElementById("TimerSettings") ||
           document.getElementById("CustomBowlFruits");
-        if (anchor && anchor.parentElement) {
-          anchor.parentElement.insertBefore(row, anchor.nextSibling);
+        const anchorRow =
+          (anchorInput && anchorInput.closest(".form-check")) ||
+          (anchorInput && anchorInput.parentElement);
+        if (anchorRow && anchorRow.parentNode) {
+          anchorRow.parentNode.insertBefore(row, anchorRow.nextSibling);
         } else {
           panel.appendChild(row);
         }
