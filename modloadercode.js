@@ -925,16 +925,15 @@ window.mouseMode.alterSnakeCode = function (code) {
     if (next) code = next;
   }
 
-  // Shield / chess Oba death: same hitreg as Shield mode under mouse.
-  // e7 (shield/chess) → OaF<1; otherwise rounded tile.
-  // Chess locks set all 4 dirs — also kill when direction is NONE/missing.
+  // Shield mode Oba death: e7 → OaF (same as Shield under mouse); else rounded tile.
+  // Chess lethality while carrying is the eat-path Na() above — not Oba.has(direction).
   {
     const next = step(
       "shieldTick",
       () =>
         code.assertReplace(
           /\(e7\(this\.settings\)\?OaF\(this\.ka,a,f\.pos\)<1:f\.pos\.equals\(a\)\)&&\(\(g=f\.Oba\)==null\?0:g\.has\(d\)\)&&this\.Na\(\)/,
-          "(e7(this.settings)?OaF(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.Oba)==null?0:(g.has(d)||(window.__chessCarrying&&g.size>=4)))&&this.Na()"
+          "(e7(this.settings)?OaF(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.Oba)==null?0:g.has(d))&&this.Na()"
         ),
       true
     );
@@ -1196,15 +1195,15 @@ window.mouseMode.alterSnakeCode = function (code) {
     if (next) code = next;
   }
 
-  // Tag eaten apple; if it's a chess piece, apply Remix pickup immediately
-  // (don't wait for findApple — fractional heads make that miss → fruit path).
+  // Chess eat: while locked/carrying, any eat attempt kills (generous $d||He hitreg).
+  // While OPEN, tag Wd and apply piece pickup immediately (don't trust findApple alone).
   {
     const next = step(
-      "chessEatPickup",
+      "chessEatLockedDeath",
       () =>
         code.assertReplace(
           /if\(\$d\|\|He\)\{let dg=Wd\.nla/,
-          "if($d||He){window.__chessEatenApple=Wd;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(window.isChessActive&&window.isChessActive()&&Wd.isPiece){window.just_ate='piece';window.head_state=Wd.ChessPiece;window.head_color=Wd.ChessColor;window.__chessCarrying=true;window.__chessCarryPiece=Wd.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(Wd.type);if(typeof window.shield_all==='function')window.shield_all();}let dg=Wd.nla"
+          "if($d||He){if(window.isChessActive&&window.isChessActive()&&(window.__chessCarrying||(window.head_state&&window.head_state!=='OPEN'))){this.Na();break;}window.__chessEatenApple=Wd;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(window.isChessActive&&window.isChessActive()&&Wd.isPiece){window.just_ate='piece';window.head_state=Wd.ChessPiece;window.head_color=Wd.ChessColor;window.__chessCarrying=true;window.__chessCarryPiece=Wd.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(Wd.type);if(typeof window.shield_all==='function')window.shield_all();}let dg=Wd.nla"
         ),
       true
     );
