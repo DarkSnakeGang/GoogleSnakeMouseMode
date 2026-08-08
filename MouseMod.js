@@ -68,6 +68,9 @@ window.Theme = {};
 
 window.Theme.make = function () {
 
+  // style for all pudding sidebar overlays
+  window.puddingSidebarStyle = 'position:absolute;left:100%;z-index:10000;background-color:#4a752c;padding:8px;display:block;border-radius:3px;width:220px;height:584px;top:0px;';
+
   let advancedSettings = JSON.parse(localStorage.getItem('snakeAdvancedSettings')) ?? {};
 
   window.themes = [
@@ -247,8 +250,8 @@ window.Theme.make = function () {
     },
     {
       name: 'Pacman',
-      light_tiles: '#010101',
-      dark_tiles: '#000000',
+      light_tiles: '#1D1D1D',
+      dark_tiles: '#161616',
       shadow: '#000000',
       border: '#0805c6',
       key_block_sign_color: '#000000',
@@ -438,6 +441,11 @@ window.Theme.alterCode = function (code) {
 
     document.getElementById('settings-popup-pudding').style.background = real_top_bar;
     document.getElementById('speedinfo-popup-pudding').style.background = real_top_bar;
+    const portalPanel = document.getElementById('fruit-bowl-popup-pudding') || document.getElementById('portal-pairs-popup-pudding');
+    if (portalPanel) {
+      portalPanel.style.background = real_top_bar;
+      portalPanel.style.backgroundColor = real_top_bar;
+    }
 
     window.real_topbar_color = real_top_bar;
     window.button_color = buttons_color;
@@ -513,7 +521,6 @@ window.DistinctVisual.make = function () {
 
     // window.skull_toggle = false;
     // window.soko_toggle = true;
-    //document.getElementsByClassName('TO4uAe wSwbef')[1].addEventListener('click', toggle_skull_func, false);
 
     window.distinct_soko_goal = new Image();
     window.distinct_soko_goal.src = 'https://i.postimg.cc/x11nt4Pb/box-distinct-soko-goals.png';
@@ -528,97 +535,37 @@ window.DistinctVisual.make = function () {
 }
 
 window.DistinctVisual.alterCode = function (code) {
-    // Attempt to get info on which mode it is
-    spawn_func_regex = new RegExp(/if\([a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},\n?2\)\)[a-zA-Z0-9_$]{1,8}=!0;else if\([a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},\n?10\)&&[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\)[a-zA-Z0-9_$]{1,8}=\n?!1;else{var [a-zA-Z0-9_$]{1,8}=[a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},6\)\|\|[a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},7\);[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8}\([a-zA-Z0-9_$]{1,8},![a-zA-Z0-9_$]{1,8},null\)}/)
 
-    spawn_func_code = code.match(spawn_func_regex)[0]
-
-    is_portal = spawn_func_code.split('(')[1] + "(" + spawn_func_code.split(')')[0].split('(')[2] + ")"
-    is_soko = is_portal.replace('2', '9').replace("this", "a");
-
-    // The elegent piece of code that replace the grey pudding with the skull icon
-    //console.log("Making soko goals more distinct")
-    //console.log("Adding poison trophy as poison apple (click on the trophy at the top bar to toggle)")
-    ////console.log(code)
-
-    realism_draw = new RegExp(/switch\(void.*{d/);
+    realism_draw = new RegExp(/function\(a,b\){switch.*{d/);
+    catchError(realism_draw, code);
     realism_switch = code.match(realism_draw)[0];
-    //actual_canvas_regexp = new RegExp(/a.[a-zA-Z0-9_$]{1,8}.canvas,/);
-    //actual_canvas = code.match(actual_canvas_regexp)[0]
-    realism_path = new RegExp(/switch\(void.*}}/);
+
+    realism_path = new RegExp(/function\(a,b\){switch.*}}/);
+    catchError(realism_path, code);
     last_path = code.match(realism_path)[0].split('.')[9].split('}')[0]
 
     get_graphics = realism_switch.split(':')[1].split(')')[0];
-nothing =` if(window.pudding_settings.SokoGoals && a.${last_path}.path.includes("box")){
-    switch (${get_graphics}) {
-        default:
-        case 0:
-            a.oa.xy = window.distinct_soko_goal;
-            break;
-        case 1:
-            a.Ba.xy = window.distinct_soko_goal_px;
-            break;
-        case 2:
-            a.Ea.xy = window.distinct_soko_goal;
-            break;
-    }
-}`
 
     window.drawing_apple = true;
 
-    get_apple_stuff = new RegExp(/var.*[a-zA-Z0-9_$]{1,8}\.canvas\:.*\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\);/)
+    get_apple_stuff = new RegExp(/(?:let|const|var).*[a-zA-Z0-9_$]{1,8}\.canvas\:.*\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\);/)
+    catchError(get_apple_stuff, code);
     poison_default = code.match(get_apple_stuff)[0]
     b_graphics = poison_default.split('(')[2].split(')')[0]
 
     get_apple_code = `
     if(window.pudding_settings.Skull){
-        b.type = ${poison_default.split('?')[1].split('=')[1]} ? ${poison_default.split('<')[2].split('?')[0]} - 1 : b.type;
+        b.type = ${poison_default.split('?')[1].split('=')[1]} ? ${poison_default.split('<')[1].split('?')[0]} - 1 : b.type;
     }
     ${poison_default}
     `
 
-    /*get_apple_code = `
-    if(window.pudding_settings.Skull){
-        switch (window.graphics_selected) {
-            default:
-            case 0:
-                final_skull = window.skull;
-                break;
-            case 1:
-                final_skull = window.px_skull;
-                break;
-            case 2:
-                final_skull = window.real_skull;
-                break;
-            case 3:
-                switch (${b_graphics}) {
-                    default:
-                    case 0:
-                        final_skull = window.skull;
-                        break;
-                    case 1:
-                        final_skull = window.px_skull;
-                        break;
-                    case 2:
-                        final_skull = window.real_skull;
-                        break;
-                }
-                break;
-        }
-        b.type = ${poison_default.split('?')[1].split('=')[1]} ? ${poison_default.split('<')[2].split('?')[0]} - 1 : b.type;
-        //${poison_default.split('?')[0]} ? ${poison_default.split('?')[1]} ? final_skull : ${poison_default.split(':')[2]}
-        ${poison_default}
-
-    }
-    else {
-        ${poison_default}
-    }
-     `*/
     code = code.assertReplace(get_apple_stuff, get_apple_code)
 
-    disable_real_grey = new RegExp(/null==\(f=[a-zA-Z0-9_$]{1,8}.[a-zA-Z0-9_$]{1,8}\)\|\|[a-zA-Z0-9_$]{1,8}\(f,b,c,-1\)/)
+    disable_real_grey = new RegExp(/\(f=[a-zA-Z0-9_$]{1,8}.[a-zA-Z0-9_$]{1,8}\)==null\|\|[a-zA-Z0-9_$]{1,8}\(f,b,c,-1\)/)
+    catchError(disable_real_grey, code);
     real_grey = code.match(disable_real_grey)[0]
-    real_grey_path = real_grey.split(')')[0].split('=')[3]
+    real_grey_path = real_grey.split(')')[0].split('=')[1]
 
     new_grey_code = `
     if (${real_grey_path} && ${real_grey_path}.path.includes("poison-skull")) {
@@ -629,34 +576,23 @@ nothing =` if(window.pudding_settings.SokoGoals && a.${last_path}.path.includes(
     }
     `
 
-    code = code.assertReplace(disable_real_grey,new_grey_code)
+    code = code.assertReplace(disable_real_grey, new_grey_code)
 
-    if (window.NepDebug) {
-        console.log(code)
-    }
-
-    sokondeez = new RegExp(/this\.[a-zA-Z0-9_$]{1,8}=new.*box\..*}/gm)
+    // Match only the box goal creation. v12 puts the sequence.png creation on the
+    // same line just before it, which a greedy match swallows — that truncated the
+    // rebuilt call and grabbed the sequence property instead of the box one.
+    sokondeez = new RegExp(/this\.[a-zA-Z0-9_$]{1,8}=new [a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},"[^"]*box[^"]*",\d+,this\.[a-zA-Z0-9_$]{1,8},"[^"]*"\)/)
+    catchError(sokondeez, code);
     sokondeez_code = code.match(sokondeez)[0]
 
     sokondeez_nuts = `
     window.SokoRef=this;
-    window.DefaultSokoGoal=${sokondeez_code.slice(0, -1)}
+    window.DefaultSokoGoal=${sokondeez_code};
     window.DistinctSokoFinal=${sokondeez_code.split('=')[1].split('"')[0]} "${window.distinct_soko_goal.src}" ${sokondeez_code.split('"')[2]} "${window.distinct_soko_goal_px.src}" ${sokondeez_code.split('"')[4]}
     `
 
     code = code.assertReplace(sokondeez, sokondeez_nuts)
 
-    //keep_running = new RegExp(/;if\([a-zA-Z0-9_$]{1,8}\(this.[a-zA-Z0-9_$]{1,8},9\)\)/)
-/*
-    code = code.assertReplace(keep_running, `;
-    if (window.pudding_settings.SokoGoals) {
-        window.SokoRef.${sokondeez_code.split('=')[0].split('.')[1]} = window.DistinctSokoFinal;
-    }
-    else {
-        window.SokoRef.${sokondeez_code.split('=')[0].split('.')[1]} = window.DefaultSokoGoal;
-    }
-    ${code.match(keep_running)[0]}`)
-*/
     reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
     set_on_reset = `;
@@ -668,84 +604,6 @@ nothing =` if(window.pudding_settings.SokoGoals && a.${last_path}.path.includes(
     }
     $&`
     code = code.assertReplace(reset_regex, set_on_reset)
-
-    //code = code.assertReplace(/this.Ja.canvas,/, `window.distinct_soko_goal,`)
-
-/*
-
-Generally speaking, there is a "shadow" apple that is just the skull icon
-And the code recognizes poison apples and changes their "type" (fruit) to that skull
-
-*/
-
-    //disappear_skull = new RegExp(/this\.[$a-zA-Z0-9_]{0,6}\.drawImage\([a-z],0,\n?0,\n?[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}/)
-    //dis_skull = code.match(disappear_skull)[0]
-    //code = code.assertReplace(disappear_skull, `false && ` + dis_skull)
-
-/*
-    pudding_draw = `
-
-    if(window.drawing_apple && (a.${last_path}.path.includes("apple") || a.${last_path}.path.includes("postimg")) ){
-        //a.oa.xy = window.skull;
-        //debugger
-
-        if(window.pudding_settings.Skull){
-            switch (${get_graphics}) {
-                default:
-                case 0:
-                    a.oa.xy = window.skull;
-                    break;
-                case 1:
-                    a.Ba.xy = window.px_skull;
-                    break;
-                case 2:
-                    a.Ea.xy = window.real_skull;
-                    break;
-            }
-        }
-        else if(a.${last_path}.path.includes("ghost")){
-            switch (${get_graphics}) {
-                default:
-                case 0:
-                    a.oa.xy = window.ghost_skull;
-                    break;
-                case 1:
-                    a.Ba.xy = window.px_ghost_skull;
-                    break;
-                case 2:
-                    a.Ea.xy = window.ghost_skull;
-                    break;
-            }
-        }
-    }
-
-    `
-*/
-    //actual_canvas = code.match(test_regexp)[0]
-
-    // Still need to take into account realism style.
-
-    //code = code.assertReplace(realism_draw, pudding_draw + `;` + realism_switch)
-
-
-    /*
-
-    draw_skull_func = new RegExp(/return [a-zA-Z0-9_$]{1,8}\(a.[a-zA-Z0-9_$]{1,8}\)\&\&a\.[a-zA-Z0-9_$]{1,8}\?a\.[a-zA-Z0-9_$]{1,8}\.canvas\:a\.[a-zA-Z0-9_$]{1,8}\.canvas},[a-zA-Z0-9_$]{1,8}=function\(\)/gm)
-    new_draw_skull = code.match(draw_skull_func)[0].split("}")[0]
-    get_pixel = new_draw_skull.split(' ')[1].split('&')[0]
-    pudding_skull_xd = `
-if(!a.path.includes("key")){
-if(window.pudding_settings.SokoGoals && a.path.includes("box")){if(${get_pixel}){return window.distinct_soko_goal_px;}return window.distinct_soko_goal;}
-if(window.pudding_settings.Skull && !a.path.includes("box")){if(${get_pixel}){return window.px_skull;}return window.skull;}
-if(a.path.includes("ghost")){if(${get_pixel}){return window.px_ghost_skull;}return window.ghost_skull;}
-}
-${code.match(draw_skull_func)[0].split("}")[0]};}
-${code.match(draw_skull_func)[0].split("}")[1]}`
-
-    code = code.assertReplace(draw_skull_func, pudding_skull_xd)
-
-    */
-
 
     return code;
 }
@@ -905,9 +763,11 @@ window.Counter.make = function () {
 window.Counter.alterCode = function (code) {
 
     reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
+    window.wallCoords = [];
 
     counter_reset_code = `;stats.inputs.game = 0;
     stats.walls.game = 0;
+    window.wallCoords = [];
     window.timeKeeper.playing = false;
     window.BootstrapHide();
     stats.plays.session++;
@@ -915,7 +775,7 @@ window.Counter.alterCode = function (code) {
     window.timeKeeper.addAttempt(window.timeKeeper.mode, window.timeKeeper.count, window.timeKeeper.speed, window.timeKeeper.size);
     saveStatistics();
     stats.visible = true;
-    if((window.CurrentModeNum != 1 && window.CurrentModeNum != 17) && stats.statShown == "walls"){
+    if((window.CurrentModeNum != 1 && window.CurrentModeNum != 19) && stats.statShown == "walls"){
         stats.visible = false;
     }
     window.setCounter();
@@ -966,25 +826,56 @@ window.Counter.alterCode = function (code) {
 
 
 
-    stop_regex = new RegExp(/stop=function\(a\){/)
+    stop_regex = new RegExp(/stop\(a\){/)
     catchError(stop_regex, code)
-    save_stats_code = `stop=function(a){saveStatistics();`
+    save_stats_code = `stop\(a\){saveStatistics();`
+    
 
     code = code.assertReplace(stop_regex, save_stats_code);
 
-    wall_spawn_regex = new RegExp(/var [a-zA-Z0-9_$]{1,8}=\n?[a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},this\.[a-zA-Z0-9_$]{1,8}\(null,5\)\);/gm)
+    wall_spawn_regex = new RegExp(/(?:let|const|var) [a-zA-Z0-9_$]{1,8}=\n?[a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},this\.[a-zA-Z0-9_$]{1,8}\(null,5\)\);/gm)
     catchError(wall_spawn_regex, code)
     wall_pos = code.match(wall_spawn_regex)[0].split('=')[0].split(' ')[1]
 
-
     wall_counter_code = `${code.match(wall_spawn_regex)[0]}
-    if(${wall_pos}){stats.walls.game++;updateCounterDisplay();}
+    if(${wall_pos}){stats.walls.game++;
+    window.wallCoords.push([${wall_pos}.x, ${wall_pos}.y]);
+    updateCounterDisplay();}
     `
     if (window.NepDebug) {
         console.log("Wall thing: " + wall_pos)
         console.log("Wall thing 2: " + wall_counter_code)
     }
     code = code.assertReplace(wall_spawn_regex, wall_counter_code);
+    
+
+    window.coordinatesToBoardString = function coordinatesToBoardString(coordinates) {
+        if(window.timeKeeper.getCurrentSetting("size") != 1)
+            return false;
+
+        // Initialize an array of 90 tiles, all initialized to '1' (empty)
+        let board = Array(90).fill('1');
+
+        // Set '2' (wall) for each coordinate in the list
+        coordinates.forEach(coord => {
+            let [x, y] = coord;
+            let index = y * 10 + x; // Calculate the index in the 1D array
+            board[index] = '2'; // Set '2' at the calculated index
+        });
+
+        // Join the array into a single string of 90 characters
+        return board.join('');
+    }
+
+    let death_wall_icon = document.querySelector('[jsname="LpoWPe"]');
+
+    death_wall_icon.addEventListener("click", function () {
+        pattern_string = window.coordinatesToBoardString(window.wallCoords)
+        if(pattern_string){
+            navigator.clipboard.writeText("pattern " + pattern_string);
+        }
+    });
+    
 
     return code;
 }
@@ -1091,9 +982,11 @@ window.TimeKeeper.make = function () {
         }
 
         let mode = window.timeKeeper.getCurrentSetting("trophy");
-        if (mode != document.getElementById("trophy").children.length - 1) {	//not on blender mode
+        let trophyCount = document.getElementById("trophy").children.length;
+        if (mode != trophyCount - 1) {	//not on blender mode
             modeStr = "";
-            for (t = 1; t <= 17; t++) {
+            // Bits cover every trophy except Classic (0) and Blender (last)
+            for (t = 1; t < trophyCount - 1; t++) {
                 if (t == mode) {
                     modeStr += "1";
                 }
@@ -1139,8 +1032,8 @@ window.TimeKeeper.make = function () {
 
     //save highscore
     window.timeKeeper.saveScore = function (time, score, mode, count, speed, size) {
-        if (count > 3 || speed > 2 || size > 2 || typeof window.aimTrainer !== 'undefined' || typeof window.megaWholeSnakeObject !== 'undefined') {
-            // More Menu, or Dice, or MouseMode or Level Editor
+        // count > 6 = beyond Tally (MoreMenu / custom); also skip MouseMode / Level Editor
+        if (count > 6 || speed > 2 || size > 2 || typeof window.aimTrainer !== 'undefined' || typeof window.megaWholeSnakeObject !== 'undefined') {
             return;
         }
         if (typeof (window.timeKeeper.lastAppleDate) == "undefined") {
@@ -1173,9 +1066,8 @@ window.TimeKeeper.make = function () {
 
     //save 25, 50, 100 or 'ALL' score
     window.timeKeeper.savePB = function (time, score, mode, count, speed, size) {
-
-        if (count > 3 || speed > 2 || size > 2 || typeof window.aimTrainer !== 'undefined' || typeof window.megaWholeSnakeObject !== 'undefined') {
-            // More Menu, or MouseMode or Level Editor
+        // count > 6 = beyond Tally (MoreMenu / custom); also skip MouseMode / Level Editor
+        if (count > 6 || speed > 2 || size > 2 || typeof window.aimTrainer !== 'undefined' || typeof window.megaWholeSnakeObject !== 'undefined') {
             return;
         }
 
@@ -1306,14 +1198,14 @@ window.TimeKeeper.make = function () {
             if (old_pbs != null) {
                 old_pbs = JSON.parse(old_pbs);
                 //console.log("Converting local storage to new storage type");
-                for (mode = 0; mode < 16; mode++) {
-                    modeStr = "00000000000000000".split("");
+                for (mode = 0; mode < 20; mode++) {
+                    modeStr = "00000000000000000000".split("");
                     if (mode != 0) {
                         modeStr[mode - 1] = '1';
                     }
                     modeStr = modeStr.join('');
 
-                    for (count = 0; count < 3; count++) {
+                    for (count = 0; count < 5; count++) {
                         for (speed = 0; speed < 3; speed++) {
                             for (size = 0; size < 3; size++) {
                                 for (let score of ["25", "50", "100", "ALL", "att"]) {
@@ -1334,7 +1226,25 @@ window.TimeKeeper.make = function () {
         else {
             storage = JSON.parse(storage);
         }
-        if (storage["version"] != 2) {
+
+        // v2 (20-bit modeStr) -> v3 (21-bit): insert Bridge bit before Peaceful
+        if (storage["version"] == 2) {
+            const migrated = { version: 3 };
+            for (const key of Object.keys(storage)) {
+                if (key === "version") continue;
+                const parts = key.split("-");
+                if (parts.length >= 5 && /^[01]{20}$/.test(parts[1])) {
+                    const modeStr = parts[1];
+                    const newModeStr = modeStr.slice(0, 19) + "0" + modeStr.slice(19);
+                    migrated[parts[0] + "-" + newModeStr + "-" + parts.slice(2).join("-")] = storage[key];
+                } else {
+                    migrated[key] = storage[key];
+                }
+            }
+            storage = migrated;
+        }
+
+        if (storage["version"] != 3) {
             alert("Something went wrong with you localStorage!");
         }
         localStorage.setItem("snake_timeKeeper", JSON.stringify(storage));
@@ -1344,6 +1254,7 @@ window.TimeKeeper.make = function () {
 
     //generate and show the dialog
     window.timeKeeper.showDialog = function () {
+
         //make dialog
         window.timeKeeper.dialogActive = true;
         document.getElementById('time-keeper').innerHTML = 'Hide Details';
@@ -1363,26 +1274,56 @@ window.TimeKeeper.make = function () {
         var gamemode = "";
         for (t of modeStr) {
             if (t == 1) {
-
-                switch (counter) {
-                    case 0: gamemode += "Wall, "; break;
-                    case 1: gamemode += "Portal, "; break;
-                    case 2: gamemode += "Cheese, "; break;
-                    case 3: gamemode += "Borderless, "; break;
-                    case 4: gamemode += "Twin, "; break;
-                    case 5: gamemode += "Winged, "; break;
-                    case 6: gamemode += "YinYang, "; break;
-                    case 7: gamemode += "Key, "; break;
-                    case 8: gamemode += "Sokoban, "; break;
-                    case 9: gamemode += "Poison, "; break;
-                    case 10: gamemode += "Dimension, "; break;
-                    case 11: gamemode += "Minesweeper, "; break;
-                    case 12: gamemode += "Statue, "; break;
-                    case 13: gamemode += "Light, "; break;
-                    case 14: gamemode += "Shield, "; break;
-                    case 15: gamemode += "Arrow, "; break;
-                    case 16: gamemode += "Peaceful, "; break;
-                    default: gamemode += "Unknown, "; break;
+                if(window.isBridge){
+                    switch (counter) {
+                        case 0: gamemode += "Wall, "; break;
+                        case 1: gamemode += "Portal, "; break;
+                        case 2: gamemode += "Cheese, "; break;
+                        case 3: gamemode += "Borderless, "; break;
+                        case 4: gamemode += "Twin, "; break;
+                        case 5: gamemode += "Winged, "; break;
+                        case 6: gamemode += "YinYang, "; break;
+                        case 7: gamemode += "Key, "; break;
+                        case 8: gamemode += "Sokoban, "; break;
+                        case 9: gamemode += "Poison, "; break;
+                        case 10: gamemode += "Dimension, "; break;
+                        case 11: gamemode += "Minesweeper, "; break;
+                        case 12: gamemode += "Statue, "; break;
+                        case 13: gamemode += "Light, "; break;
+                        case 14: gamemode += "Shield, "; break;
+                        case 15: gamemode += "Arrow, "; break;
+                        case 16: gamemode += "Hotdog, "; break;
+                        case 17: gamemode += "Magnet, "; break;
+                        case 18: gamemode += "Gate, "; break;
+                        case 19: gamemode += "Bridge, "; break;
+                        case 20: gamemode += "Peaceful, "; break;
+                        default: gamemode += "Unknown, "; break;
+                    }
+                }else{
+                    switch (counter) {
+                        case 0: gamemode += "Wall, "; break;
+                        case 1: gamemode += "Portal, "; break;
+                        case 2: gamemode += "Cheese, "; break;
+                        case 3: gamemode += "Borderless, "; break;
+                        case 4: gamemode += "Twin, "; break;
+                        case 5: gamemode += "Winged, "; break;
+                        case 6: gamemode += "YinYang, "; break;
+                        case 7: gamemode += "Key, "; break;
+                        case 8: gamemode += "Sokoban, "; break;
+                        case 9: gamemode += "Poison, "; break;
+                        case 10: gamemode += "Dimension, "; break;
+                        case 11: gamemode += "Minesweeper, "; break;
+                        case 12: gamemode += "Statue, "; break;
+                        case 13: gamemode += "Light, "; break;
+                        case 14: gamemode += "Shield, "; break;
+                        case 15: gamemode += "Arrow, "; break;
+                        case 16: gamemode += "Hotdog, "; break;
+                        case 17: gamemode += "Magnet, "; break;
+                        case 18: gamemode += "Gate, "; break;
+                        case 19: gamemode += "Skip, "; break;
+                        case 20: gamemode += "Peaceful, "; break;
+                        default: gamemode += "Unknown, "; break;
+                    }
                 }
             }
             counter++;
@@ -1407,7 +1348,10 @@ window.TimeKeeper.make = function () {
             case 0: dialog.appendChild(document.createTextNode("1 Apple, ")); break;
             case 1: dialog.appendChild(document.createTextNode("3 Apples, ")); break;
             case 2: dialog.appendChild(document.createTextNode("5 Apples, ")); break;
-            case 3: dialog.appendChild(document.createTextNode("Dice count, ")); break;
+            case 3: dialog.appendChild(document.createTextNode("10 Apples, ")); break;
+            case 4: dialog.appendChild(document.createTextNode("Dice count, ")); break;
+            case 5: dialog.appendChild(document.createTextNode("Bomb count, ")); break;
+            case 6: dialog.appendChild(document.createTextNode("Tally count, ")); break;
             default: dialog.appendChild(document.createTextNode("MoreMenu Apples, ")); break;
         }
         switch (speed) {
@@ -1461,40 +1405,65 @@ window.TimeKeeper.make = function () {
                 if (score == "att")
                     continue;
 
-                minutes = Math.floor(storage[name].time / 60000);
-                seconds = Math.floor((storage[name].time - minutes * 60000) / 1000);
-                mseconds = storage[name].time - minutes * 60000 - seconds * 1000;
-                if (minutes.toString().length < 2) { minutes = "0" + minutes.toString() }
-                if (seconds.toString().length < 2) { seconds = "0" + seconds.toString() }
-                while (mseconds.toString().length < 3) { mseconds = "0" + mseconds.toString() }
-                if (score != "H") {
-                    dialog.appendChild(document.createTextNode("Best Time: " + minutes + ":" + seconds + ":" + mseconds));
+                hours = Math.floor(storage[name].time / 3600000);
+                minutes = String(Math.floor((storage[name].time-hours*3600000) / 60000)).padStart(2, "0");
+                seconds = String(Math.floor((storage[name].time - minutes * 60000-hours*3600000) / 1000)).padStart(2, "0");
+                mseconds = String(storage[name].time - minutes * 60000 - seconds * 1000-hours*3600000).padStart(3, "0");
+                if(hours==0){
+                    if (score != "H") {
+                        dialog.appendChild(document.createTextNode("Best Time: " + minutes + ":" + seconds + ":" + mseconds));
+                        dialog.appendChild(document.createElement("br"));
+                        dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
+                        dialog.appendChild(document.createElement("br"));
+                    }
+                    else {
+                        dialog.appendChild(document.createTextNode("Duration: " + minutes + ":" + seconds + ":" + mseconds));
+                        dialog.appendChild(document.createElement("br"));
+                        dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
+                        dialog.appendChild(document.createElement("br"));
+                        dialog.appendChild(document.createTextNode("Average score: " + (Math.round(100 * (storage[name].sum / totalAttempts)) / 100).toString()));
+                        dialog.appendChild(document.createElement("br"));
+                    }
+                    if (storage[name].att != undefined && storage[name].sum != undefined) {
+                        let time = Math.floor(storage[name].sum / storage[name].att);
+                        hours = Math.floor(storage[name].time / 3600000)
+                        minutes = String(Math.floor((time - hours * 3600000) / 60000)).padStart(2, "0");
+                        seconds = String(Math.floor((time - minutes * 60000-hours*3600000) / 1000)).padStart(2, "0");
+                        mseconds = String(time - minutes * 60000 - seconds * 1000-hours*3600000).padStart(3, "0");
+                        dialog.appendChild(document.createTextNode("Attempts to this point: " + storage[name].att));
+                        dialog.appendChild(document.createElement("br"));
+                        dialog.appendChild(document.createTextNode("Average: " + minutes + ":" + seconds + ":" + mseconds));
+                        dialog.appendChild(document.createElement("br"));
+                    }
                     dialog.appendChild(document.createElement("br"));
-                    dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
+                }else{
+                    if (score != "H") {
+                        dialog.appendChild(document.createTextNode("Best Time: " + hours + ":" + minutes + ":" + seconds + ":" + mseconds));
+                        dialog.appendChild(document.createElement("br"));
+                        dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
+                        dialog.appendChild(document.createElement("br"));
+                    }
+                    else {
+                        dialog.appendChild(document.createTextNode("Duration: " + hours + ":" + minutes + ":" + seconds + ":" + mseconds));
+                        dialog.appendChild(document.createElement("br"));
+                        dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
+                        dialog.appendChild(document.createElement("br"));
+                        dialog.appendChild(document.createTextNode("Average score: " + (Math.round(100 * (storage[name].sum / totalAttempts)) / 100).toString()));
+                        dialog.appendChild(document.createElement("br"));
+                    }
+                    if (storage[name].att != undefined && storage[name].sum != undefined) {
+                        let time = Math.floor(storage[name].sum / storage[name].att);
+                        hours = Math.floor(storage[name].time / 3600000)
+                        minutes = String(Math.floor((time - hours * 3600000) / 60000)).padStart(2, "0");
+                        seconds = String(Math.floor((time - minutes * 60000-hours*3600000) / 1000)).padStart(2, "0");
+                        mseconds = String(time - minutes * 60000 - seconds * 1000-hours*3600000).padStart(3, "0");
+                        dialog.appendChild(document.createTextNode("Attempts to this point: " + storage[name].att));
+                        dialog.appendChild(document.createElement("br"));
+                        dialog.appendChild(document.createTextNode("Average: " + hours + ":" + minutes + ":" + seconds + ":" + mseconds));
+                        dialog.appendChild(document.createElement("br"));
+                    }
                     dialog.appendChild(document.createElement("br"));
                 }
-                else {
-                    dialog.appendChild(document.createTextNode("Duration: " + minutes + ":" + seconds + ":" + mseconds));
-                    dialog.appendChild(document.createElement("br"));
-                    dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
-                    dialog.appendChild(document.createElement("br"));
-                    dialog.appendChild(document.createTextNode("Average score: " + (Math.round(100 * (storage[name].sum / totalAttempts)) / 100).toString()));
-                    dialog.appendChild(document.createElement("br"));
-                }
-                if (storage[name].att != undefined && storage[name].sum != undefined) {
-                    let time = Math.floor(storage[name].sum / storage[name].att);
-                    minutes = Math.floor(time / 60000);
-                    seconds = Math.floor((time - minutes * 60000) / 1000);
-                    mseconds = time - minutes * 60000 - seconds * 1000;
-                    if (minutes.toString().length < 2) { minutes = "0" + minutes.toString() }
-                    if (seconds.toString().length < 2) { seconds = "0" + seconds.toString() }
-                    while (mseconds.toString().length < 3) { mseconds = "0" + mseconds.toString() }
-                    dialog.appendChild(document.createTextNode("Attempts to this point: " + storage[name].att));
-                    dialog.appendChild(document.createElement("br"));
-                    dialog.appendChild(document.createTextNode("Average: " + minutes + ":" + seconds + ":" + mseconds));
-                    dialog.appendChild(document.createElement("br"));
-                }
-                dialog.appendChild(document.createElement("br"));
             }
         }
 
@@ -1525,6 +1494,8 @@ window.TimeKeeper.make = function () {
         dialog.classList.add("custom-dialog");
 
         div.insertBefore(dialog, div.firstChild)
+
+
     };
 
     //Function to find the snake code, and apply changes.
@@ -1571,9 +1542,10 @@ window.TimeKeeper.alterCode = function (code) {
     // TimeKeeper stuff start
     //change stepfunction to run gotApple(), gotAll() and death()
 
-    func_regex = new RegExp(/[a-zA-Z0-9_$.]{1,40}=function\(\)[^\\]{1,1000}RIGHT":0[\s\S]*?=function/)
+    // This is the full tick function
+    func_regex = new RegExp(/tick\(\){[^\\]{1,4000}light=Math.max[\s\S]*?=function/)
     window.catchError(func_regex, code)
-    let func = code.match(/[a-zA-Z0-9_$.]{1,40}=function\(\)[^\\]{1,1000}RIGHT":0[\s\S]*?=function/)[0];
+    let func = code.match(/tick\(\){[^\\]{1,4000}light=Math.max[\s\S]*?=function/)[0];
     StartOfNext = func.substring(func.lastIndexOf(";"), func.length);
     func = func.substring(0, func.lastIndexOf(";"));
     if (window.NepDebug) {
@@ -1585,7 +1557,7 @@ window.TimeKeeper.alterCode = function (code) {
     //modeFunc = modeFunc.substring(modeFunc.indexOf("(") + 1, modeFunc.lastIndexOf("("));
     //modeFunc = modeFunc.split('(')[0];
     //scoreFunc = func.match(/25\!\=\=this.[a-zA-Z0-9$]{1,4}/)[0]; // Need to figure this out
-    scoreFuncVar = func.match(/25\=\=\=\n?[a-zA-Z0-9$]{1,4}/)[0].split('=')[3]; // Assuming he wanted just the "this.score"
+    scoreFuncVar = func.match(/[a-zA-Z0-9$]{1,4}\=\=\=\n?25/)[0].split('=')[0]; // Assuming he wanted just the "this.score"
     scoreFunc = func.match(`${window.escapeRegex(scoreFuncVar.replace('\n', ''))}=\n?this.[a-zA-Z0-9$]{1,6}`)[0].split('=')[1]
     ////console.log(scoreFunc)
     //scoreFunc = scoreFunc.substring(scoreFunc.indexOf("this."),scoreFunc.size);
@@ -1602,7 +1574,7 @@ window.TimeKeeper.alterCode = function (code) {
     //ownFuncIndex = func.indexOf(func.match(/!1}\);\([^%]{0,10}/)[0])+5; // No idea how this ever worked
     ownFunc = "window.timeKeeper.gotApple(Math.floor(" + timeFunc + ")," + scoreFunc + ");"
     //func = func.slice(0, ownFuncIndex) + ownFunc + func.slice(ownFuncIndex); // Cool but no, just going to insert before the if 25 50 100 instead
-    if25_regex = new RegExp(/if\(25===/)
+    if25_regex = new RegExp(/if\([a-zA-Z0-9$]{1,4}\=\=\=\n?25/)
     ownFuncIndex = func.indexOf(func.match(if25_regex)[0]);
     func = func.slice(0, ownFuncIndex) + ownFunc + func.slice(ownFuncIndex);
     ////console.log(func);
@@ -1680,12 +1652,6 @@ window.Fruit.make = function () {
         "Real": "https://i.postimg.cc/LXFmtS7M/lime-real.png",
         "Poison_values": 'b,\'#93ef13\',\'#909090\',70',
     });
-    new_fruit.push({ // Blackberries
-        "Normal": 'https://i.postimg.cc/hPTVGdNX/blackberries.png',
-        "Pixel": 'https://i.postimg.cc/RZTf7zS9/px-blackberries.png',
-        "Real": "https://i.postimg.cc/RVgCjj3c/blackberries-real.png",
-        "Poison_values": 'b,\'#000044\',\'#909090\',50',
-    });
     new_fruit.push({ // Green Grapes
         "Normal": 'https://i.postimg.cc/dQ78zXBm/green-grapes.png',
         "Pixel": 'https://i.postimg.cc/J79bmqYw/px-green-grapes.png',
@@ -1711,8 +1677,8 @@ window.Fruit.make = function () {
         "Poison_values": 'b,\'#ffc107\',\'#909090\',30',
     });
     new_fruit.push({ // Hotdog
-        "Normal": 'https://i.postimg.cc/BbQf4Vgs/hotdog.png',
-        "Pixel": 'https://i.postimg.cc/xTcnz1kL/px-hotdog.png',
+        "Normal": 'https://i.postimg.cc/bwYq44f1/hotdog.png',
+        "Pixel": 'https://i.postimg.cc/zXFJt86J/px-trophy-17.png',
         "Real": "https://i.postimg.cc/Y0RcM953/hotdog-real.png",
         "Poison_values": 'b,\'#9b441c\',\'#909090\',30',
     });
@@ -1720,18 +1686,6 @@ window.Fruit.make = function () {
         "Normal": 'https://i.postimg.cc/rwDXKnPj/pizza.png',
         "Pixel": 'https://i.postimg.cc/1tY1RKYq/pixil-frame-0-5.png',
         "Real": "https://i.postimg.cc/D0vyKmjv/pizza-real.png",
-        "Poison_values": 'b,\'#FFCF86\',\'#909090\',30',
-    });
-    new_fruit.push({ // Pacman Ghost
-        "Normal": 'https://i.postimg.cc/TP7ZGZGf/pacman-ghost.png',
-        "Pixel": 'https://i.postimg.cc/BvtK8fxb/px-pacman-ghost.png',
-        "Real": "https://i.postimg.cc/3Nc4x2Ch/ghost-real.png",
-        "Poison_values": 'b,\'#FFCF86\',\'#909090\',30',
-    });
-    new_fruit.push({ // Sonic Rings
-        "Normal": 'https://i.postimg.cc/pX1xYGp9/sonic-ring.png',
-        "Pixel": 'https://i.postimg.cc/BvzJqWhs/ring-1.png',
-        "Real": "https://i.postimg.cc/W3WrCR8H/ring-real.png",
         "Poison_values": 'b,\'#FFCF86\',\'#909090\',30',
     });
     new_fruit.push({ // Steak
@@ -1758,18 +1712,6 @@ window.Fruit.make = function () {
         "Real": "https://i.postimg.cc/ncX0G22k/egg-real.png",
         "Poison_values": 'b,\'#e7dfa4\',\'#909090\',50',
     });
-    new_fruit.push({ // Mango
-        "Normal": 'https://i.postimg.cc/R0NbYNSH/Mango.png',
-        "Pixel": 'https://i.postimg.cc/bNny7wv4/mango-px.png',
-        "Real": "https://i.postimg.cc/Hsb6V2tP/mango-real.png",
-        "Poison_values": 'b,\'#fc8824\',\'#909090\',50',
-    });
-    new_fruit.push({ // Melon
-        "Normal": 'https://i.postimg.cc/8knkL3WN/melon.png',
-        "Pixel": 'https://i.postimg.cc/Qt8NqZ0x/pixel-melon.png',
-        "Real": "https://i.postimg.cc/kG6h1PKn/melon-real.png",
-        "Poison_values": 'b,\'#93ef13\',\'#909090\',50',
-    });
     new_fruit.push({ // Musa Banana
         "Normal": 'https://i.postimg.cc/3JsKcvnq/musa-banana.png',
         "Pixel": 'https://i.postimg.cc/bwSh0wPR/pixel-musa-banana.png',
@@ -1781,12 +1723,6 @@ window.Fruit.make = function () {
         "Pixel": 'https://i.postimg.cc/RZp3PRWz/pixel-pear.png',
         "Real": "https://i.postimg.cc/63dDtXTY/pear-real.png",
         "Poison_values": 'b,\'#93ef13\',\'#909090\',50',
-    });
-    new_fruit.push({ // Soccer Ball
-        "Normal": 'https://i.postimg.cc/C1yT8vjL/soccer-ball.png',
-        "Pixel": 'https://i.postimg.cc/kGDnkN00/pixel-soccer-ball.png',
-        "Real": "https://i.postimg.cc/J7cnn0n8/soccer-real.png",
-        "Poison_values": 'b,\'#ffffff\',\'#909090\',100',
     });
     new_fruit.push({ // Jacko
         "Normal": 'https://i.postimg.cc/rwMX5hbg/true-jacko.png',
@@ -1805,24 +1741,6 @@ window.Fruit.make = function () {
         "Pixel": 'https://i.postimg.cc/C5rrFjzV/red-pudding-px.png',
         "Real": "https://i.postimg.cc/pTCF6hCJ/redpudding-real.png",
         "Poison_values": 'b,\'#ff3f3f\',\'#909090\',20',
-    });
-    new_fruit.push({ // Dirt Block
-        "Normal": 'https://i.postimg.cc/9FwzBRY4/mc-dirt.png',
-        "Pixel": 'https://i.postimg.cc/7ZvhtHKK/mc-dirt-px.png',
-        "Real": "https://i.postimg.cc/Z5rR1Gg4/mc-dirt-real.png",
-        "Poison_values": 'b,\'#ff3f3f\',\'#909090\',100',
-    });
-    new_fruit.push({ // Bread
-        "Normal": 'https://i.postimg.cc/YSMVtPr1/bread.png',
-        "Pixel": 'https://i.postimg.cc/265KZBBy/bread-px.png',
-        "Real": "https://i.postimg.cc/sgpqdzrj/bread-real.png",
-        "Poison_values": 'b,\'#ff3f3f\',\'#909090\',100',
-    });
-    new_fruit.push({ // Santa
-        "Normal": 'https://i.postimg.cc/kgV7FKDL/santa.png',
-        "Pixel": 'https://i.postimg.cc/SN1yMDQW/santa-px.png',
-        "Real": "https://i.postimg.cc/FsHrz2vr/santa-rtx.png",
-        "Poison_values": 'b,\'#ff3f3f\',\'#909090\',100',
     });
     new_fruit.push({ // Cabbage
         "Normal": 'https://i.postimg.cc/j59z8v1m/cabbage.png',
@@ -1844,17 +1762,36 @@ window.Fruit.make = function () {
     }
 
     // Secret fruit, can't be selected by menu
-    new_fruit.push({ // Golden Apple
+    // Order matters: Apple, Cherry, Strawberry, Carrot, Watermelon (then Skull)
+    new_fruit.push({ // Golden Apple — 1 in 1m
         "Normal": 'https://i.postimg.cc/tJqR4tT6/gold-apple.png',
         "Pixel": 'https://i.postimg.cc/MGDg1gBQ/px-gold-apple.png',
         "Real": "https://i.postimg.cc/764WBzhL/golden-real.png",
         "Poison_values": 'b,\'#eaca23\',\'#909090\',20',
     });
-    new_fruit.push({ // Golden Strawberry
+    new_fruit.push({ // Golden Cherry — 1 in 5m
+        "Normal": 'https://i.postimg.cc/sXDXkRP7/gold-cherry.png',
+        "Pixel": 'https://i.postimg.cc/3RJRsHjG/px-gold-cherry.png',
+        "Real": "https://i.postimg.cc/MTKTC80R/real-gold-cherry.png",
+        "Poison_values": 'b,\'#eaca23\',\'#909090\',20',
+    });
+    new_fruit.push({ // Golden Strawberry — 1 in 10m
         "Normal": 'https://i.postimg.cc/CxLDtZkB/golden-strawberry.png',
         "Pixel": 'https://i.postimg.cc/9Q8TjWYx/px-golden-strawberry.png',
         "Real": "https://i.postimg.cc/tCzW2dZG/real-golden-strawberry.png",
         "Poison_values": 'b,\'#ff3f3f\',\'#909090\',20',
+    });
+    new_fruit.push({ // Golden Carrot — 1 in 50m
+        "Normal": 'https://i.postimg.cc/g0Kjt0hv/gold-carrot.png',
+        "Pixel": 'https://i.postimg.cc/yNTxpNRP/gold-px-carrot.png',
+        "Real": "https://i.postimg.cc/s2JxH2Wm/gold-real-carrot.png",
+        "Poison_values": 'b,\'#fc8824\',\'#909090\',20',
+    });
+    new_fruit.push({ // Golden Watermelon — 1 in 100m
+        "Normal": 'https://i.postimg.cc/0NCjXNSc/gold-watermelon-1.png',
+        "Pixel": 'https://i.postimg.cc/25xy95Wx/gold-px-watermelon-1.png',
+        "Real": "https://i.postimg.cc/k5yGY5Sw/gold-real-watermelon-1.png",
+        "Poison_values": 'b,\'#93ef13\',\'#909090\',20',
     });
 
     // Only used for Distinct Poison Skulls
@@ -1874,30 +1811,17 @@ window.Fruit.alterCode = function (code) {
     // Code to alter snake code here
 
     // Regex for a function that sets the src for count (I think)
-    settings_src_regex = new RegExp(/[a-zA-Z0-9_$]{1,8}=function\([a-zA-Z0-9_$]{1,8}\){""!==[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}&&\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.src=[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}\);/)
-    settings_var = code.match(settings_src_regex)[0].split('.')[0].split('=')[3] // This is usually "a", the variable the function gets, which has settings in it
+    settings_src_regex = new RegExp(/[a-zA-Z0-9_$]{1,8}=function\([a-zA-Z0-9_$]{1,8}\){[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}!==""&&/)
+    settings_var = code.match(settings_src_regex)[0].split('.')[0].split('{')[1] // This is usually "a", the variable the function gets, which has settings in it
     settings_itself = code.match(settings_src_regex)[0].split('.')[1] // This is either the word "settings" or whatever google replaced it with that's obfuscated
-    settings_src = code.match(settings_src_regex)[0].split('.')[2].split('&')[0] // This is the [] part in a.settings.[] - which has an src link to an image in it
+    settings_src = code.match(settings_src_regex)[0].split('.')[2].split('!')[0] // This is the [] part in a.settings.[] - which has an src link to an image in it
     // ${settings_itself}
 
     get_graphics = new RegExp(/case "graphics":/);
     code = code.assertReplace(get_graphics, "$& window.graphics_selected=")
     get_fruit = new RegExp(/case "apple":/);
     code = code.assertReplace(get_fruit, "$& window.fruit_selected=")
-    fruit_image = code.match(/\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}="/gm)[0].split('(')[1].split('=')[0]
-    // Very poorly coded, get back here using this: "https://www.google.com/logos/fnbx/"+(1===
-    /*
-    // Full function that sets the current fruit icon
-    realism_load_image = new RegExp(/if\("apple"===[a-zA-Z0-9_$]{1,8}\|\|"graphics"===[a-zA-Z0-9_$]{1,8}\).*;if/);
-    realism_image_code = code.match(realism_load_image)[0];
-    realism_image_code = realism_image_code.split(')')[0] + '){' + realism_image_code.split(')')[1] + ')};if'
-    //selected_fruit_num = realism_image_code.split('{')[1].split('=')[1].split(';')[0];
-    selected_fruit_num = realism_image_code.split('(')[2].split(',')[0];
-    //graphics_selected_code = realism_image_code.split('{')[1].split('(')[2].split(')')[0];
-    graphics_selected_code = realism_image_code.split(',')[1];
-
-    fruit_image = realism_image_code.split('{')[1].split('=')[0]
-    */
+    fruit_image = code.match(/\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}=`/gm)[0].split('(')[1].split('=')[0]
 
     new_realism_code = `
     if(window.fruit_selected >= ${last_fruit_num + 1}){
@@ -1913,59 +1837,36 @@ window.Fruit.alterCode = function (code) {
             case 2:
                 window.current_fruit_img = window.new_fruit[fruit_index].Real;
         }
+                
         ${fruit_image} = window.current_fruit_img;
+        document.querySelector('[jsname="Jesp7b"]').src = window.current_fruit_img;
     }
     `
+    
+    rude_insert = new RegExp(/trophy_\${b}\.png`}`\)}/gm);
+    code = code.assertReplace(rude_insert, "trophy_\${b}\.png`}`\); " + `${new_realism_code}` + " }");
 
-    rude_insert = new RegExp(/"\.png"\)\)}/gm)
-    code = code.assertReplace(rude_insert, `".png")); ${new_realism_code} }`);
+    deathscreen_fruit = new RegExp(`\\(a.[a-zA-Z0-9_$]{1,8},${fruit_image}\\);`, 'g')
+    code.match(deathscreen_fruit).forEach(element => {
+        code.assertReplace(element, element + new_realism_code);
+    });
+    
+    image_check = new RegExp(/b!==a\.src&&\(a\.src=b\)/gm)
+    code = code.assertReplace(image_check, code.match(image_check)[0] + new_realism_code.replace(`${fruit_image} = window.current_fruit_img;`, ''))
 
-    daily_fruit_deathscreen = code.match(/[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.src/)[0]
-
-
-    rude_insert2 = code.match(/0,[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\)}/)[0]
-    code = code.assertReplace(rude_insert2,
-        `${rude_insert2.split('}')[0]} ${new_realism_code.replace(fruit_image, daily_fruit_deathscreen)} }`);
-    /*
-    load_image_func = new RegExp(/if\("apple"===[a-zA-Z0-9_$]{1,8}\|\|"graphics"===[a-zA-Z0-9_$]{1,8}\)[a-zA-Z0-9_$]{1,8}=[a-zA-Z0-9_$]{1,8}\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}\),\n?[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}="https:\/\/www\.google\.com\/logos\/fnbx\/"\+\(1===[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{0,8}\.[a-zA-Z0-9_$]{1,8}\?"snake_arcade\/pixel\/[a-zA-Z0-9_$]{1,8}\/px_apple_"\+[a-zA-Z0-9_$]{1,8}\+"\.png":"snake_arcade\/[a-zA-Z0-9_$]{1,8}\/apple_"\+[a-zA-Z0-9_$]{1,8}\+"\.png"\);/)
-
-    // Get all required variables around src for endscreen
-    settings_regex = new RegExp(`,\n?[a-zA-Z0-9_$]{1,8}\.${settings_itself}\.[a-zA-Z0-9_$]{1,8}`)
-    //debugger
-    settings_var = code.match(load_image_func)[0].match(settings_regex)[0].split('.')[0].split(',')[1]
-    settings_src = code.match(load_image_func)[0].match(settings_regex)[0].split('.')[2]
-    select_fruit_numvar = code.match(load_image_func)[0].match(new RegExp(/\+.\+/))[0].split('+')[1]
-    pixel_setting_regex = new RegExp(`case "graphics":[a-zA-Z0-9_$]{1,8}.${settings_itself}.[a-zA-Z0-9_$]{1,8}`);
-    pixel_setting = code.match(pixel_setting_regex)[0].split('.')[2]
-    // Gets the element that changed, "apple" means fruit here, in endscreen - Unused code here, but may be useful in the future.
-    get_changed_var = code.match(load_image_func)[0].split('=')[3].split('|')[0]
-
-    load_code_condensed = ``;
-
-    for (let index = 0; index < window.new_fruit.length; index++) {
-        current_fruit = window.new_fruit[index].Normal;
-        current_fruit_px = window.new_fruit[index].Pixel;
-        load_fruit_template = `
-    ,\(${select_fruit_numvar}==${last_fruit_num + 1 + index} && ${settings_var}.${settings_itself}.${pixel_setting} === 0 ? ${settings_var}.${settings_itself}.${settings_src}="${current_fruit}" : {}\)
-    ,\(${select_fruit_numvar}==${last_fruit_num + 1 + index} && ${settings_var}.${settings_itself}.${pixel_setting} === 1 ? ${settings_var}.${settings_itself}.${settings_src}="${current_fruit_px}" : {}\)`
-        load_code_condensed = load_code_condensed + load_fruit_template;
-    }
-    load_code_condensed = load_code_condensed + ';';
-*/
-
-    //ip_grabber = new RegExp(/=new [a-zA-Z0-9_$]{1,8}\(this.[a-zA-Z0-9_$]{0,8},\"snake_arcade\/[a-zA-Z0-9_$]{1,8}\/apple_\"/)
-    get_apple_make_func = new RegExp(/for\(a=0;22>a;a\+\+\)b=new [a-zA-Z0-9_$]{0,8}/)
-    //func_name = code.match(ip_grabber)[0].replace("=new ", "").replace(`\(this.${settings_itself},\"snake_arcade\/[a-zA-Z0-9_$]{1,8}\/apple_\"`, "")
-    func_name = code.match(get_apple_make_func)[0].split(' ')[1]
+    // Derive fruit ctor + image-cache prop (v11: S6/oa, v12: c7/ka — this.oa is the fruit array on v12)
+    get_apple_make_func = new RegExp(/for\(a=0;a<24;a\+\+\)b=new ([a-zA-Z0-9_$]{1,8})\(this\.[a-zA-Z0-9_$]{1,8},[\s\S]*?,1,this\.([a-zA-Z0-9_$]{1,8}),/)
+    apple_make_match = code.match(get_apple_make_func)
+    func_name = apple_make_match[1]
+    image_cache_name = apple_make_match[2]
     ip_grabber2 = new RegExp(/[a-zA-Z0-9_$]{1,8}\(b,c.[a-zA-Z0-9_$]{1,8},c.target,c.threshold\)/)
-    poison_convert = code.match(ip_grabber2)[0].split('(')[0] // replace('\(b,c.base,c.target,c.threshold\)',"") // This function is what makes the poison grey in poison mode
+    poison_convert = code.match(ip_grabber2)[0].split('(')[0] // This function is what makes the poison grey in poison mode
     array_grabber = new RegExp(/c=[a-zA-Z0-9_$]{1,8}\[a\]/)
     array_name = code.match(array_grabber)[0].replace('c=', "").replace('[a]', "")
 
     add_fruit_array_last_func_regex = new RegExp(/.threshold\),this.[a-zA-Z0-9_$]{1,8}.push\([a-zA-Z0-9_$]{1,8}\)/);
 
     fruit_array_name = code.match(add_fruit_array_last_func_regex)[0].split('.')[2] // ${fruit_array_name}
-    ////console.log(func_name.split('(')[0])
     golden_index = `window.goldenIndex`
 
     add_fruit = `$&;this.${fruit_array_name}.push(b); // Add dummy for randomizer
@@ -1976,7 +1877,7 @@ window.Fruit.alterCode = function (code) {
         current_fruit_real = window.new_fruit[index].Real;
         current_fruit_poison_values = window.new_fruit[index].Poison_values; // ${current_fruit_poison_values}
         add_fruit_template = `
-    b=new ${func_name.split('(')[0]}(this.${settings_itself},"${current_fruit}",1,this.oa,"${current_fruit_px}","${current_fruit_real}");
+    b=new ${func_name}(this.${settings_itself},"${current_fruit}",1,this.${image_cache_name},"${current_fruit_px}","${current_fruit_real}");
     ${poison_convert}(${current_fruit_poison_values});
     this.${fruit_array_name}.push(b);`
         add_fruit = add_fruit + add_fruit_template;
@@ -1984,7 +1885,7 @@ window.Fruit.alterCode = function (code) {
 
 
     add_gold = `
-  ${golden_index} = this.${fruit_array_name}.length - 2;
+  ${golden_index} = this.${fruit_array_name}.length - 6; // Golden Apple (first of 5 secrets; Skull is last)
   `
 
     add_fruit = add_fruit + add_gold;
@@ -1998,88 +1899,34 @@ window.Fruit.alterCode = function (code) {
     // Basically, adds an if statement anywhere fruit image is search to compensate for pudding existing
     // The if statements are janky and get be condensed
     // This fixes errors in console but doesn't "change" anything in-game
-    shh_grabber = new RegExp(/[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.src=\"https:\/\/www\.google\.com\/logos\/fnbx\/\"\+[a-zA-Z0-9_$]{1,8}\.path/);
+    shh_grabber = new RegExp(/[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.src=`https:\/\/www.google.com\/logos\/fnbx\/\${a\.path}`/);
     firstvar_name = code.match(shh_grabber)[0].split('.')[0];
     Hr_name = code.match(shh_grabber)[0].split('.')[1];
 
     new_shh_line = "if(" + firstvar_name + ".path.includes(\"postimg\"))" + firstvar_name + "." + Hr_name + ".src=" + firstvar_name + ".path;else $&";
 
-/*
-    Pr_regex = new RegExp(/[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\&\&\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.src=\"https:\/\/www\.google\.com\/logos\/fnbx\/\"\+[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/)
-    Pr_a = code.match(Pr_regex)[0].split('.')[0]
-    Pr_ka = code.match(Pr_regex)[0].split('.')[1].split('&')[0]
-    Pr_pa = code.match(Pr_regex)[0].split('.')[6] // Where relative path is stored
-
-    load_pixelated_regex = new RegExp(/[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\&\&\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.src=\"https:\/\/www\.google\.com\/logos\/fnbx\/\"\+[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8},[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8},"load",\n?function\(\){[a-zA-Z0-9_$]{1,8}\(a\)}\)\)}/gm)
-
-    pixelated_switch = `switch(${Pr_a}.${Pr_pa}){ `;
-
-    for (let index = 0; index < window.new_fruit.length; index++) {
-        current_fruit = window.new_fruit[index].Normal;
-        current_fruit_px = window.new_fruit[index].Pixel;
-        pixelated_case_template = `
-    case '${current_fruit_px}': ${Pr_a}.${Pr_ka}.src = '${current_fruit_px}'; break;`;
-        pixelated_switch = pixelated_switch + pixelated_case_template;
-    }
-
-
-    pixelated_switch = pixelated_switch + `
-  default: ${Pr_a}.${Pr_ka}.src = "https://www.google.com/logos/fnbx/" + ${Pr_a}.${Pr_pa}; break;
-}`;
-
-    new_pixelated_func = `
-  if (${Pr_a}.${Pr_ka})
-  {
-    ${pixelated_switch}
-    ${code.match(load_pixelated_regex)[0].split(',')[1].split('(')[0]}(${Pr_a}.${Pr_ka}, "load",
-    function() {
-        ${code.match(load_pixelated_regex)[0].split('{')[1].split('(')[0]}(${Pr_a})
-    });
-  }
-}
-  `
-
-    only_link_regex = new RegExp(/\"https:\/\/www\.google\.com\/logos\/fnbx\/\"\+[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/)
-
-    //console.log("Adding pixelated images")
-    code = code.assertReplace(load_pixelated_regex, new_pixelated_func);
-*/
- // THIS ENTIRE CHUNK IS MISSING, WHAT DOES IT DO? it used to fix deathscreen, but it works without it so no need.
-    // Fixes a image calls
-    //console.log("Adding images")
     code = code.assertReplace(shh_grabber, new_shh_line);
 
-    // Gets the settings value that hold the src for count and apple, also the var it's held in is the same for both.
-    //get_count_val1 = code.match(/case "count":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[0].split(':')[1]
-    //get_count_val2 = code.match(/case "count":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
-    //get_apple_val2 = code.match(/case "apple":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
-    //get_speed_val2 = code.match(/case "speed":[a-zA-Z0-9_$]{1,4}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,4}/)[0].split('.')[2]
-
-    // Endscreen related image loading for new fruit - pudding. Keep this last
-    // Since it effect load_image_func in a way that would break the other code that relies on it !!
-    //console.log("Adding new fruit to endscreen")
-    ////console.log(load_image_func)
-    ////console.log(code)
-    //code = code.assertReplace(load_image_func, code.match(load_image_func)[0].replaceAll(';', load_code_condensed));
-    ////console.log(code)
-    //debugger
-
-    gold_chance = `* 1000000) + 1) == 426017)` // ${gold_chance}
-    super_chance = `* 10000000) + 1) == 4263017)` // ${super_chance}
-    free_test = `* 10) + 1) == 6)` // ${free_test}
+    // Secret fruit rarities (checked later → rarer overwrites if both hit)
+    gold_chance = `* 1000000) + 1) == 426017)` // Apple 1m
+    cherry_chance = `* 5000000) + 1) == 421017)` // Cherry 5m
+    super_chance = `* 10000000) + 1) == 4263018)` // Strawberry 10m
+    carrot_chance = `* 50000000) + 1) == 4263019)` // Carrot 50m
+    melon_chance = `* 100000000) + 1) == 4263217)` // Watermelon 100m
 
     apple_info_regex_improved = new RegExp(/[a-zA-Z0-9_$]{1,8}=function\(a,b,c\){a\.[a-zA-Z0-9_$]{1,8}\[b\]\.[a-zA-Z0-9_$]{1,8}=c;/)
     get_ka = code.match(apple_info_regex_improved)[0].split('.')[1].split('[')[0]
     get_pos = code.match(apple_info_regex_improved)[0].split('.')[2].split('=')[0]
     apple_info_regex = new RegExp(`a\.${get_ka}\\\[b\\\]\.${get_pos}`)
-    ////console.log(apple_info_regex)
 
-    set_gold = `if(a.${get_ka}[b].type >= ${golden_index} - 1){a.${get_ka}[b].type = a.${get_ka}[b].old_type;}
-    if(Math.floor((Math.random() ${gold_chance}{a.${get_ka}[b].old_type = a.${get_ka}[b].type; a.${get_ka}[b].type = ${golden_index} - 1;}
-    if(Math.floor((Math.random() ${super_chance}{a.${get_ka}[b].old_type = a.${get_ka}[b].type; a.${get_ka}[b].type = ${golden_index};}
+    // goldenIndex = Apple; +1 Cherry; +2 Strawberry; +3 Carrot; +4 Watermelon
+    set_gold = `if(a.${get_ka}[b].type >= ${golden_index} && a.${get_ka}[b].type <= ${golden_index} + 4){a.${get_ka}[b].type = a.${get_ka}[b].old_type;}
+    if(Math.floor((Math.random() ${gold_chance}{a.${get_ka}[b].old_type = a.${get_ka}[b].type; a.${get_ka}[b].type = ${golden_index};}
+    if(Math.floor((Math.random() ${cherry_chance}{a.${get_ka}[b].old_type = a.${get_ka}[b].type; a.${get_ka}[b].type = ${golden_index} + 1;}
+    if(Math.floor((Math.random() ${super_chance}{a.${get_ka}[b].old_type = a.${get_ka}[b].type; a.${get_ka}[b].type = ${golden_index} + 2;}
+    if(Math.floor((Math.random() ${carrot_chance}{a.${get_ka}[b].old_type = a.${get_ka}[b].type; a.${get_ka}[b].type = ${golden_index} + 3;}
+    if(Math.floor((Math.random() ${melon_chance}{a.${get_ka}[b].old_type = a.${get_ka}[b].type; a.${get_ka}[b].type = ${golden_index} + 4;}
     $&`
-    //console.log("Adding 1 in a Million Golden Apple")
-    //console.log("Adding 1 in a 10 Million Special Secret")
     code = code.assertReplace(apple_info_regex, set_gold)
 
     return code;
@@ -2191,7 +2038,7 @@ window.SnakeColor.make = function () {
 }
 
 window.SnakeColor.alterCode = function (code) {
-
+try{
     // Code to alter snake code here
     snake_colors_regex = new RegExp(/[a-zA-Z0-9_$]{1,6}[^]?=[^]?\[\["#4E7CF6","#17439F"\][^]*?\]\]/);
     yinyang_colors_regex = new RegExp(/\[5,4,7,7,1,2,0,3,9,8,0,14,15,15,11,\n?12,17,16\]/)
@@ -2380,10 +2227,10 @@ window.SnakeColor.alterCode = function (code) {
 
     // https://www.google.com/logos/fnbx/snake_arcade/v5/color_10.png
 
-    snake_face_regex = new RegExp(/[a-zA-Z0-9_$]{1,6}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,6}\?\([a-zA-Z0-9_$]{1,6}\.[a-zA-Z0-9_$]{1,6}=[a-zA-Z0-9_$]{1,6}\[0\]\[0\]/)
+    snake_face_regex = new RegExp(/[a-zA-Z0-9_$]{1,6}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,6}=?=?=?1?0?\?\([a-zA-Z0-9_$]{1,6}\.[a-zA-Z0-9_$]{1,6}=[a-zA-Z0-9_$]{1,6}\[0\]\[0\]/)
     catchError(snake_face_regex, code)
     snake_face_code = code.match(snake_face_regex)[0]
-    snake_face_code = `${code.match(snake_face_regex)[0].split('=')[0]}=10===${code.match(snake_face_regex)[0].split('?')[0]}? window.rainbowAlts[window.snakeRainbowOverride].set[0] : ${code.match(snake_face_regex)[0].split('=')[1]}`
+    snake_face_code = `window.isRainbow ? ${code.match(snake_face_regex)[0].split('?')[1].split('=')[0]}= window.isRainbow ? window.rainbowAlts[window.snakeRainbowOverride].set[0] : ${code.match(snake_face_regex)[0].replace("===10","").split('?')[1].split('=')[1]}`
 
     //console.log(snake_face_code)
     code = code.assertReplace(snake_face_regex, snake_face_code)
@@ -2395,18 +2242,18 @@ window.SnakeColor.alterCode = function (code) {
     //code = code.assertReplace(/0===a\.settings\.Aa\|\|/, "")
     //code = code.assertReplace(/\["#4E7CF6","#17439F"\]/, `["#FFFFFF","#FFFFFF"]`)
 
-    snake_face2_reg = new RegExp(/\|\|10===[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\)[a-zA-Z0-9_$]{1,8}=[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8},[a-zA-Z0-9_$]{1,8}\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/gm)
+    snake_face2_reg = new RegExp(/\|\|1?0?=?=?=?[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}=?=?=?=1?0?\)[a-zA-Z0-9_$]{1,8}=[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8},[a-zA-Z0-9_$]{1,8}\([a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/gm)
     snakeface2code = '&&!window.randomColor&&!window.isRainbow)' + code.match(snake_face2_reg)[0].split(')')[1]
     code = code.assertReplace(snake_face2_reg, snakeface2code)
 
-    rainbow_bool_regex = new RegExp(/10===[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/g)
+    rainbow_bool_regex = new RegExp(/[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}===10/g)
     catchError(rainbow_bool_regex, code)
 
     is_rainbow_matches = code.match(rainbow_bool_regex).length;
     for (let index = 0; index < is_rainbow_matches; index++) {
         const element = code.match(rainbow_bool_regex)[0];
-        snake_color_num = element.split('=')[3]
-        make_me_different = `10==` + element.split('=')[3]
+        snake_color_num = element.split('=')[0]
+        make_me_different = element.split('=')[0] + `==10`
         new_rainbow_bool = make_me_different + `||window.isRainbow`
         code = code.assertReplace(element, new_rainbow_bool)
 
@@ -2449,6 +2296,17 @@ window.SnakeColor.alterCode = function (code) {
 
     PopulateSnakeColorsDropdown()
 
+    // This fixes gate color issue, hardcoded is a poor choice but it works
+    // Better search: /a=_....\(a\)/ -> 3 dots should match some function name that sets gate color or something similar
+    code = code.assertReplace(/a=_.([a-zA-Z0-9_$]{1,8})\(a\);a=parseInt/,`
+        if (typeof a === 'undefined') {
+            a = "#4E7CF6";
+        }
+        a=_.$1(a);a=parseInt`);
+        console.log("spawn yay");
+}catch(error){
+    console.error("error in running counter: "+error);
+}
 
     //code = code.assertReplace(/this\.zd=qN\[0\]\[0\];/,`this.zd=qN[0][0];debugger;`)
 
@@ -2457,6 +2315,46 @@ window.SnakeColor.alterCode = function (code) {
 window.SettingsSaver = {};
 
 window.SettingsSaver.make = function () {
+    const COUNT_KEYS = ["0", "1", "2", "3", "4", "5", "6"];
+    const COUNT_MINIMA = { 0: 1, 1: 3, 2: 5, 3: 10, 4: 6, 5: 24, 6: 5 };
+
+    function defaultPoolForCount(count) {
+        const min = COUNT_MINIMA[count] || 1;
+        const pool = [];
+        for (let i = 0; pool.length < min; i++) {
+            if (i === 24) continue; // skip fruit bowl
+            pool.push(i);
+        }
+        return pool;
+    }
+
+    function migrateSelectedPairsByCount(settings) {
+        if (settings.SelectedPairsByCount && typeof settings.SelectedPairsByCount === "object") {
+            for (const key of COUNT_KEYS) {
+                if (!Array.isArray(settings.SelectedPairsByCount[key])) {
+                    settings.SelectedPairsByCount[key] = defaultPoolForCount(Number(key));
+                }
+            }
+            return settings;
+        }
+
+        const legacy = Array.isArray(settings.SelectedPairs) ? settings.SelectedPairs.map(Number) : null;
+        settings.SelectedPairsByCount = {};
+        for (const key of COUNT_KEYS) {
+            const count = Number(key);
+            const min = COUNT_MINIMA[count];
+            // Seed each count with only its own minimum slice of the old shared list
+            const seed = legacy ? legacy.slice(0, min) : defaultPoolForCount(count);
+            const pool = Array.from(new Set(seed.map(Number).filter((n) => !isNaN(n) && n !== 24)));
+            for (let i = 0; pool.length < min; i++) {
+                if (i === 24) continue;
+                if (!pool.includes(i)) pool.push(i);
+            }
+            settings.SelectedPairsByCount[key] = pool;
+        }
+        return settings;
+    }
+
     window.loadSettings = function () {
         let pudding_settings = localStorage.getItem('PuddingSettings');
         if (pudding_settings === null) {
@@ -2467,44 +2365,53 @@ window.SettingsSaver.make = function () {
                 TopBar: true,
                 SpeedInfo: false,
                 PortalPairs: false,
-                SelectedPairs: [0, 1, 2, 3, 4, 5],
+                AlwaysUniqueFruit: false,
+                SelectedPairs: defaultPoolForCount(0),
+                SelectedPairsByCount: {},
                 DisableRandom: false,
-                randomizeThemeApple: false
+                randomizeThemeApple: false,
+                ScrollBar: false
             };
-
+            for (const key of COUNT_KEYS) {
+                pudding_settings.SelectedPairsByCount[key] = defaultPoolForCount(Number(key));
             }
-         else {
+        } else {
             pudding_settings = JSON.parse(pudding_settings);
+            if (typeof pudding_settings.PortalPairs !== 'boolean') {
+                pudding_settings.PortalPairs = false;
+            }
+            if (typeof pudding_settings.AlwaysUniqueFruit !== 'boolean') {
+                pudding_settings.AlwaysUniqueFruit = false;
+            }
+            if (typeof pudding_settings.ScrollBar !== 'boolean') {
+                pudding_settings.ScrollBar = false;
+            }
+            pudding_settings = migrateSelectedPairsByCount(pudding_settings);
+            pudding_settings.SelectedPairs = pudding_settings.SelectedPairsByCount["0"];
         }
 
         return pudding_settings;
     }
     window.pudding_settings = window.loadSettings();
 
-
     window.saveSettings = function () {
-        window.pudding_settings.SelectedPairs = window.selected_fruit;
-        if (typeof pudding_settings !== 'undefined' && typeof pudding_settings.Skull !== 'undefined' &&
-        typeof pudding_settings.SokoGoals !== 'undefined' &&
-        typeof pudding_settings.InputDisplay !== 'undefined' &&
-        typeof pudding_settings.TopBar !== 'undefined' &&
-        typeof pudding_settings.SpeedInfo !== 'undefined' &&
-        typeof pudding_settings.PortalPairs !== 'undefined' &&
-        typeof pudding_settings.DisableRandom !== 'undefined' &&
-        typeof pudding_settings.randomizeThemeApple !== 'undefined'
+        const s = window.pudding_settings;
+        if (typeof s !== 'undefined' &&
+            typeof s.Skull !== 'undefined' &&
+            typeof s.SokoGoals !== 'undefined' &&
+            typeof s.InputDisplay !== 'undefined' &&
+            typeof s.TopBar !== 'undefined' &&
+            typeof s.SpeedInfo !== 'undefined' &&
+            typeof s.PortalPairs !== 'undefined' &&
+            typeof s.DisableRandom !== 'undefined' &&
+            typeof s.randomizeThemeApple !== 'undefined'
         ) {
-            localStorage.setItem('PuddingSettings', JSON.stringify(pudding_settings));
+            localStorage.setItem('PuddingSettings', JSON.stringify(s));
         }
     }
-
 }
 
 window.SettingsSaver.alterCode = function (code) {
-    window.PopulateOptions();
-    window.PopulateDropdowns();
-    window.PopulateOptions();
-    window.PopulateDropdowns();
-
     reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
     settings_reset_code = `
@@ -2514,10 +2421,9 @@ window.SettingsSaver.alterCode = function (code) {
     catchError(reset_regex, code)
     code = code.assertReplace(reset_regex, settings_reset_code);
 
-
-    stop_regex = new RegExp(/stop=function\(a\){/)
+    stop_regex = new RegExp(/stop\(a\){/)
     catchError(stop_regex, code)
-    save_settings_code = `stop=function(a){saveSettings();`
+    save_settings_code = `stop\(a\){saveSettings();`
 
     code = code.assertReplace(stop_regex, save_settings_code);
     return code;
@@ -2526,68 +2432,170 @@ window.SpeedInfo = {};
 
 window.SpeedInfo.make = function () {
 
+    window.isBridge = (Math.floor((Math.random()* 50) + 1) != 32);
+
     // First game must be CE, the other is the normal game
     const gameIDs = ["o1y9pyk6", "9dow0go1"];
-    window.first_time_call =true;
+    window.first_time_call = true;
     window.requestsMade = 0;
+
+    // FastSnakeStats runs-derived WR timelines (preferred over legacy daily/ snapshots)
+    const FASTSNAKE_BASE = "https://raw.githubusercontent.com/DarkSnakeGang/FastSnakeStats/refs/heads/main/time-travel-cache";
+    const RUNS_DATES_URL = `${FASTSNAKE_BASE}/metadata/available-dates-runs.json`;
+    const TIMELINES_URL = `${FASTSNAKE_BASE}/runs-derived/wr-timelines.json`;
+    const CACHE_STALE_THRESHOLD = 3 * 60 * 60 * 1000; // 3 hours
+
+    let timelinesData = null;
+    let runsDatesMeta = null;
+    let lastTimelinesUpdate = 0;
+    let timelinesPromise = null;
 
     function sleepFor(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    window.makeAPIrequest = function (requestURL, callback) {
-        // Add id to solve query isssue
-        hasQuery = requestURL.includes("?")
-        url = requestURL
-        if (hasQuery) {
-            url += "&"
-        }
-        else {
-            url += "?"
-        }
-        url += "id=" + new Date().getTime()
-        if (window.NepDebug) {
-            //console.log(url);
-            //console.log("Getting runs..." + window.requestsMade);
-        }
-
-        let request = new XMLHttpRequest();
-        request.open("GET", url);
-        request.onload = function () {
-            if (request.status == 200) {
-                window.requestsMade += 1;
-                let response = JSON.parse(request.response);
-                //console.log(response);
-                if (callback && typeof callback === "function") {
-                    callback(response);
-                }
-            }
-            else if (request.status == 404) {
-                console.error("You used the API wrong!");
-            }
-            else {
-                sleepFor(2000);
-                makeAPIrequest(requestURL);
-            }
-        }
-        request.send();
+    async function getJSON(url) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
+        return res.json();
     }
 
+    // Binary search: latest WR snapshot on or before `date` (same as FastSnakeStats GitHubCacheFetcher)
+    function wrAsOf(timeline, date) {
+        if (!timeline || !timeline.length) return [];
+        let lo = 0;
+        let hi = timeline.length - 1;
+        let best = -1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (timeline[mid].d <= date) {
+                best = mid;
+                lo = mid + 1;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return best >= 0 ? timeline[best].runs : [];
+    }
 
+    function expandCompactRun(r, date) {
+        const isGuest = r.g || String(r.p).indexOf("guest:") === 0;
+        return {
+            id: r.id,
+            date: date,
+            weblink: r.w,
+            times: { primary: r.t, primary_t: r.pt },
+            players: {
+                data: [
+                    isGuest
+                        ? {
+                            rel: "guest",
+                            name: r.n,
+                            "name-style": r.ns || {
+                                style: "solid",
+                                color: { dark: "#9e9e9e", light: "#9e9e9e" },
+                            },
+                        }
+                        : {
+                            rel: "user",
+                            id: r.p,
+                            names: { international: r.n },
+                            weblink: "https://www.speedrun.com/user/" + r.p,
+                            "name-style": r.ns || undefined,
+                        },
+                ],
+            },
+            values: {},
+        };
+    }
 
+    async function loadRunsDerived() {
+        if (
+            timelinesData &&
+            runsDatesMeta &&
+            Date.now() - lastTimelinesUpdate < CACHE_STALE_THRESHOLD
+        ) {
+            const date = runsDatesMeta.availableDates[runsDatesMeta.availableDates.length - 1];
+            return { timelines: timelinesData, date };
+        }
+        if (timelinesPromise) return timelinesPromise;
+
+        timelinesPromise = (async () => {
+            if (window.NepDebug) {
+                console.log("Loading FastSnakeStats runs-derived timelines...");
+            }
+            const [dates, timelines] = await Promise.all([
+                getJSON(RUNS_DATES_URL),
+                getJSON(TIMELINES_URL),
+            ]);
+            if (!dates.availableDates || !dates.availableDates.length) {
+                throw new Error("No available dates in runs-derived metadata");
+            }
+            if (!timelines.boards) {
+                throw new Error("runs-derived timelines missing boards");
+            }
+            runsDatesMeta = dates;
+            timelinesData = timelines;
+            lastTimelinesUpdate = Date.now();
+            window.requestsMade += 2;
+            const date = dates.availableDates[dates.availableDates.length - 1];
+            if (window.NepDebug) {
+                console.log(`Runs-derived ready as of ${date} (${Object.keys(timelines.boards).length} boards)`);
+            }
+            return { timelines, date };
+        })().finally(() => {
+            timelinesPromise = null;
+        });
+
+        return timelinesPromise;
+    }
+
+    // Look up one category key as of the latest runs-derived date
+    async function getRecordForKey(cacheKey) {
+        const { timelines, date } = await loadRunsDerived();
+        const top = wrAsOf(timelines.boards[cacheKey], date);
+        return {
+            date,
+            success: top.length > 0,
+            runs: top.map((r) => expandCompactRun(r, date)),
+        };
+    }
+
+    // Preload timelines (startup / legacy hooks)
+    async function getLatestCacheData() {
+        const { timelines, date } = await loadRunsDerived();
+        return { date, source: "runs-derived", boards: timelines.boards };
+    }
+
+    // Legacy function for compatibility (now uses runs-derived)
+    window.makeAPIrequest = function (requestURL, callback) {
+        if (window.NepDebug) {
+            console.log("Legacy API request called, using runs-derived instead");
+        }
+        getLatestCacheData().then(data => {
+            if (callback && typeof callback === "function") {
+                callback(data);
+            }
+        }).catch(error => {
+            if (window.NepDebug) {
+                console.error("Runs-derived fetch failed:", error);
+            }
+            if (callback && typeof callback === "function") {
+                callback({ data: { runs: [] } });
+            }
+        });
+    }
+
+    // Legacy function for compatibility
     window.getGameDetails = function () {
-
-        makeAPIrequest("https://www.speedrun.com/api/v1/games/" + gameIDs[0] + "/variables", (x) => { window.SpeedrunVaraiblesJson = x });
-        makeAPIrequest("https://www.speedrun.com/api/v1/games/" + gameIDs[0] + "/categories?embed=game", (x) => { window.SpeedrunCategoriesJson = x });
-        makeAPIrequest("https://www.speedrun.com/api/v1/games/" + gameIDs[0] + "/levels", (x) => { window.SpeedrunLevelsJson = x });
-
-        makeAPIrequest("https://www.speedrun.com/api/v1/games/" + gameIDs[1] + "/variables", (x) => { window.SpeedrunVaraiblesJsonCE = x });
-        makeAPIrequest("https://www.speedrun.com/api/v1/games/" + gameIDs[1] + "/categories?embed=game", (x) => { window.SpeedrunCategoriesJsonCE = x });
-        makeAPIrequest("https://www.speedrun.com/api/v1/games/" + gameIDs[1] + "/levels", (x) => { window.SpeedrunLevelsJsonCE = x });
-
-        //makeAPIrequest("https://www.speedrun.com/api/v1/games/o1y9pyk6/records?top=1", printMe);
-
-
+        if (window.NepDebug) {
+            console.log("getGameDetails called - using runs-derived instead");
+        }
+        getLatestCacheData().catch(error => {
+            if (window.NepDebug) {
+                console.error("Failed to initialize runs-derived data:", error);
+            }
+        });
     }
 
     window.modeToTxt = {
@@ -2608,15 +2616,22 @@ window.SpeedInfo.make = function () {
         14: { name: "Light" },
         15: { name: "Shield" },
         16: { name: "Arrow" },
-        17: { name: "Peaceful" },
-        18: { name: "Blender" },
+        17: { name: "Hotdog" },
+        18: { name: "Magnet" },
+        19: { name: "Gate" },
+        20: { name: "Bridge" },
+        21: { name: "Peaceful" },
+        22: { name: "Blender" },
     }
 
     window.countToTxt = {
         0: { name: "1 Apple" },
         1: { name: "3 Apples" },
         2: { name: "5 Apples" },
-        3: { name: "Dice" },
+        3: { name: "10 Apples" },
+        4: { name: "Dice" },
+        5: { name: "Bomb" },
+        6: { name: "Tally" },
     }
 
     window.sizeToTxt = {
@@ -2626,36 +2641,25 @@ window.SpeedInfo.make = function () {
     }
 
     window.speedToTxt = {
-        0: { name: "Standard" },
+        0: { name: "Normal" },
         1: { name: "Fast" },
         2: { name: "Slow" },
     }
 
     daily_button.addEventListener("click", function() {
-        SpeedInfoUpdate()
+        SpeedInfoUpdate().catch(e=>console.error('SpeedInfoUpdate error:',e))
         EmptyAll()
       });
 
-    window.getRecordSRC = function (level) {
+    window.getRecordSRC = async function (level) {
 
         if(window.daily_challenge){
-
             EmptyAll();
             return;
         }
 
         if (!window.pudding_settings.SpeedInfo) {
             // For those that don't want to see speedrun info, to keep the game stable without api calls
-            EmptyAll();
-            return;
-        }
-
-        if (typeof window.SpeedrunVaraiblesJson == "undefined" ||
-            typeof window.SpeedrunCategoriesJson == "undefined" ||
-            typeof window.SpeedrunLevelsJson == "undefined" ||
-            typeof window.SpeedrunVaraiblesJsonCE == "undefined" ||
-            typeof window.SpeedrunCategoriesJsonCE == "undefined" ||
-            typeof window.SpeedrunLevelsJsonCE == "undefined") {
             EmptyAll();
             return;
         }
@@ -2677,8 +2681,13 @@ window.SpeedInfo.make = function () {
         STATUE = 13
         LIGHT = 14
         SHIELD = 15
-        PEACEFUL = 16
-        BLENDER = 17
+        ARROW = 16
+        HOTDOG = 17
+        MAGNET = 18
+        GATE = 19
+        BRIDGE = 20
+        PEACEFUL = 21
+        BLENDER = 22
 
         // Speed list
         DEFAULT_SPEED = 0
@@ -2689,18 +2698,20 @@ window.SpeedInfo.make = function () {
         ONE_APPLE = 0;
         THREE_APPLES = 1;
         FIVE_APPLES = 2;
-        DICE = 3;
+        TEN_APPLES = 3;
+        DICE = 4;
+        BOMB = 5;
 
 
         let count = window.timeKeeper.getCurrentSetting("count");
         let speed = window.timeKeeper.getCurrentSetting("speed");
         let size = window.timeKeeper.getCurrentSetting("size");
         let mode = window.CurrentModeNum;
-        // Implement new method of getting mod that excludes blender
 
-        const highscore_modes = [WALL, PORTAL, KEY, SOKO, POISON, MINESWEEPER, STATUE, SHIELD];
+        const highscore_modes = [WALL, PORTAL, KEY, SOKO, POISON, MINESWEEPER, STATUE, SHIELD, HOTDOG, GATE, CHEESE, BRIDGE];
 
-        if (size > 2 || count > 3) {
+        // > 6 = beyond Tally (MoreMenu / custom counts)
+        if (size > 2 || count > 6) {
             EmptyAll();
             return;
         }
@@ -2712,132 +2723,105 @@ window.SpeedInfo.make = function () {
             HandleHighscore("Empty")
             return;
         }
-        if (mode == STATUE && level == "H" && speed == SLOW) {
-            HandleHighscore("Empty")
-            return; // Statue isn't highscore on slow (yet?)
+
+        // Build cache key based on FastSnakeStats format
+        const modeName = window.modeToTxt[mode].name;
+        const countName = window.countToTxt[count].name;
+        const speedName = window.speedToTxt[speed].name;
+        const sizeName = window.sizeToTxt[size].name;
+        
+        // Determine category name
+        let categoryName;
+        if (level === "H") {
+            categoryName = "High Score";
+        } else {
+            categoryName = level + " Apples";
         }
 
-        gameID = speed == SLOW ? gameIDs[1] : gameIDs[0]; // Set gameID to CE if Slow
-
-        Highscore_ID = "";
-        variable_IDs = speed != SLOW ? window.SpeedrunVaraiblesJson : window.SpeedrunVaraiblesJsonCE;
-        category_IDs = speed != SLOW ? window.SpeedrunCategoriesJson : window.SpeedrunCategoriesJsonCE;
-        speed_var_ID = speed_value_ID = ""
-
-        // reset the stuff, blame moterstorm for CE having issues
-        multi_value_ID = ""
-        size_value_ID = ""
-        //debugger
-        for (let currentVar = 0; currentVar < variable_IDs["data"].length; currentVar++) {
-            if (multi_value_ID == "" && variable_IDs["data"][currentVar].name.includes("Multi")) {
-                multi_var_ID = variable_IDs["data"][currentVar].id;
-                for (var currentValue in variable_IDs["data"][currentVar].values.values) {
-                    if (variable_IDs["data"][currentVar].values.values[currentValue].label == window.countToTxt[count].name) {
-                        multi_value_ID = currentValue;
-                        break;
-                    }
-                }
-            }
-
-            if (speed_value_ID == "" && variable_IDs["data"][currentVar].name.includes("Speed")) {
-                speed_var_ID = variable_IDs["data"][currentVar].id;
-                for (var currentValue in variable_IDs["data"][currentVar].values.values) {
-                    if (variable_IDs["data"][currentVar].values.values[currentValue].label == window.speedToTxt[speed].name) {
-                        speed_value_ID = currentValue;
-                        break;
-                    }
-                }
-            }
-
-            if (size_value_ID == "" && variable_IDs["data"][currentVar].name.includes("Board")) {
-                size_var_ID = variable_IDs["data"][currentVar].id;
-                for (var currentValue in variable_IDs["data"][currentVar].values.values) {
-                    if (variable_IDs["data"][currentVar].values.values[currentValue].label == window.sizeToTxt[size].name) {
-                        size_value_ID = currentValue;
-                        break;
-                    }
-                }
-            }
-        }
-
-        catch_multi = "var-" + multi_var_ID + "=" + multi_value_ID
-        catch_speed = "&var-" + speed_var_ID + "=" + speed_value_ID
-        catch_size = "&var-" + size_var_ID + "=" + size_value_ID
-
-        if (speed_var_ID = "") { // Slow stuff doesn't have speed value when it's high score
-            catch_speed = ""
-        }
-
-        if (level == "H") {
-
-            for (let index = 0; index < category_IDs["data"].length; index++) {
-                if (category_IDs["data"][index].name.includes(window.modeToTxt[mode].name)) {
-
-                    Highscore_ID = category_IDs["data"][index].id;
-                    break;
-                }
-            }
-
-            if (window.NepDebug) {
-                //console.log("https://www.speedrun.com/api/v1/leaderboards/" + gameID +
-                //    "/category/" + Highscore_ID + "?top=1&" + catch_multi + catch_speed + catch_size)
-            }
-
-            makeAPIrequest("https://www.speedrun.com/api/v1/leaderboards/" + gameID +
-                "/category/" + Highscore_ID + "?top=1&" + catch_multi + catch_speed + catch_size, HandleHighscore);
-
-            return;
-            //makeAPIrequest("https://www.speedrun.com/api/v1/categories/"+Highscore_ID+"/records?top=1&x=7kj63r42-0nwovxdl.mlnmj661-0nwomwdl.xqkkj49q-p854j77l.z19gp0jl", printMe);
-        }
-
-        level_IDs = speed != SLOW ? window.SpeedrunLevelsJson : window.SpeedrunLevelsJsonCE;
-
-        for (let index = 0; index < level_IDs["data"].length; index++) {
-            if (level_IDs["data"][index].name.includes(window.modeToTxt[mode].name) &&
-                level_IDs["data"][index].name.includes(window.speedToTxt[speed].name)) {
-                level_ID = level_IDs["data"][index].id;
-                break;
-            }
-        }
-
-        for (let index = 0; index < category_IDs["data"].length; index++) {
-            if (category_IDs["data"][index].name.includes(level + " Apples")) {
-
-                category_ID = category_IDs["data"][index].id;
-                break;
-            }
-        }
-
-        src_link_stuff = "https://www.speedrun.com/api/v1/leaderboards/" + gameID + "/level/"
+        // Build the cache key in FastSnakeStats format
+        const cacheKey = `${countName}|${speedName}|${sizeName}|${modeName}|${categoryName}`;
 
         if (window.NepDebug) {
-            //console.log(src_link_stuff + level_ID + "/" + category_ID + "?top=1&" + catch_multi + catch_size)
-        }
-        switch (level) {
-            case "25":
-                makeAPIrequest(src_link_stuff + level_ID + "/" + category_ID + "?top=1&" + catch_multi + catch_size, Handle25)
-                break;
-            case "50":
-                if (size == 1 && mode == YINYANG) {
-                    Handle50("Empty")
-                    break;
-                }
-                makeAPIrequest(src_link_stuff + level_ID + "/" + category_ID + "?top=1&" + catch_multi + catch_size, Handle50)
-                break;
-            case "100":
-                if (size != 1) {
-                    makeAPIrequest(src_link_stuff + level_ID + "/" + category_ID + "?top=1&" + catch_multi + catch_size, Handle100)
-                    break;
-                }
-                Handle100("Empty");
-                break;
-            case "All":
-                makeAPIrequest(src_link_stuff + level_ID + "/" + category_ID + "?top=1&" + catch_multi + catch_size, HandleAll)
-                break;
-            default:
-                break;
+            console.log(`Looking for runs-derived key: ${cacheKey}`);
         }
 
+        let recordData;
+        try {
+            recordData = await getRecordForKey(cacheKey);
+        } catch (error) {
+            if (window.NepDebug) {
+                console.error("Failed to get runs-derived record:", error);
+            }
+            EmptyAll();
+            return;
+        }
+
+        if (window.NepDebug) {
+            console.log(`Record data for key ${cacheKey}:`, recordData);
+        }
+
+        if (!recordData || !recordData.success || !recordData.runs || recordData.runs.length === 0) {
+            if (window.NepDebug) {
+                console.log(`No successful runs found for key: ${cacheKey}`);
+            }
+            if (level === "H") {
+                HandleHighscore("Empty");
+            } else {
+                switch (level) {
+                    case "25": Handle25("Empty"); break;
+                    case "50": Handle50("Empty"); break;
+                    case "100": Handle100("Empty"); break;
+                    case "All": HandleAll("Empty"); break;
+                    default: break;
+                }
+            }
+            return;
+        }
+
+        // Runs are already expanded objects from runs-derived timelines
+        const bestRun = recordData.runs[0];
+
+        if (!bestRun || !bestRun.times || !bestRun.times.primary || !bestRun.weblink) {
+            if (window.NepDebug) {
+                console.log(`Invalid run data structure for key: ${cacheKey}`, bestRun);
+            }
+            if (level === "H") {
+                HandleHighscore("Empty");
+            } else {
+                switch (level) {
+                    case "25": Handle25("Empty"); break;
+                    case "50": Handle50("Empty"); break;
+                    case "100": Handle100("Empty"); break;
+                    case "All": HandleAll("Empty"); break;
+                    default: break;
+                }
+            }
+            return;
+        }
+
+        const runData = {
+            data: {
+                runs: [{
+                    run: {
+                        times: { primary: bestRun.times.primary },
+                        weblink: bestRun.weblink
+                    }
+                }]
+            }
+        };
+
+        switch (level) {
+            case "H": HandleHighscore(runData); break;
+            case "25": Handle25(runData); break;
+            case "50": Handle50(runData); break;
+            case "100": Handle100(runData); break;
+            case "All": HandleAll(runData); break;
+            default:
+                if (window.NepDebug) {
+                    console.warn(`No handler found for level: ${level}`);
+                }
+                break;
+        }
 
     }
 
@@ -2852,10 +2836,11 @@ window.SpeedInfo.make = function () {
         HandleHighscore(emp);
     }
 
-    window.getAllSrc = function () {
-        ["25", "50", "100", "All", "H"].forEach(element => {
-            getRecordSRC(element);
-        });
+    window.getAllSrc = async function () {
+        const levels = ["25", "50", "100", "All", "H"];
+        for (const element of levels) {
+            await getRecordSRC(element);
+        }
     }
 
     function Handle25(response) {
@@ -2964,7 +2949,7 @@ window.SpeedInfo.make = function () {
             const wholeSeconds = Math.floor(seconds);
             convertedTime += wholeSeconds + 's';
 
-            const milliseconds = Math.round((seconds - wholeSeconds) * 1000);
+            const milliseconds = String(Math.round((seconds - wholeSeconds) * 1000)).padStart(3, "0");
 
             if (milliseconds > 0) {
                 convertedTime += milliseconds + 'ms';
@@ -2984,8 +2969,12 @@ window.SpeedInfo.make = function () {
         return matches ? matches.length : 0;
     }
 
-    window.getGameDetails();
-    //window.getSomethingSRC();
+    // Prefetch runs-derived timelines on startup
+    getLatestCacheData().catch(error => {
+        if (window.NepDebug) {
+            console.error("Failed to initialize runs-derived data:", error);
+        }
+    });
 
    // window.speedinfoVisible = false;
 
@@ -2995,7 +2984,7 @@ window.SpeedInfo.make = function () {
         speedinfoBox.style.visibility = 'visible';
         window.pudding_settings.SpeedInfo = true;
 
-        window.SpeedInfoUpdate();
+        window.SpeedInfoUpdate().catch(e=>console.error('SpeedInfoUpdate error:',e));
     }
 
     window.SpeedInfoHide = function () {
@@ -3016,8 +3005,9 @@ window.SpeedInfo.make = function () {
 
 
         const speedinfoBox = document.createElement('div');
-        speedinfoBox.style = 'position:absolute;left:100%;z-index:10000;background-color:#4a752c;padding:8px;display:none;border-radius:3px;width:208px;height:584px;top:0px;';
+        speedinfoBox.style = window.puddingSidebarStyle;
         speedinfoBox.id = 'speedinfo-popup-pudding';
+        speedinfoBox.style.visibility = 'hidden';
         window.speedinfoInput = speedinfoBox;
         speedinfoBox.innerHTML = `
 
@@ -3084,15 +3074,15 @@ window.SpeedInfo.make = function () {
     //Listeners to hide/show speedinfo box
     const backButton = 'p17HVe';
     document.querySelector("[class^=\"" + backButton + "\"]").addEventListener("click", (e) => {
-        window.SpeedInfoUpdate();
+        window.SpeedInfoUpdate().catch(e=>console.error('SpeedInfoUpdate error:',e));
     });
 
     const playButton = 'NSjDf';
     document.querySelector("[jsname^=\"" + playButton + "\"]").addEventListener("click", (e) => {
-        window.SpeedInfoUpdate();
+        window.SpeedInfoUpdate().catch(e=>console.error('SpeedInfoUpdate error:',e));
     });
 
-    window.SpeedInfoUpdate = function () {
+    window.SpeedInfoUpdate = async function () {
         // Mainly for TimeKeeper, runs when "play" is clicked
         let count = window.timeKeeper.getCurrentSetting("count");
         let speed = window.timeKeeper.getCurrentSetting("speed");
@@ -3106,25 +3096,56 @@ window.SpeedInfo.make = function () {
         for (t of modeStr) {
             if (t == 1) {
 
-                switch (counter) {
-                    case 0: gamemode += "Wall, "; break;
-                    case 1: gamemode += "Portal, "; break;
-                    case 2: gamemode += "Cheese, "; break;
-                    case 3: gamemode += "Borderless, "; break;
-                    case 4: gamemode += "Twin, "; break;
-                    case 5: gamemode += "Winged, "; break;
-                    case 6: gamemode += "YinYang, "; break;
-                    case 7: gamemode += "Key, "; break;
-                    case 8: gamemode += "Sokoban, "; break;
-                    case 9: gamemode += "Poison, "; break;
-                    case 10: gamemode += "Dimension, "; break;
-                    case 11: gamemode += "Minesweeper, "; break;
-                    case 12: gamemode += "Statue, "; break;
-                    case 13: gamemode += "Light, "; break;
-                    case 14: gamemode += "Shield, "; break;
-                    case 15: gamemode += "Arrow, "; break;
-                    case 16: gamemode += "Peaceful, "; break;
-                    default: gamemode += "Unknown, "; break;
+                if(window.isBridge){
+                    switch (counter) {
+                        case 0: gamemode += "Wall, "; break;
+                        case 1: gamemode += "Portal, "; break;
+                        case 2: gamemode += "Cheese, "; break;
+                        case 3: gamemode += "Borderless, "; break;
+                        case 4: gamemode += "Twin, "; break;
+                        case 5: gamemode += "Winged, "; break;
+                        case 6: gamemode += "YinYang, "; break;
+                        case 7: gamemode += "Key, "; break;
+                        case 8: gamemode += "Sokoban, "; break;
+                        case 9: gamemode += "Poison, "; break;
+                        case 10: gamemode += "Dimension, "; break;
+                        case 11: gamemode += "Minesweeper, "; break;
+                        case 12: gamemode += "Statue, "; break;
+                        case 13: gamemode += "Light, "; break;
+                        case 14: gamemode += "Shield, "; break;
+                        case 15: gamemode += "Arrow, "; break;
+                        case 16: gamemode += "Hotdog, "; break;
+                        case 17: gamemode += "Magnet, "; break;
+                        case 18: gamemode += "Gate, "; break;
+                        case 19: gamemode += "Bridge, "; break;
+                        case 20: gamemode += "Peaceful, "; break;
+                        default: gamemode += "Unknown, "; break;
+                    }
+                }else{
+                    switch (counter) {
+                        case 0: gamemode += "Wall, "; break;
+                        case 1: gamemode += "Portal, "; break;
+                        case 2: gamemode += "Cheese, "; break;
+                        case 3: gamemode += "Borderless, "; break;
+                        case 4: gamemode += "Twin, "; break;
+                        case 5: gamemode += "Winged, "; break;
+                        case 6: gamemode += "YinYang, "; break;
+                        case 7: gamemode += "Key, "; break;
+                        case 8: gamemode += "Sokoban, "; break;
+                        case 9: gamemode += "Skull, "; break;
+                        case 10: gamemode += "Dimension, "; break;
+                        case 11: gamemode += "Minesweeper, "; break;
+                        case 12: gamemode += "Statue, "; break;
+                        case 13: gamemode += "Light, "; break;
+                        case 14: gamemode += "Shield, "; break;
+                        case 15: gamemode += "Arrow, "; break;
+                        case 16: gamemode += "Hotdog, "; break;
+                        case 17: gamemode += "Magnet, "; break;
+                        case 18: gamemode += "Gate, "; break;
+                        case 19: gamemode += "Skip, "; break;
+                        case 20: gamemode += "Peaceful, "; break;
+                        default: gamemode += "Unknown, "; break;
+                    }
                 }
             }
             counter++;
@@ -3161,14 +3182,16 @@ window.SpeedInfo.make = function () {
                     continue;
                 }
 
-                minutes = Math.floor(storage[name].time / 60000);
-                seconds = Math.floor((storage[name].time - minutes * 60000) / 1000);
-                mseconds = storage[name].time - minutes * 60000 - seconds * 1000;
-                if (minutes.toString().length < 2) { minutes = "0" + minutes.toString() }
-                if (seconds.toString().length < 2) { seconds = "0" + seconds.toString() }
-                while (mseconds.toString().length < 3) { mseconds = "0" + mseconds.toString() }
+                hours = Math.floor(storage[name].time / 3600000);
+                minutes = String(Math.floor((storage[name].time / 60000)-hours*60)).padStart(2, "0");
+                seconds = String(Math.floor((storage[name].time - minutes * 60000-hours*3600000) / 1000)).padStart(2, "0");
+                mseconds = String(storage[name].time - minutes * 60000 - seconds * 1000-hours*3600000).padStart(3, "0");
                 score_label = "ALL" === score ? "All" : score;
-                bold.innerHTML = score_label + " Apples: " + minutes + "m" + seconds + "s" + mseconds + "ms";
+                if(hours==0){
+                    bold.innerHTML = score_label + " Apples: " + minutes + "m" + seconds + "s" + mseconds + "ms";
+                }else{
+                    bold.innerHTML = score_label + " Apples: " + hours + "h" + minutes + "m" + seconds + "s" + mseconds + "ms";
+                }
 
             }
             else {
@@ -3188,7 +3211,10 @@ window.SpeedInfo.make = function () {
             case 0: return "1 Apple, "; break;
             case 1: return "3 Apples, "; break;
             case 2: return "5 Apples, "; break;
-            case 3: return "Dice count, "; break;
+            case 3: return "10 Apples, "; break;
+            case 4: return "Dice count, "; break;
+            case 5: return "Bomb count, "; break;
+            case 6: return "Tally count, "; break;
             default: return "MoreMenu Apples, "; break;
         }
     }
@@ -3213,10 +3239,11 @@ window.SpeedInfo.make = function () {
 }
 
 window.SpeedInfo.alterCode = function (code) {
+    
     reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
 
-    speedinfo_reset = `;window.SpeedInfoUpdate();
-    if(window.first_time_call){window.getAllSrc();window.first_time_call=false;}
+    speedinfo_reset = `;window.SpeedInfoUpdate().catch(e=>console.error('SpeedInfoUpdate error:',e));
+    if(window.first_time_call){window.getAllSrc().catch(e=>console.error('getAllSrc error:',e));window.first_time_call=false;}
     ;$&`
 
 
@@ -3224,7 +3251,7 @@ window.SpeedInfo.alterCode = function (code) {
     code = code.assertReplace(reset_regex, speedinfo_reset);
 
     switch_regex = new RegExp(/switch\(b\){case "apple"/)
-    speedinfo_switch = `window.SpeedInfoUpdate();switch(b){case "apple"`
+    speedinfo_switch = `window.SpeedInfoUpdate().catch(e=>console.error('SpeedInfoUpdate error:',e));switch(b){case "apple"`
     code = code.assertReplace(switch_regex, speedinfo_switch);
 
     window.CurrentModeNum = 0;
@@ -3252,16 +3279,18 @@ window.InputDisplay = {};
 
 window.InputDisplay.make = function () {
 
+  let displayPosition = parseInt((window.puddingSidebarStyle.split(';').find(style => style.trim().startsWith('width')) ? window.puddingSidebarStyle.split(';').find(style => style.trim().startsWith('width')).split(':')[1].trim() : null),10);
+
   // Code that runs before anything else here, loading variables, etc.
   // Recommended to use "window." for things
   const e = document.createElement('div');
   e.id = 'input-display-container';
-  e.style = 'position:absolute;left:-447px;top:530px;z-index:10001;display:block;line-height:normal;';
+  e.style = `position:absolute;left:${(-553+displayPosition/2)}px;top:530px;z-index:10001;display:block;line-height:normal;`;
   window.speedinfoInput.appendChild(e);
 
   const f = document.createElement('div');
-  f.id = 'input-display-container';
-  f.style = 'position:absolute;left:-447px;top:460px;z-index:10001;display:block;line-height:normal;';
+  f.id = 'input-display-container2';
+  f.style = `position:absolute;left:${(-553+displayPosition/2)}px;top:460px;z-index:10001;display:block;line-height:normal;width: 0;height: 0;`;
   window.speedinfoInput.appendChild(f);
 
   const InpBox = document.querySelector('#input-display-container');
@@ -3305,8 +3334,6 @@ window.InputDisplay.make = function () {
       document.getElementById('down-button-id').style.visibility = 'visible';
       document.getElementById('right-button-id').style.visibility = 'visible';
       document.getElementById('top-button-id').style.visibility = 'visible';
-      window.ToggleSpeedInfo();
-      window.ToggleSpeedInfo();
     }
     else {
       document.getElementById('left-button-id').style.display = 'none';
@@ -3451,6 +3478,16 @@ window.Timer = {
     localStorage._snake_pb = localStorage._snake_pb ?? '{}'
     window._pb = JSON.parse(localStorage._snake_pb)
 
+    // Bridge inserted before Peaceful: old mode index 20 (Peaceful) -> 21
+    if (!localStorage._snake_pb_bridge_migrated) {
+      if (window._pb[20] && !window._pb[21]) {
+        window._pb[21] = window._pb[20];
+        delete window._pb[20];
+        localStorage._snake_pb = JSON.stringify(window._pb);
+      }
+      localStorage._snake_pb_bridge_migrated = '1';
+    }
+
 
     localStorage._snake_aheadg  = localStorage._snake_aheadg  ?? '#008010'
     localStorage._snake_aheadl  = localStorage._snake_aheadl  ?? '#53dd87'
@@ -3551,6 +3588,10 @@ window.Timer = {
   <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_14.png" />
   <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/trophy_15.png" />
   <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/trophy_16.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v19/trophy_17.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v20/trophy_18.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v21/trophy_19.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v22/trophy_20.png" />
   <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_15.png" />
 </div>
 <br/>
@@ -3558,7 +3599,10 @@ window.Timer = {
   <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_00.png" />
   <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_01.png" />
   <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_02.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_03.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_03.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_04.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_05.png" />
+  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v19/count_06.png" />
 </div>
 <br/>
 <div id="edit-speed">
@@ -3983,9 +4027,10 @@ window.Timer = {
     code = code.replace('"25"', 'Math.min(25, ...(window._splits.length === 0 ? [25] : window._splits)) || 25')
 
     const resetFunction = code.match(
-      /[a-zA-Z0-9_$]{1,8}\n?\.\n?prototype\n?\.\n?reset\n?=\n?function\(\)\n?{\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?=\n?\[\];\n?var a\n?=\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?this\n?\.\n?settings[^]*?\)\}\;/
+      /reset\(\)\n?{\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?=\n?\[\];\n?var a\n?=\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?this\n?\.\n?settings[^]*?\)\}\;/
     )[0]
 
+    /*
     const modeKey = resetFunction.match(
       /0===this\.settings\.[a-zA-Z0-9_$]{1,8}/
     )[0].replace('0===this.settings.', '')
@@ -3998,11 +4043,12 @@ window.Timer = {
     const sizeKey = resetFunction.match(
       /1!==this\.settings\.[a-zA-Z0-9_$]{1,8}/
     )[0].replace('1!==this.settings.', '')
+*/
 
     code = code.replace(resetFunction,
       resetFunction.replace(
-        'function(){',
-        `function(){this.xdddd=[];
+        'reset(){',
+        `reset(){this.xdddd=[];
 
           const _mode  = getSelected('#trophy')
           const _count = getSelected('#count')
@@ -4048,7 +4094,7 @@ window.Timer = {
 
 
     const timeFormatFunction = code.match(
-      /[a-zA-Z0-9_$]{1,8}=function\(a\){a=Math\.floor\(a\);if\(0>=a\)return[^]*?3,"0"\)}/
+      /[a-zA-Z0-9_$]{1,8}=function\(a\){a=Math\.floor\(a\);if\(a<=0\)return[^]*?3,"0"\)}/
     )[0]
 
 
@@ -4098,7 +4144,7 @@ window.Timer = {
 
 
     const splitStuff = code.match(
-      /if\(25===\n?[a-zA-Z0-9_$]{1,8}\|\|50===[a-zA-Z0-9_$]{1,8}\|\|100===[a-zA-Z0-9_$]{1,8}\)/
+      /if\(2?5?=?=?=?\n?[a-zA-Z0-9_$]{1,8}=?=?=?2?5?\|\|5?0?=?=?=?[a-zA-Z0-9_$]{1,8}=?=?=?5?0?\|\|1?0?0?=?=?=?[a-zA-Z0-9_$]{1,8}=?=?=?1?0?0?\)/
     )[0]
 
     code = code.replace(
@@ -4210,12 +4256,6 @@ window.Timer = {
       `
     )
 
-
-
-
-
-
-
     return code
   }
 }
@@ -4230,15 +4270,20 @@ window.BootstrapMenu.make = function () {
         settingsBox.style.display = 'block';
         settingsBox.style.visibility = 'visible';
         window.bootstrapVisible = true;
+
     }
 
     window.BootstrapHide = function () {
         const settingsBox = document.getElementById('settings-popup-pudding');
         settingsBox.style.visibility = 'hidden';
+        if (typeof window.PortalPairsPanelHide === "function") {
+            window.PortalPairsPanelHide();
+        }
         if (window.bootstrapVisible && typeof window.getAllSrc != "undefined") {
             window.getAllSrc();
         }
         window.bootstrapVisible = false;
+
     }
 
     random_button_jsname = 'qycu7d' // Hardcoded because I'm lazy
@@ -4271,6 +4316,7 @@ window.BootstrapMenu.make = function () {
         }
     }
 
+
     window.BootstrapSetup = function () {
 
         const a = new Image();
@@ -4278,7 +4324,6 @@ window.BootstrapMenu.make = function () {
         a.id = 'stat-icon';
         a.width = a.height = 25;
         a.style = 'position:relative;left:200px;top:70px;';
-
         window.divList = document.createElement('div');
         divList.class = 'counter-num'
         divList.style = 'width:25px;z-index:5;position:relative;left:230px;top:45px;font-size:14px;font-family:Roboto,Arial,sans-serif;color:white;font-size:14px;line-height: normal;'
@@ -4287,47 +4332,54 @@ window.BootstrapMenu.make = function () {
         document.getElementsByClassName('sEOCsb')[0].appendChild(a);
         document.getElementsByClassName('sEOCsb')[0].appendChild(divList);
 
-        /*const c = new Image();
-        c.src = 'https://i.postimg.cc/02xshYj1/index.png';
-        c.width = c.height = 16;
-        c.style = 'cursor:pointer;position:relative;left:-10px;top:30px;';
-        c.id = 'input-counter-settings';
-*/
         const d = document.createElement('div');
         d.id = 'input-counter-settings-container';
         d.style = 'position:absolute;left:465px;top:45px;z-index:10002;';
         document.getElementsByClassName('sEOCsb')[0].appendChild(d);
-        const settingsElement = document.querySelector('#input-counter-settings-container');
 
-        //settingsElement.appendChild(c);
-        css_stripped = 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakePudding/main/bootstrap-stripped.css';
-        if (window.NepDebug) {
-            css_stripped = "http://127.0.0.1:5500/bootstrap-stripped.css"
-        }
+        const css_stripped = window.NepDebug
+            ? "http://127.0.0.1:5500/bootstrap-stripped.css"
+            : 'https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakePudding/main/bootstrap-stripped.css';
 
-        window.bootstrap_css = '';
         const xhr = new XMLHttpRequest();
 
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    const data = xhr.responseText;
-                    // Use the fetched data as a string
-                    //console.log(data); // Or do something else with the data
-                    window.bootstrap_css = data;
-                    document.getElementsByTagName('style')[0].innerHTML = document.getElementsByTagName('style')[0].innerHTML + window.bootstrap_css;
-                } else {
-                    console.error('An error occurred while fetching Bootstrap: ', xhr.status);
+        xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                const cssText = xhr.responseText;
+                window.bootstrap_css = cssText;
+
+                const styleElement = document.getElementsByTagName('style')[0];
+                if (styleElement) {
+                    styleElement.innerHTML = styleElement.innerHTML + cssText;
                 }
+
+                let styleElnew = document.getElementById('custom-style');
+                if (!styleElnew) {
+                    styleElnew = document.createElement('style');
+                    styleElnew.id = 'custom-style';
+                    document.head.appendChild(styleElnew);
+                    styleElnew.innerHTML = cssText;
+                }
+            } else {
+                console.error('Failed to load Bootstrap CSS:', xhr.status, xhr.statusText);
             }
         };
 
+        xhr.onerror = function () {
+            console.error('Network error while loading Bootstrap CSS');
+        };
+
+        xhr.ontimeout = function () {
+            console.error('Timeout while loading Bootstrap CSS');
+        };
+
+        xhr.timeout = 10000;
         xhr.open('GET', css_stripped, true);
         xhr.send();
 
-
         const settingsBox = document.createElement('div');
-        settingsBox.style = 'position:absolute;left:100%;z-index:10000;background-color:#4a752c;padding:8px;display:none;border-radius:3px;width:208px;height:584px;top:0px;';
+        settingsBox.style = window.puddingSidebarStyle;
+        settingsBox.style.display = 'none';
         settingsBox.id = 'settings-popup-pudding';
         settingsBox.innerHTML = `
 
@@ -4385,30 +4437,9 @@ window.BootstrapMenu.make = function () {
     <input class="form-check-input" type="checkbox" role="switch" id="EatThemeRandomizer">
     <label class="form-check-label" for="EatThemeRandomizer" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;" id="EatThemeRandomizer2">"Dragon Fruit"</label>
     </div>
-    <div class="form-check form-check-inline">
-    <input class="form-check-input" type="checkbox" role="switch" id="PortalPairs">
-    <label class="form-check-label" for="PortalPairs" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Custom Portal Pairs</label>
+  <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="ResetKeybind">Reset Key: Shift</button><br>
+  <button type="button" class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="CustomBowlFruits" onclick="window.TogglePortalPairsPanel&&window.TogglePortalPairsPanel()">Custom Bowl Fruits</button><br>
     </div>
-<select style="width:95px;margin:3px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display: inline-block; align-items: center; text-align: center;" id="fruitSelect1" class="form-control flex-row">
-    <option value="0">Apple</option>
-  </select>
-  <select style="width:95px;margin:3px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display: inline-block; align-items: center; text-align: center;" id="fruitSelect2" class="form-control flex-row">
-  <option value="1">Banana</option>
-</select><br>
-
-  <select style="width:95px;margin:3px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display: inline-block; align-items: center; text-align: center;" id="fruitSelect3" class="form-control flex-row">
-    <option value="2">Pineapple</option>
-  </select>
-  <select style="width:95px;margin:3px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display: inline-block; align-items: center; text-align: center;" id="fruitSelect4" class="form-control flex-row">
-    <option value="3">Purple Grapes</option>
-  </select><br>
-  <select style="width:95px;margin:3px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display: inline-block; align-items: center; text-align: center;" id="fruitSelect5" class="form-control flex-row">
-    <option value="4">Pumpkin</option>
-  </select>
-  <select style="width:95px;margin:3px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display: inline-block; align-items: center; text-align: center;" id="fruitSelect6" class="form-control flex-row">
-    <option value="5">Onion</option>
-  </select>
-  <br>
 
 <select style="display:none;margin:3px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif; align-items: center; text-align: center;" id="snakePride" class="form-control flex-row">
   <option value="0">Default Rainbow</option>
@@ -4489,8 +4520,10 @@ window.BootstrapMenu.make = function () {
             EatThemeRandomizer2.style.display = 'none';
             EatThemeRandomizer.checked = false;
             window.pudding_settings.randomizeThemeApple = false;
+            EatThemeRandomizer.parentElement.style.display = 'none';
         } else
         {
+            EatThemeRandomizer.parentElement.style.display = 'block';
             console.log("Disabling SpeedInfo")
             speedinfo_checkbox.disabled = true;
             speedinfo_checkbox.checked = false;
@@ -4543,17 +4576,10 @@ window.BootstrapMenu.make = function () {
             hideCount: { stat: 'hide', duration: 'count' },
         }
 
-        //preselect based on saved settings
-        //document.querySelector(`#stat-chooser option[value=${settingsToValues[stats.statShown][stats.statDurationShown]}]`).selected = true;
-
         document.querySelector(`#stat-chooser option[value=${settingsToValues[stats.statShown][stats.statDurationShown]}]`).selected = true;
-
-        //Listeners to hide/show settings box when clickng the cog, or the X - not anymore! Only back button.
-        //document.querySelector('#input-counter-settings').addEventListener('click', showSettingsBox);
 
         const settingsCloseElements = document.getElementById('settings-close');
         settingsCloseElements.addEventListener('click', window.BootstrapHide);
-        //settingsCloseElements[1].addEventListener('click', hideSettingsBox);
 
         document.getElementById('stat-chooser').onchange = function () {
             stats.statShown = valuesToSettings[this.value].stat;
@@ -4564,18 +4590,6 @@ window.BootstrapMenu.make = function () {
 
         document.getElementById('edit-stat').addEventListener('click', promptToEditStatCount);
         document.getElementById('reset-stats').addEventListener('click', promptToResetStats);
-        //document.getElementById('toggle-counter').addEventListener('click', toggleCounter);
-
-        tempID = "time-keeper"; // Inspect element on Timer and take jsname from it
-        //document.querySelector("button[jsname^=\"" + tempID + "\"]").addEventListener("click", (e) => {
-        //    window.timeKeeper.toggleDialog();
-        //});
-        TimerID = "yddQF"; // Inspect element on Timer and take jsname from it
-        //document.querySelector("div[jsname^=\"" + TimerID + "\"]").addEventListener("click", (e) => {
-        //    window.timeKeeper.toggleDialog();
-        //});
-
-        //debugger
     }
 
     window.BootstrapSetup();
@@ -4640,317 +4654,636 @@ window.BootstrapMenu.alterCode = function (code) {
     }
     return code;
 }
-window.CustomPortalPairs = {};
+window.ResetKey = {}
 
-window.CustomPortalPairs.make = function () {
+window.ResetKey.make = function (){
+  keybind_settings = document.getElementById("ResetKeybind"); // keybind changer
 
-    // Code that runs before anything else here, loading variables, etc.
-    // Recommended to use "window." for things
-    //window.portal_pairs = false;
-    let first_time_portal = true;
-    window.toggle_portal_pairs = function toggle_portal_pairs() {
-          // this is so that if the input display starts on, it doesnt trigger it to be off, like what normally unchecking the box would do, since I'm using the same function.
-          if(first_time_portal){
-            first_time_portal=false;
-          }
-          else
-          {window.pudding_settings.PortalPairs = !window.pudding_settings.PortalPairs;}
+  // Code for reset key
+  let keybinds = JSON.parse(localStorage.getItem("keybinds")) || {};
+  function setupKeybindPicker(buttonId, keybindType) {
+      const button = document.getElementById(buttonId);
+      if(!keybinds[keybindType]){
+          keybinds[keybindType] = "Shift";
+      }
+      button.textContent = `Reset Key: ${keybinds[keybindType]}`;
 
-        for (var i = 1; i <= 6; i++) {
-            var selectElement = document.getElementById('fruitSelect' + i.toString());
+      button.addEventListener("click", () => {
+          button.textContent = "Press any key...";
+          document.addEventListener("keydown", function handler(e) {
+          keybinds[keybindType] = e.key;
+          button.textContent = `Reset Key: ${e.key}`;
+          localStorage.setItem("keybinds", JSON.stringify(keybinds));
+          document.removeEventListener("keydown", handler);
+          });
+      });
+  }
 
-            selectElement.disabled = !window.pudding_settings.PortalPairs;
+  // Apply to each bind
+  setupKeybindPicker("ResetKeybind", "resetKey");
+}
+
+window.ResetKey.alterCode = function(code){
+  document.addEventListener('keydown', function(e){
+    let keybinds = JSON.parse(localStorage.getItem("keybinds")) || {};
+    let resetButton = document.getElementById('ResetKeybind');
+    let isSettingKeybind = resetButton && resetButton.textContent === "Press any key...";
+    if(!(isSettingKeybind || window.timeKeeper.dialogActive || document.getElementById('edit-box'))){
+        if(e.key === keybinds["resetKey"]){
+            const keydownEvent = new KeyboardEvent('keydown', {
+                keyCode: 27
+            });
+            document.dispatchEvent(keydownEvent);
+            document.querySelector('[jsname="NSjDf"]').click();
         }
-        //console.log(window.pudding_settings.PortalPairs)
+    }
+  });
+  return code
+}
+// Hold the first game tick until the board has visually rendered once.
+// Four hooks: render() stamps lastFrameTime; reset() stamps resetTime and
+// drains a delayed key; the key handler queues early inputs until then.
+
+window.RenderDelayFix = {};
+
+window.RenderDelayFix.make = function () {
+  window.lastFrameTime = 0;
+  window.resetTime = 0;
+  window.oldResetTime = 0;
+  window.delayedKeyStorage = false;
+  window.keyObject = false;
+  window.stuffKeys = ()=>{};
+}
+
+window.RenderDelayFix.alterCode = function (code) {
+  code = assertReplace(
+    code,
+    /render\s*\(\s*a\s*,\s*b\s*\)\s*\{\s*this\.([a-zA-Z0-9_$]{1,8})\.([a-zA-Z0-9_$]{1,8})\s*&&/,
+    "render(a,b){window.lastFrameTime=Date.now();if(window.resetTime!=window.oldResetTime){window.oldResetTime=window.resetTime;}this.$1.$2&&"
+  );
+  // Capture all three props — v11 uses Bb.oa.oa, v12 uses wb.ka.ka
+  code = assertReplace(
+    code,
+    /reset\s*\(\s*\)\s*\{\s*this\.([a-zA-Z0-9_$]{1,8})\.([a-zA-Z0-9_$]{1,8})\.([a-zA-Z0-9_$]{1,8})\s*=\s*0\s*;/,
+    "reset(){window.resetTime=Date.now();setTimeout(()=>{if(delayedKeyStorage){stuffKeys.call(keyObject,delayedKeyStorage);delayedKeyStorage=false;keyObject=false}},20);this.$1.$2.$3=0;"
+  );
+  code = assertReplace(
+    code,
+    /([a-zA-Z0-9_$]{1,8})\s*\(\s*a\s*\)\s*\{\s*if\s*\(\s*!this\.closed\s*\)\s*\{/,
+    "$1=window.stuffKeys=function(a){if(!this.closed){if(window.resetTime<window.lastFrameTime){"
+  );
+  code = assertReplace(
+    code,
+    /a\.preventDefault\s*\(\s*\)\s*\}\s*\}\}/,
+    "a.preventDefault()}}else{delayedKeyStorage=a;keyObject=this}}};"
+  );
+  return code;
+}
+window.CustomBowl = {};
+
+window.CustomBowl.make = function () {
+    const FRUIT_BOWL_INDEX = 24;
+    const COUNT_MINIMA = {
+        0: 1,  // 1a
+        1: 3,  // 3a
+        2: 5,  // 5a
+        3: 10, // 10a
+        4: 6,  // dice
+        5: 24, // bomb
+        6: 5   // tally
+    };
+    const BOWL_SPRITE = "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_22.png";
+
+    window.custom_pair_call_counter = 0;
+    window.__portalAppleArrayName = window.__portalAppleArrayName || "ka";
+    window.__customBowlCountOverride = null;
+
+    function getCountIndex() {
+        if (typeof window.__customBowlCountOverride === "number" && !isNaN(window.__customBowlCountOverride)) {
+            return window.__customBowlCountOverride;
+        }
+        if (window.timeKeeper && typeof window.timeKeeper.getCurrentSetting === "function") {
+            const c = window.timeKeeper.getCurrentSetting("count");
+            if (typeof c === "number" && !isNaN(c)) return c;
+        }
+        if (typeof window.count_var !== "undefined") {
+            const c = Number(window.count_var);
+            if (!isNaN(c)) return c;
+        }
+        return 0;
     }
 
-    window.sortFruit = function (arr) {
-        return arr.slice().sort((a, b) => a - b);
-    }
-
-    portal_pairs_checkbox = document.getElementById("PortalPairs");
-    portal_pairs_checkbox.checked = window.pudding_settings.PortalPairs;
-    portal_pairs_checkbox.addEventListener("change", toggle_portal_pairs);
-    toggle_portal_pairs();
-    // console.log("AAAAAAAAAAAAAAAAAAAA", window.pudding_settings.PortalPairs);
-
-    var fruitToText = {
-        0: { name: "Apple", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_00.png" },
-        1: { name: "Banana", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_01.png" },
-        2: { name: "Pineapple", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_02.png" },
-        3: { name: "Purple Grapes", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_03.png" },
-        4: { name: "Pumpkin", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_04.png" },
-        5: { name: "Onion", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_05.png" },
-        6: { name: "Eggplant", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_06.png" },
-        7: { name: "Strawberry", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_07.png" },
-        8: { name: "Cherry", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_08.png" },
-        9: { name: "Carrot", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_09.png" },
-        10: { name: "Mushroom", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_10.png" },
-        11: { name: "Broccoli", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_11.png" },
-        12: { name: "Watermelon", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_12.png" },
-        13: { name: "Green Pepper", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_13.png" },
-        14: { name: "Kiwi", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_14.png" },
-        15: { name: "Lemon", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_15.png" },
-        16: { name: "Orange", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_16.png" },
-        17: { name: "Peach", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_17.png" },
-        18: { name: "Peanut", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_18.png" },
-        19: { name: "Raspberries", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_19.png" },
-        20: { name: "Tomato", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_20.png" },
-        21: { name: "Juniper Berries", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_21.png" },
-        22: { name: "Fruit Bowl", image: "https://www.google.com/logos/fnbx/snake_arcade/v17/apple_22.png" },
-        23: { name: "Pudding", image: "https://i.postimg.cc/5y7gwwGY/pudding-cr.png" },
-        24: { name: "Blue Berries", image: "https://i.postimg.cc/8cmVPfGd/blueberries.png" },
-        25: { name: "Red Pepper", image: "https://i.postimg.cc/BQqHMbDc/redpepper.png" },
-        26: { name: "Lime", image: "https://i.postimg.cc/k5kWcyFB/lime.png" },
-        27: { name: "Black Berries", image: "https://i.postimg.cc/hPTVGdNX/blackberries.png" },
-        28: { name: "Green Grapes", image: "https://i.postimg.cc/dQ78zXBm/green-grapes.png" },
-        29: { name: "Burger", image: "https://i.postimg.cc/13m2Cr16/burger.png" },
-        30: { name: "Cheese", image: "https://i.postimg.cc/zXD1z9d6/trophy-03.png" },
-        31: { name: "Fries", image: "https://i.postimg.cc/YCMFFP1Q/french-fries.png" },
-        32: { name: "Hotdog", image: "https://i.postimg.cc/BbQf4Vgs/hotdog.png" },
-        33: { name: "Pizza", image: "https://i.postimg.cc/rwDXKnPj/pizza.png" },
-        34: { name: "Pacman Ghost", image: "https://i.postimg.cc/TP7ZGZGf/pacman-ghost.png" },
-        35: { name: "Sonic Ring", image: "https://i.postimg.cc/pX1xYGp9/sonic-ring.png" },
-        36: { name: "Steak", image: "https://i.postimg.cc/XYjC4zzf/steak.png" },
-        37: { name: "Coconut", image: "https://i.postimg.cc/1XbSVygZ/coconut.png" },
-        38: { name: "Poop", image: "https://i.postimg.cc/66719KfJ/poop.png" },
-        39: { name: "Egg", image: "https://i.postimg.cc/ZRg1jkrg/egg.png" },
-        40: { name: "Mango", image: "https://i.postimg.cc/R0NbYNSH/Mango.png" },
-        41: { name: "Melon", image: "https://i.postimg.cc/8knkL3WN/melon.png" },
-        42: { name: "Red Banana", image: "https://i.postimg.cc/3JsKcvnq/musa-banana.png" },
-        43: { name: "Pear", image: "https://i.postimg.cc/L6Y9DTBf/pear.png" },
-        44: { name: "Soccer Ball", image: "https://i.postimg.cc/C1yT8vjL/soccer-ball.png" },
-        45: { name: "Jackolantern", image: "https://i.postimg.cc/rwMX5hbg/true-jacko.png" },
-        46: { name: "Ice", image: "https://i.postimg.cc/mrL8PJmK/ice.png" },
-        47: { name: "Red Pudding", image: "https://i.postimg.cc/15kNH2Y5/pudding-red.png" },
-        48: { name: "Dirt Block", image: "https://i.postimg.cc/7ZvhtHKK/mc-dirt-px.png" },
-        49: { name: "Bread", image: "https://i.postimg.cc/YSMVtPr1/bread.png" },
-        50: { name: "Santa", image: "https://i.postimg.cc/kgV7FKDL/santa.png" },
-        51: { name: "Cabbage", image: "https://i.postimg.cc/j59z8v1m/cabbage.png" },
-        52: { name: "Heart", image: "https://i.postimg.cc/8PGLRXCb/heart.png" }
-
+    window.getPortalPairMinimum = function () {
+        const count = getCountIndex();
+        return COUNT_MINIMA.hasOwnProperty(count) ? COUNT_MINIMA[count] : 1;
     };
 
-
-    window.fruit_options = [];
-    //debugger
-    window.selected_fruit = window.pudding_settings.SelectedPairs;
-    window.onscreen_fruit = [];
-    window.offscreen_fruit = [];
-
-    // Code to alter snake code here
-    if (window.NepDebug) {
-        //console.log(document.querySelector('#apple').children)
-        console.log(document.querySelector('#apple').children.length);
-        //console.log(window.new_fruit)
-        //console.log(code)
+    function countKey(count) {
+        return String(count);
     }
 
-
-    window.PopulateOptions = function PopulateOptions() {
-        window.fruit_options = [];
-
-        for (let index = 0; index < document.querySelector('#apple').children.length; index++) {
-            if (index == 22) {
-                index++; // Skip fruit bowl
-            }
-            window.fruit_options.push(index);
-        }
-
-        for (var i = 1; i <= 6; i++) { // Remove selected fruit from new options
-            var otherSelectElement = document.getElementById('fruitSelect' + i);
-            var selectedFruitIndex = fruit_options.indexOf(parseInt(otherSelectElement.value));
-            if (selectedFruitIndex > -1) {
-                fruit_options.splice(selectedFruitIndex, 1);
-            }
-        }
-
-        window.fruit_options = Array.from(new Set(window.fruit_options));
-        window.fruit_options = window.sortFruit(window.fruit_options);
+    function defaultPoolForCount(count) {
+        const min = COUNT_MINIMA.hasOwnProperty(count) ? COUNT_MINIMA[count] : 1;
+        return normalizePool([], min);
     }
 
-
-
-    window.PopulateDropdowns = function PopulateDropdowns() {
-        // Populate dropdowns
-
-        for (var i = 1; i <= 6; i++) {
-            //debugger
-            var selectElement = document.getElementById('fruitSelect' + i);
-
-            var dropdown_fruit = selected_fruit[i - 1];
-            var option = document.createElement('option');
-            option.value = dropdown_fruit;
-            if (typeof (dropdown_fruit) === 'undefined') {
-                dropdown_fruit = i - 1;
-                option.value = dropdown_fruit;
+    function normalizePool(pool, min) {
+        let next = Array.isArray(pool) ? pool.map(Number).filter((n) => !isNaN(n) && n !== FRUIT_BOWL_INDEX) : [];
+        next = Array.from(new Set(next));
+        if (next.length < min) {
+            for (let i = 0; i < 64 && next.length < min; i++) {
+                if (i === FRUIT_BOWL_INDEX) continue;
+                if (!next.includes(i)) next.push(i);
             }
+        }
+        return next;
+    }
 
-            option.textContent = fruitToText[dropdown_fruit].name;
-            option.setAttribute('data-image', fruitToText[dropdown_fruit].image);
-            selectElement.innerHTML = '';
-            selectElement.appendChild(option);
-
-            for (var j = 0; j < fruit_options.length; j++) {
-                if (fruit_options[j] != dropdown_fruit &&
-                    fruit_options.indexOf(parseInt(selected_fruit[0])) == -1
-                    && fruit_options.indexOf(parseInt(selected_fruit[1])) == -1
-                    && fruit_options.indexOf(parseInt(selected_fruit[2])) == -1
-                    && fruit_options.indexOf(parseInt(selected_fruit[3])) == -1
-                    && fruit_options.indexOf(parseInt(selected_fruit[4])) == -1
-                    && fruit_options.indexOf(parseInt(selected_fruit[5])) == -1
-                ) {
-                    var fruit = fruit_options[j];
-                    var option = document.createElement('option');
-                    option.value = fruit;
-                    option.textContent = fruitToText[fruit].name;
-                    option.setAttribute('data-image', fruitToText[fruit].image);
-                    selectElement.appendChild(option);
-                }
+    function ensurePairsByCountStore() {
+        if (!window.pudding_settings.SelectedPairsByCount || typeof window.pudding_settings.SelectedPairsByCount !== "object") {
+            window.pudding_settings.SelectedPairsByCount = {};
+        }
+        for (const c of Object.keys(COUNT_MINIMA)) {
+            const key = countKey(c);
+            if (!Array.isArray(window.pudding_settings.SelectedPairsByCount[key])) {
+                window.pudding_settings.SelectedPairsByCount[key] = defaultPoolForCount(Number(c));
             }
         }
     }
 
+    function getPoolForCurrentCount(minOverride) {
+        ensurePairsByCountStore();
+        const count = getCountIndex();
+        const key = countKey(count);
+        const min = Math.max(window.getPortalPairMinimum(), minOverride || 0);
+        const pool = normalizePool(window.pudding_settings.SelectedPairsByCount[key], min);
+        window.pudding_settings.SelectedPairsByCount[key] = pool;
+        window.pudding_settings.SelectedPairs = pool;
+        return pool;
+    }
 
+    function setPoolForCurrentCount(pool) {
+        ensurePairsByCountStore();
+        const count = getCountIndex();
+        const key = countKey(count);
+        const min = window.getPortalPairMinimum();
+        const next = normalizePool(pool, min);
+        window.pudding_settings.SelectedPairsByCount[key] = next;
+        window.pudding_settings.SelectedPairs = next;
+        return next;
+    }
 
-}
+    function ensurePoolMeetsMinimum() {
+        return getPoolForCurrentCount();
+    }
 
-window.CustomPortalPairs.alterCode = function (code) {
+    function getAppleList(appleManager) {
+        if (!appleManager) return null;
+        const key = window.__portalAppleArrayName || "ka";
+        if (Array.isArray(appleManager[key])) return appleManager[key];
+        if (Array.isArray(appleManager.ka)) return appleManager.ka;
+        return null;
+    }
 
-
-    // window.PopulateOptions();
-    // window.PopulateDropdowns();
-
-    // PopulateOptions();
-    // PopulateDropdowns();
-
-
-    // Function to handle the selection change
-    function handleSelection(index) {
-        //var selectElement = document.getElementById('fruitSelect' + index);
-        //var selectedOption = selectElement.value;
-        window.selected_fruit = [];
-
-        // Update Selected Fruit from all dropdowns
-        for (var i = 1; i <= 6; i++) {
-            var otherSelectElement = document.getElementById('fruitSelect' + i);
-            window.selected_fruit.push(otherSelectElement.value)
+    // Types currently visible on the board (type < 0 = slot being reassigned, not showing).
+    function typesOnBoard(appleManager) {
+        const showing = new Set();
+        const apples = getAppleList(appleManager);
+        if (!apples) return showing;
+        for (const apple of apples) {
+            if (!apple) continue;
+            const t = Number(apple.type);
+            if (!isNaN(t) && t >= 0) showing.add(t);
         }
-
-        PopulateOptions();
-        PopulateDropdowns();
+        return showing;
     }
 
+    function isCustomBowlActive(settings) {
+        if (!(window.pudding_settings && window.pudding_settings.PortalPairs && settings)) return false;
+        const prop = window.__fruitBowlSettingProp || "Ka";
+        return Number(settings[prop]) === 24;
+    }
 
-    var selectElement = document.getElementById('fruitSelect1');
-    selectElement.addEventListener("click", function () {
-        window.fruitSelectID = 1
-    });
-    var selectElement = document.getElementById('fruitSelect2');
-    selectElement.addEventListener("click", function () {
-        window.fruitSelectID = 2
-    });
-    var selectElement = document.getElementById('fruitSelect3');
-    selectElement.addEventListener("click", function () {
-        window.fruitSelectID = 3
-    });
-    var selectElement = document.getElementById('fruitSelect4');
-    selectElement.addEventListener("click", function () {
-        window.fruitSelectID = 4
-    });
-    var selectElement = document.getElementById('fruitSelect5');
-    selectElement.addEventListener("click", function () {
-        window.fruitSelectID = 5
-    });
-    var selectElement = document.getElementById('fruitSelect6');
-    selectElement.addEventListener("click", function () {
-        window.fruitSelectID = 6
-    });
+    function syncCountOverride(settings) {
+        if (settings && typeof settings.ka === "number" && !isNaN(settings.ka)) {
+            window.__customBowlCountOverride = settings.ka;
+        }
+    }
 
-    for (var i = 1; i <= 6; i++) {
-        var selectElement = document.getElementById('fruitSelect' + i);
-        selectElement.addEventListener("change", function () {
-            handleSelection(window.fruitSelectID)
-            if (window.NepDebug) {
-                console.log(window.selected_fruit)
-                console.log(window.fruit_options)
+    /**
+     * Roll a fruit from the custom bowl pool.
+     * Unique (pool − showing) when portal OR AlwaysUniqueFruit is on.
+     * Portal always uses unique logic; the checkbox enables it for other modes.
+     * If allowed is empty, fall back to full pool (re-roll eaten type when board is full).
+     */
+    window.pickCustomPortalType = function (appleManager, isPortal) {
+        syncCountOverride(appleManager && appleManager.settings);
+        try {
+            const pool = ensurePoolMeetsMinimum();
+            if (!pool.length) return 0;
+            const useUnique = !!isPortal ||
+                !!(window.pudding_settings && window.pudding_settings.AlwaysUniqueFruit);
+            if (!useUnique) {
+                return pool[Math.floor(Math.random() * pool.length)];
             }
-        });
-    }
+            const showing = typesOnBoard(appleManager);
+            const available = pool.filter((t) => !showing.has(t));
+            const source = available.length > 0 ? available : pool;
+            return source[Math.floor(Math.random() * source.length)];
+        } finally {
+            window.__customBowlCountOverride = null;
+        }
+    };
 
-    window.custom_pair_call_counter = 0; // Reset every new game
+    // Portal-only full board assign: clear slots, then roll with showing-list rules.
+    window.assignCustomPortalPairTypes = function (appleManager) {
+        if (!appleManager || !isCustomBowlActive(appleManager.settings)) return false;
+        const apples = getAppleList(appleManager);
+        if (!apples || apples.length < 2) return false;
 
-    reset_regex = new RegExp(/;this\.reset\(\)\}\}/)
+        for (let i = 0; i < apples.length; i++) apples[i].type = -1;
 
-    counter_reset_code = `window.custom_pair_call_counter = 0;
-    $&`
+        for (let i = 0; i < apples.length; i += 2) {
+            const t = window.pickCustomPortalType(appleManager, true);
+            apples[i].type = t;
+            if (apples[i + 1]) apples[i + 1].type = t;
+        }
+        return true;
+    };
 
-    code = code.assertReplace(reset_regex, counter_reset_code);
-    portal_pairs_regex = new RegExp(/this\.[a-zA-Z0-9_$]{1,8}\[[a-zA-Z0-9_$]{1,8}\]\.[a-zA-Z0-9_$]{1,8}=[a-zA-Z0-9_$]{1,8}\(this\)/)
-    catchError(portal_pairs_regex, code) // Third {1,8} here should be "type" - since this is where portal pair type is determined
-    apple_array = code.match(portal_pairs_regex)[0].split('.')[1].split('[')[0]
-    give_portal_type_func = code.match(portal_pairs_regex)[0].split('=')[1]
-    apple_type = code.match(portal_pairs_regex)[0].split('.')[2].split('=')[0]
-    apple_index = code.match(portal_pairs_regex)[0].split('[')[1].split(']')[0]
-    if (window.NepDebug) {
+    // Portal-only safety: if two pairs share a type, re-roll with showing-list rules.
+    window.enforceUniquePortalFruitTypes = function (appleManager) {
+        if (!appleManager || !isCustomBowlActive(appleManager.settings)) return;
+        const apples = getAppleList(appleManager);
+        if (!apples || apples.length < 2) return;
 
-        console.log("Apple array: " + apple_array)
-        console.log("portal type func: " + give_portal_type_func)
-        console.log("apple type: " + apple_type)
-    }
+        const seen = new Set();
+        for (let i = 0; i < apples.length; i += 2) {
+            const a0 = apples[i];
+            const a1 = apples[i + 1];
+            let t = Number(a0 && a0.type);
+            if (isNaN(t) || t < 0 || seen.has(t)) {
+                if (a0) a0.type = -1;
+                if (a1) a1.type = -1;
+                t = window.pickCustomPortalType(appleManager, true);
+                if (a0) a0.type = t;
+                if (a1) a1.type = t;
+            } else if (a1 && Number(a1.type) !== t) {
+                a1.type = t;
+            }
+            seen.add(t);
+        }
+    };
 
     window.give_custom_pair = function () {
-        window.custom_pair_call_counter = window.custom_pair_call_counter + 1;
-        if (window.NepDebug) {
-            console.log("Giving fruit: " + selected_fruit[window.custom_pair_call_counter - 1].toString())
+        return window.pickCustomPortalType(null, true);
+    };
+    window.startCustomBowlDeal = function () { /* no-op */ };
+    window.endCustomBowlDeal = function () { /* no-op */ };
+
+    function getFruitSrc(index) {
+        const apple = document.querySelector("#apple");
+        if (apple && apple.children[index] && apple.children[index].src) {
+            return apple.children[index].src;
         }
-        return selected_fruit[window.custom_pair_call_counter - 1]
+        if (index < FRUIT_BOWL_INDEX) {
+            const ver = index >= 22 ? "v18" : "v17";
+            const num = String(index).padStart(2, "0");
+            return `https://www.google.com/logos/fnbx/snake_arcade/${ver}/apple_${num}.png`;
+        }
+        return BOWL_SPRITE;
     }
 
-    portal_pairs_code = `
-    if(window.pudding_settings.PortalPairs){this.${apple_array}[${apple_index}].${apple_type} = window.give_custom_pair();
-    this.${apple_array}[${apple_index}+1].${apple_type} = this.${apple_array}[${apple_index}].${apple_type};}
-    else this.${apple_array}[${apple_index}].${apple_type} = ${give_portal_type_func}
-    `
-
-    code = code.assertReplace(portal_pairs_regex, portal_pairs_code);
-
-    // Code to alter snake code here
-    if (window.NepDebug) {
-        //console.log(document.querySelector('#apple').children)
-        console.log(document.querySelector('#apple').children.length);
-        //console.log(window.new_fruit)
-        //console.log(code)
+    function buildFruitOptions() {
+        const apple = document.querySelector("#apple");
+        const options = [];
+        if (!apple) return options;
+        for (let i = 0; i < apple.children.length; i++) {
+            if (i === FRUIT_BOWL_INDEX) continue;
+            options.push(i);
+        }
+        return options;
     }
 
-    portal_dice_regex = new RegExp(/if\([a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},2\)&&0<[a-zA-Z0-9_$]{1,8}\.length\)\{/)
-    catchError(portal_dice_regex, code)
-    apple_dice_array = code.match(portal_dice_regex)[0].split('<')[1].split('.')[0];
-    portal_dice_full_regex = new RegExp(/if\([a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},2\)&&0<[a-zA-Z0-9_$]{1,8}\.length\)\{[^]*type}/gm)
-    catchError(portal_dice_full_regex, code)
-    portal_pairs_dice_code = code.match(portal_dice_full_regex)[0]
+    function updateStatusLabel() {
+        const el = document.getElementById("fruit-bowl-status");
+        if (!el) return;
+        const pool = getPoolForCurrentCount();
+        const min = window.getPortalPairMinimum();
+        el.textContent = `Selected ${pool.length} / min ${min}`;
+    }
 
-    portal_dice_pairs_code = `
-    {
+    function renderFruitGrid() {
+        const grid = document.getElementById("fruit-bowl-grid");
+        if (!grid) return;
+        const pool = new Set(ensurePoolMeetsMinimum());
+        const options = buildFruitOptions();
+        const min = window.getPortalPairMinimum();
+        grid.innerHTML = "";
 
-        if(window.pudding_settings.PortalPairs){
-            window.custom_pair_call_counter = 0;
-            for(var apple_index=0;apple_index<${apple_dice_array}.length;apple_index+=2){
-                ${apple_dice_array}[apple_index].${apple_type} = window.give_custom_pair();
-                ${apple_dice_array}[apple_index+1].${apple_type} = ${apple_dice_array}[apple_index].${apple_type};
-            }
+        const rowSize = 6;
+        for (let i = 0; i < options.length; i += rowSize) {
+            const row = document.createElement("div");
+            row.style = "display:flex;flex-wrap:nowrap;gap:8px;margin-bottom:8px;justify-content:center;";
+            options.slice(i, i + rowSize).forEach((fruitIndex) => {
+                const selected = pool.has(fruitIndex);
+                const cell = document.createElement("div");
+                cell.className = "blender_icon" + (selected ? " blender_icon_on" : "");
+                cell.style = "width:52px;height:52px;padding-bottom:0;flex:0 0 52px;display:flex;align-items:center;justify-content:center;cursor:pointer;";
+                cell.dataset.fruit = String(fruitIndex);
+                cell.title = `Fruit ${fruitIndex}`;
+
+                const img = document.createElement("img");
+                img.className = "blender_icon_img" + (selected ? " blender_icon_img_selected" : "");
+                img.src = getFruitSrc(fruitIndex);
+                img.draggable = false;
+                img.style = "width:44px;height:44px;max-width:100%;";
+                cell.appendChild(img);
+
+                cell.addEventListener("click", function () {
+                    if (!window.pudding_settings.PortalPairs) return;
+                    const current = getPoolForCurrentCount().slice();
+                    const idx = current.indexOf(fruitIndex);
+                    if (idx >= 0) {
+                        if (current.length <= min) return;
+                        current.splice(idx, 1);
+                    } else {
+                        current.push(fruitIndex);
+                    }
+                    setPoolForCurrentCount(current.sort((a, b) => a - b));
+                    if (typeof window.saveSettings === "function") window.saveSettings();
+                    renderFruitGrid();
+                    updateStatusLabel();
+                });
+
+                row.appendChild(cell);
+            });
+            grid.appendChild(row);
         }
-        else {
+        updateStatusLabel();
+    }
 
-    `
+    function syncPanelEnabledState() {
+        const toggle = document.getElementById("fruit-bowl-enable");
+        if (toggle) toggle.checked = !!window.pudding_settings.PortalPairs;
+        const uniqueToggle = document.getElementById("fruit-bowl-always-unique");
+        if (uniqueToggle) uniqueToggle.checked = !!window.pudding_settings.AlwaysUniqueFruit;
+        const grid = document.getElementById("fruit-bowl-grid");
+        if (grid) {
+            grid.style.opacity = window.pudding_settings.PortalPairs ? "1" : "0.45";
+            grid.style.pointerEvents = window.pudding_settings.PortalPairs ? "auto" : "none";
+        }
+    }
 
-    portal_pairs_dice_code = portal_pairs_dice_code.assertReplace('type}', 'type}}');
-    portal_pairs_dice_code = portal_pairs_dice_code.assertReplace('{', portal_dice_pairs_code);
+    // Theme background is applied separately via applyPanelTheme (Theme.js sets real_topbar_color).
+    const PANEL_STYLE =
+        "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100000;" +
+        "padding:18px 20px 16px;display:none;border-radius:8px;" +
+        "width:min(480px,92vw);min-width:280px;height:auto;min-height:320px;max-height:min(720px,88vh);" +
+        "overflow-x:hidden;overflow-y:auto;visibility:hidden;box-sizing:border-box;" +
+        "box-shadow:0 12px 36px rgba(0,0,0,0.5);border:2px solid rgba(255,255,255,0.18);";
 
-    code = code.assertReplace(portal_dice_full_regex, portal_pairs_dice_code);
+    const BACKDROP_STYLE =
+        "position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:99999;" +
+        "background:rgba(0,0,0,0.45);display:none;visibility:hidden;";
+
+    function applyPanelTheme(panel) {
+        if (!panel) return;
+        const color = window.real_topbar_color || "#4a752c";
+        panel.style.background = color;
+        panel.style.backgroundColor = color;
+    }
+
+    function getPanelHost() {
+        return document.body;
+    }
+
+    function ensureUi() {
+        const host = getPanelHost();
+        if (!host) return;
+
+        document.querySelectorAll("#fruit-bowl-settings-icon").forEach((el) => el.remove());
+
+        // If an old tiny in-game panel exists, rebuild it.
+        const existing = document.getElementById("fruit-bowl-popup-pudding");
+        if (existing && existing.parentElement !== host) {
+            existing.remove();
+            const oldBd = document.getElementById("fruit-bowl-backdrop-pudding");
+            if (oldBd) oldBd.remove();
+        }
+
+        const legacy = document.getElementById("portal-pairs-popup-pudding");
+        if (legacy) legacy.remove();
+
+        let backdrop = document.getElementById("fruit-bowl-backdrop-pudding");
+        if (!backdrop) {
+            backdrop = document.createElement("div");
+            backdrop.id = "fruit-bowl-backdrop-pudding";
+            backdrop.style.cssText = BACKDROP_STYLE;
+            backdrop.addEventListener("click", function () {
+                window.PortalPairsPanelHide();
+            });
+            host.appendChild(backdrop);
+        } else if (backdrop.parentElement !== host) {
+            host.appendChild(backdrop);
+        }
+
+        let panel = document.getElementById("fruit-bowl-popup-pudding");
+        if (!panel) {
+            panel = document.createElement("div");
+            panel.id = "fruit-bowl-popup-pudding";
+            panel.style.cssText = PANEL_STYLE;
+            panel.innerHTML = `
+                <div style="color:white;font-family:Roboto,Arial,sans-serif;text-align:center;margin-bottom:14px;font-size:18px;font-weight:bold;letter-spacing:0.2px;">Fruit Bowl Settings</div>
+                <div style="display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;margin:0 auto 12px;width:100%;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <input class="form-check-input" type="checkbox" role="switch" id="fruit-bowl-enable" style="margin:0;float:none;position:static;">
+                        <label class="form-check-label" for="fruit-bowl-enable" style="margin:0;color:white;font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.2;">Enable custom fruit bowl</label>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <input class="form-check-input" type="checkbox" role="switch" id="fruit-bowl-always-unique" style="margin:0;float:none;position:static;">
+                        <label class="form-check-label" for="fruit-bowl-always-unique" style="margin:0;color:white;font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.2;">Always Unique Fruit</label>
+                    </div>
+                </div>
+                <div id="fruit-bowl-status" style="color:#dce8c8;font-family:Roboto,Arial,sans-serif;font-size:13px;margin:0 0 12px 0;text-align:center;"></div>
+                <div id="fruit-bowl-grid" style="padding:4px 0 8px;display:flex;flex-direction:column;align-items:center;"></div>
+                <button type="button" class="btn" style="margin-top:8px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;width:100%;padding:8px 12px;font-size:14px;" id="fruit-bowl-close">Close</button>
+            `;
+            host.appendChild(panel);
+            applyPanelTheme(panel);
+
+            document.getElementById("fruit-bowl-enable").addEventListener("change", function () {
+                window.pudding_settings.PortalPairs = !!this.checked;
+                ensurePoolMeetsMinimum();
+                if (typeof window.saveSettings === "function") window.saveSettings();
+                syncPanelEnabledState();
+                renderFruitGrid();
+            });
+            document.getElementById("fruit-bowl-always-unique").addEventListener("change", function () {
+                window.pudding_settings.AlwaysUniqueFruit = !!this.checked;
+                if (typeof window.saveSettings === "function") window.saveSettings();
+                syncPanelEnabledState();
+            });
+            document.getElementById("fruit-bowl-close").addEventListener("click", function () {
+                window.PortalPairsPanelHide();
+            });
+        } else {
+            if (panel.parentElement !== host) host.appendChild(panel);
+            const shown = !!window.portalPairsPanelVisible;
+            panel.style.cssText = PANEL_STYLE + (shown
+                ? "display:block;visibility:visible;"
+                : "display:none;visibility:hidden;");
+            applyPanelTheme(panel);
+            backdrop.style.cssText = BACKDROP_STYLE + (shown
+                ? "display:block;visibility:visible;"
+                : "display:none;visibility:hidden;");
+        }
+
+        syncPanelEnabledState();
+        renderFruitGrid();
+    }
+
+    window.PortalPairsPanelShow = function () {
+        ensureUi();
+        try { ensurePoolMeetsMinimum(); } catch (e) { /* settings may still be loading */ }
+        syncPanelEnabledState();
+        renderFruitGrid();
+        const panel = document.getElementById("fruit-bowl-popup-pudding");
+        const backdrop = document.getElementById("fruit-bowl-backdrop-pudding");
+        if (panel) {
+            panel.style.display = "block";
+            panel.style.visibility = "visible";
+            applyPanelTheme(panel);
+        }
+        if (backdrop) {
+            backdrop.style.display = "block";
+            backdrop.style.visibility = "visible";
+        }
+        window.portalPairsPanelVisible = true;
+    };
+
+    window.PortalPairsPanelHide = function () {
+        const panel = document.getElementById("fruit-bowl-popup-pudding");
+        const backdrop = document.getElementById("fruit-bowl-backdrop-pudding");
+        if (panel) {
+            panel.style.display = "none";
+            panel.style.visibility = "hidden";
+        }
+        if (backdrop) {
+            backdrop.style.display = "none";
+            backdrop.style.visibility = "hidden";
+        }
+        window.portalPairsPanelVisible = false;
+    };
+
+    window.TogglePortalPairsPanel = function () {
+        if (window.portalPairsPanelVisible) window.PortalPairsPanelHide();
+        else window.PortalPairsPanelShow();
+    };
+
+    window.CustomBowlSyncUi = function () {
+        if (!window.portalPairsPanelVisible) return;
+        ensurePoolMeetsMinimum();
+        syncPanelEnabledState();
+        renderFruitGrid();
+    };
+
+    setTimeout(function () {
+        try { ensurePoolMeetsMinimum(); } catch (e) { /* ignore */ }
+        ensureUi();
+        window.PortalPairsPanelHide();
+    }, 0);
+};
+
+window.CustomBowl.alterCode = function (code) {
+    const reset_regex = new RegExp(/;this\.reset\(\)\}\}/);
+    catchError(reset_regex, code);
+    code = code.assertReplace(reset_regex, `window.custom_pair_call_counter=0;$&`);
+
+    code = code.assertReplace(
+        /case "apple":/,
+        `case "apple":setTimeout(function(){window.CustomBowlSyncUi&&window.CustomBowlSyncUi()},0);`
+    );
+    code = code.assertReplace(
+        /case "count":/,
+        `case "count":setTimeout(function(){window.CustomBowlSyncUi&&window.CustomBowlSyncUi()},0);`
+    );
+
+    const aaf_regex = /([a-zA-Z0-9_$]{1,8})=function\(a\)\{if\(a\.settings\.([a-zA-Z0-9_$]{1,8})===24\)\{/;
+    catchError(aaf_regex, code);
+    const aaf_match = code.match(aaf_regex);
+    const aaf_name = aaf_match[1];
+    const fruit_setting = aaf_match[2];
+
+    const baf_regex = /([a-zA-Z0-9_$]{1,8})=function\(a\)\{if\(([a-zA-Z0-9_$]{1,8})\(a\.settings,2\)\)\{var b=\s*Math\.floor\(48\/a\.([a-zA-Z0-9_$]{1,8})\.length\);/;
+    catchError(baf_regex, code);
+    const baf_match = code.match(baf_regex);
+    const baf_name = baf_match[1];
+    const portal_check = baf_match[2];
+    const apple_array = baf_match[3];
+    window.__portalAppleArrayName = apple_array;
+    window.__fruitBowlSettingProp = fruit_setting;
+
+    // Portal init: clear + roll from (pool − showing) pair by pair.
+    code = code.assertReplace(
+        baf_regex,
+        `${baf_name}=function(a){` +
+        `if(${portal_check}(a.settings,2)&&window.assignCustomPortalPairTypes&&window.assignCustomPortalPairTypes(a))return;` +
+        `if(${portal_check}(a.settings,2)){var b=Math.floor(48/a.${apple_array}.length);`
+    );
+
+    // Custom bowl pick: portal → showing-list uniqueness; other modes → random from pool.
+    code = code.assertReplace(
+        aaf_regex,
+        `${aaf_name}=function(a){` +
+        `if(window.pudding_settings&&window.pudding_settings.PortalPairs&&a.settings.${fruit_setting}===24){` +
+        `return window.pickCustomPortalType(a,${portal_check}(a.settings,2));}` +
+        `if(a.settings.${fruit_setting}===24){`
+    );
+
+    // Before in-place portal retype, drop the eaten pair from "showing" (type=-1).
+    const inplace_regex = new RegExp(
+        `Ni&&\\(this\\.wa\\.ka\\[vd\\]\\.type=${aaf_name}\\(this\\.wa\\),this\\.wa\\.ka\\[Ok\\]\\.type=this\\.wa\\.ka\\[vd\\]\\.type\\)`
+    );
+    catchError(inplace_regex, code);
+    code = code.assertReplace(
+        inplace_regex,
+        `Ni&&(this.wa.ka[vd].type=-1,this.wa.ka[Ok].type=-1,this.wa.ka[vd].type=${aaf_name}(this.wa),this.wa.ka[Ok].type=this.wa.ka[vd].type)`
+    );
+
+    const refill_regex = new RegExp(
+        `if\\(([a-zA-Z0-9_$]{1,8})\\(a\\.settings,2\\)&&b\\.length>0\\)for\\(b\\[0\\]\\.type=${aaf_name}\\(a\\.([a-zA-Z0-9_$]{1,8})\\),b\\[1\\]\\.type=b\\[0\\]\\.type,a=2;a<b\\.length;a\\+=2\\)b\\[a\\]\\.type=\\(b\\[a-2\\]\\.type\\+1\\)%24,b\\[a\\+1\\]\\.type=b\\[a\\]\\.type`
+    );
+    catchError(refill_regex, code);
+    const refill_match = code.match(refill_regex);
+    const mode_check = refill_match[1];
+    const apple_mgr_prop = refill_match[2];
+
+    const refill_replacement =
+        `if(${mode_check}(a.settings,2)&&b.length>0){` +
+        `if(window.pudding_settings&&window.pudding_settings.PortalPairs&&a.settings.${fruit_setting}===24&&window.assignCustomPortalPairTypes){` +
+        `window.assignCustomPortalPairTypes(a.${apple_mgr_prop});` +
+        `}else for(b[0].type=${aaf_name}(a.${apple_mgr_prop}),b[1].type=b[0].type,a=2;a<b.length;a+=2)b[a].type=(b[a-2].type+1)%24,b[a+1].type=b[a].type;` +
+        `window.enforceUniquePortalFruitTypes&&window.enforceUniquePortalFruitTypes(a.${apple_mgr_prop})` +
+        `}`;
+
+    code = code.assertReplace(refill_regex, refill_replacement);
+
+    // Enforce after baF without breaking if/else (comma expression).
+    code = code.assertReplace(
+        new RegExp(`${baf_name}\\(this\\)`),
+        `(${baf_name}(this),window.enforceUniquePortalFruitTypes&&window.enforceUniquePortalFruitTypes(this))`
+    );
+    const bafArgRegex = new RegExp(`${baf_name}\\(a\\.([a-zA-Z0-9_$]{1,8})\\)`);
+    catchError(bafArgRegex, code);
+    const bafArgProp = code.match(bafArgRegex)[1];
+    code = code.assertReplace(
+        bafArgRegex,
+        `(${baf_name}(a.${bafArgProp}),window.enforceUniquePortalFruitTypes&&window.enforceUniquePortalFruitTypes(a.${bafArgProp}))`
+    );
 
     return code;
-}
+};
 window.PuddingMod = {};
 
 ////////////////////////////////////////////////////////////////////
@@ -5039,7 +5372,10 @@ window.PuddingMod.runCodeBefore = function () {
     "InputDisplay",
     "Timer",
     "BootstrapMenu",
-    "CustomPortalPairs"];
+    "ResetKey",
+    "RenderDelayFix",
+    "CustomBowl",
+  ];
   console.log("Enabling Pudding Mod");
 
   libUrlPrefix = window.NepDebug ? "http://127.0.0.1:5500/Libraries/" : "https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakePudding/main/Libraries/";
@@ -5059,6 +5395,7 @@ window.PuddingMod.alterSnakeCode = function (code) {
   if (window.NepDebug) {
     console.log(code)
   }
+
 
   code = code.replaceAll(/\$\$/gm, `doubleD`)
   code = code.replaceAll(/\$\&/gm, `$ &`)
@@ -5088,19 +5425,5111 @@ window.PuddingMod.runCodeAfter = function () {
   modIndicator.style = 'position:absolute;font-family:Roboto,Arial,sans-serif;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;';
   modIndicator.textContent = 'Pudding Mod';
   if (window.loaded_code) {
-    modIndicator.textContent = 'Pudding Mod - Google Test Version';
+    // commented out cuz i dont want it to annoy people since its now the official version
+    //modIndicator.textContent = 'Pudding Mod - Google Test Version';
   }
   let canvasNode = document.getElementsByClassName('jNB0Ic')[0];
   document.getElementsByClassName('EjCLSb')[0].insertBefore(modIndicator, canvasNode);
+
 };
+
+window.moreMenu = {
+  runCodeBefore: () => {
+    window.uiImage = src => {
+      let img = new Image()
+      img.src = src
+      img.width = 40
+      img.height = 40
+      img.class = 'DqMRee SsAred'
+      return img
+    }
+
+  
+    for(let src of [
+      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Micro.png?raw=true',
+      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Tiny.png?raw=true',
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAC8AAAAvCAYAAABzJ5OsAAABYElEQVRoQ+2Y2w7DIAxD1///6E2VRsUYJXZuFIm9AuHEMSzleC38OxZmf214oXrvZtxNMEugAtWL0QLX/JY9f3SwBGLgz31G81VHLwq+B1NXw7LvFdsSRKOkZs1tVTY8aNilbeNqmVOwTNssC+9umUzl3VXf8OC5WVb5EL9n2CYMPBPeciVPaw9CvF6ysSiCgIV9iFhtg7Q0oR8lFuUR+HrOKBGVEzLh3ROZBS99aUGWfhI8a0NTS0xv5r1ghvLIFQvl+SR4OikGvhec3XDU67CxKM+3wTVNF/JQBQsKT6xevMo1RislvJrR8Rj4E7r3L8nEmKZ8D54Br9ePHmfhmPDE792l8Xm59qS1qbbRJn63LhQ+w+9QT6NpQe9aWrQCroeVybL1q+TfUdfoclg18PXGjEelZJlYlzBoyaFGaTBJgpPGu6E3PFAWSVlp/NHKA/n/T8myjQpOWrThJYWixj+UTlgwJgIXFAAAAABJRU5ErkJggg==',
+      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Super%20Big.png?raw=true',
+      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Too%20Big.png?raw=true',
+      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Humongous.png?raw=true',
+      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Too%20Big.png?raw=true',
+      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Way%20Too%20Big.png?raw=true'
+    ]) document.querySelector('#size').appendChild(uiImage(src))
+  
+    for(let src of [
+      'https://i.postimg.cc/bNYJfjyZ/Turtle-Bunny.png',
+      'https://i.postimg.cc/GtdppWvS/Lightning.png',
+      'https://i.postimg.cc/L43XWspd/Snail.png',
+      'https://i.postimg.cc/brgwSmTY/Lightning-Snail.png',
+      'https://i.postimg.cc/yN3xpXVn/Desert-Bus.png',
+      'https://i.postimg.cc/dVLVDmTv/Bullet.png',
+      'https://i.postimg.cc/4N83JFyB/Red-Bullet.png',
+      'https://i.postimg.cc/MpNKBMyB/Purple-Bullet.png',
+      'https://i.postimg.cc/qRdJmPDM/Blue-Bullet.png',
+      'https://i.postimg.cc/fL4LGtys/Eternal.png',
+      'https://i.postimg.cc/LXzX29g1/Fire-Bunny.png'
+    ]) document.querySelector('#speed').appendChild(uiImage(src))
+  
+    for(let src of [
+      'https://i.postimg.cc/cJx1Lt2W/13-cr.png',
+      'https://i.postimg.cc/HWq26Bdv/25.png',
+      'https://i.postimg.cc/c4fc2wJx/40.png',
+      'https://i.postimg.cc/50sStLRc/87.png',
+      'https://i.postimg.cc/YCkxH041/Apple-Bomb.png',
+      'https://i.postimg.cc/wMx20pWL/Nuke.png'
+    ]) document.querySelector('#count').appendChild(uiImage(src))
+  },
+  alterSnakeCode: code => {
+    const resetFunction = code.match(
+      /reset\n?\(\n?\)\n?{\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?=\n?\[\];[^]*?!1\n?\)\n?}/
+    )[0]
+  
+    const selectedAppleCount = resetFunction.match(
+      /this\n?\.\n?settings\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?!==\n?0/
+    )[0].replace(/!==\n?0/, '').replace(/\n/g, '')
+  
+    const applePlacementStem = resetFunction.match(
+      /this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?push\n?\(\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?this\n?,/
+    )[0]
+    const appleArray = applePlacementStem.match(/this\n?\.\n?[a-zA-Z0-9_$]{1,8}/)[0]
+  
+    const checkBadMode = code.match(
+      /[a-zA-Z0-9_$]{1,8}\n?=\n?function\n?\(a\)\n?{\n?return [a-zA-Z0-9_$]{1,8}\n?\(\n?a\n?,\n?2\n?\)\n?\|\|\n?[a-zA-Z0-9_$]{1,8}\n?\(a\n?,\n?8\n?\)\n?\|\|\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?a\n?,\n?9\n?\)\n?\|\|\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?a\n?,\n?10\n?\)\n?}/
+    )[0].match(/[a-zA-Z0-9_$]{1,8}/)[0]
+    const isModeSelected = code.match(
+      /[a-zA-Z0-9_$]{1,8}\n?=\n?function\n?\(\n?a\n?,\n?b\n?\)\n?{\n?return a\.[a-zA-Z0-9_$]{1,8}\?a\.[a-zA-Z0-9_$]{1,8}\.has\(b\):[^]*?===\n?b\n?}/
+    )[0].match(/[a-zA-Z0-9_$]{1,8}/)[0]
+  
+  
+    code = code.assertReplace(resetFunction,
+      resetFunction.assertReplace(
+        'if(a)',
+        `
+        if(${selectedAppleCount} > 6) {
+
+          if(!${checkBadMode}(this.settings)) {
+            if(${selectedAppleCount} === 7) {
+              ${applePlacementStem} +1, +2))
+              ${applePlacementStem} -1, +2))
+              ${applePlacementStem} -3, +2))
+              ${applePlacementStem} +0, +1))
+              ${applePlacementStem} -2, +1))
+              ${applePlacementStem} +1, +0))
+              ${applePlacementStem} -1, +0))
+              ${applePlacementStem} -3, +0))
+              ${applePlacementStem} +0, -1))
+              ${applePlacementStem} -2, -1))
+              ${applePlacementStem} +1, -2))
+              ${applePlacementStem} -1, -2))
+              ${applePlacementStem} -3, -2))
+            } else if(${selectedAppleCount} === 8) {
+              ${applePlacementStem} +1, +2))
+              ${applePlacementStem} +0, +2))
+              ${applePlacementStem} -1, +2))
+              ${applePlacementStem} -2, +2))
+              ${applePlacementStem} -3, +2))
+              ${applePlacementStem} +1, +1))
+              ${applePlacementStem} +0, +1))
+              ${applePlacementStem} -1, +1))
+              ${applePlacementStem} -2, +1))
+              ${applePlacementStem} -3, +1))
+              ${applePlacementStem} +1, +0))
+              ${applePlacementStem} +0, +0))
+              ${applePlacementStem} -1, +0))
+              ${applePlacementStem} -2, +0))
+              ${applePlacementStem} -3, +0))
+              ${applePlacementStem} +1, -1))
+              ${applePlacementStem} +0, -1))
+              ${applePlacementStem} -1, -1))
+              ${applePlacementStem} -2, -1))
+              ${applePlacementStem} -3, -1))
+              ${applePlacementStem} +1, -2))
+              ${applePlacementStem} +0, -2))
+              ${applePlacementStem} -1, -2))
+              ${applePlacementStem} -2, -2))
+              ${applePlacementStem} -3, -2))
+            } else if(${selectedAppleCount} === 9) {
+              ${applePlacementStem} +1, +2))
+              ${applePlacementStem} +0, +2))
+              ${applePlacementStem} -1, +2))
+              ${applePlacementStem} -2, +2))
+              ${applePlacementStem} -3, +2))
+              ${applePlacementStem} +1, +1))
+              ${applePlacementStem} +0, +1))
+              ${applePlacementStem} -1, +1))
+              ${applePlacementStem} -2, +1))
+              ${applePlacementStem} -3, +1))
+              ${applePlacementStem} +1, +0))
+              ${applePlacementStem} +0, +0))
+              ${applePlacementStem} -1, +0))
+              ${applePlacementStem} -2, +0))
+              ${applePlacementStem} -3, +0))
+              ${applePlacementStem} +1, -1))
+              ${applePlacementStem} +0, -1))
+              ${applePlacementStem} -1, -1))
+              ${applePlacementStem} -2, -1))
+              ${applePlacementStem} -3, -1))
+              ${applePlacementStem} +1, -2))
+              ${applePlacementStem} +0, -2))
+              ${applePlacementStem} -1, -2))
+              ${applePlacementStem} -2, -2))
+              ${applePlacementStem} -3, -2))
+              ${applePlacementStem} -3, -3))
+              ${applePlacementStem} -2, -3))
+              ${applePlacementStem} -1, -3))
+              ${applePlacementStem} +0, -3))
+              ${applePlacementStem} +1, -3))
+              ${applePlacementStem} +2, -2))
+              ${applePlacementStem} +2, -1))
+              ${applePlacementStem} +2, +0))
+              ${applePlacementStem} +2, +1))
+              ${applePlacementStem} +2, +2))
+              ${applePlacementStem} +1, +3))
+              ${applePlacementStem} +0, +3))
+              ${applePlacementStem} -1, +3))
+              ${applePlacementStem} -2, +3))
+              ${applePlacementStem} -3, +3))
+            } else if(${selectedAppleCount} === 10) {
+              for(let dy = -4; dy <= 4; dy++)
+                for(let dx = -7; dx <= 2; dx++)
+                  ${applePlacementStem} dx, dy))
+            } else if(${selectedAppleCount} === 11) {
+              for(let i = 0; i < 200; i++)
+                ${applePlacementStem} -1, +0))
+            } else if(${selectedAppleCount} === 12) {
+              for(let i = 0; i < 10000; i++)
+                ${applePlacementStem} -1, +0))
+            } else
+              ${applePlacementStem} +100000, +1))
+  
+          } else {
+
+            if(${selectedAppleCount} < 12) {
+              const count = (
+                ${selectedAppleCount} === 6
+                  ? 13
+                : ${selectedAppleCount} === 7
+                  ? 25
+                : ${selectedAppleCount} === 8
+                  ? 40
+                : ${selectedAppleCount} === 9
+                  ? 87
+                : ${selectedAppleCount} === 10
+                  ? 200
+                : 0
+              )
+              for(let dx = 0; dx < count; dx++)
+                for(const dy of [-4, 4])
+                  ${applePlacementStem} -count + dx, dy))
+            } else {
+              for(let i = 0; i < 20000; i++)
+                ${applePlacementStem} +0, +0))
+            }
+          }
+        } else if(a)
+        `
+      ).assertReplace(
+        /!1\n?\)\n?}/,
+        `!1)
+          if(${isModeSelected}(this.settings, 2) && ${selectedAppleCount} > 7) {
+            for(let __i___ = 0; __i___ < ${appleArray}.length; __i___ += 2) {
+              ${appleArray}[__i___].type = ${appleArray}[__i___ + 1].type = Math.floor(Math.random() * 24)
+            }
+          }
+  
+        }`
+      )
+    )
+  
+  
+    const tileLengthSetLine = code.match(
+      /this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?=\n?\(\n?d\n?\.\n?isMobile\n?\?\n?175\n?:\n?135\n?\)\n?\*\n?a\n?;/
+    )[0]
+    const selectedSpeed = code.match(
+      /switch\n?\(\n?d\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?{\n?case(\n? \n?|\n)1\n?:\n?a\n?=\n?\.66/
+    )[0].match(
+      /d\n?\.\n?[a-zA-Z0-9_$]{1,8}/
+    )[0].replace('d', 'this.settings')
+  
+    const tickFunction = code.match(
+      /tick\n?\(\n?\)\n?{\n?[^]*?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?keys\n?,\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?,\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?}\n?}\n?}\n?}/
+    )[0]
+    const replacePoint = tickFunction.match(
+      /\.5\n?:\n?1\.25\n?\);\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\+\+;/
+    )[0]
+  
+    window.bunnyTurtleSpeed = 1.33
+    window.lightningSnailSpeed = 1.85
+  
+    code = code.assertReplace(tickFunction,
+      tickFunction.replaceAll(
+        '&&', ' && '
+      ).replace(
+        replacePoint,
+        replacePoint
+         + `
+          window.bunnyTurtleSpeed = Math.random() < .5 ? .66 : 1.33
+          window.lightningSnailSpeed = Math.random() < .5 ? .45 : 1.85
+          let speedMultiplier
+          switch(${selectedSpeed}) {
+            case 1:
+              speedMultiplier = .66
+              break
+            case 2:
+              speedMultiplier = 1.33
+              break
+            case 3:
+              speedMultiplier = window.bunnyTurtleSpeed
+              break
+            case 4:
+              speedMultiplier = .45
+              break
+            case 5:
+              speedMultiplier = 1.85
+              break
+            case 6:
+              speedMultiplier = window.lightningSnailSpeed
+              break
+            case 7:
+              speedMultiplier = 18.5
+              break
+            case 8:
+              speedMultiplier = .35
+              break
+            case 9:
+              speedMultiplier = .25
+              break
+            case 10:
+              speedMultiplier = .15
+              break
+            case 11:
+              speedMultiplier = .05
+              break
+            case 12:
+              speedMultiplier = 26640
+              break
+            case 13:
+              speedMultiplier = .00001
+              break
+            default:
+              speedMultiplier = 1
+              break
+          }
+          ${tileLengthSetLine.replace(/\*\n?a/, '* speedMultiplier').replace('d.isMobile', 'this.settings.isMobile')}
+        `
+      )
+    )
+  
+    const resetFunction1 = code.match(
+      /reset\n?\(\n?\)\n?{\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?=\n?null[^]*?\.66[^]*?!0\n?\)\n?\)\n?}/
+    )[0]
+  
+    code = code.assertReplace(resetFunction1,
+      resetFunction1.assertReplace(
+        /{case 1:a=\.66[^}]*?1}/,
+        `{
+          case 1:
+            a = .66
+            break a
+          case 2:
+            a = 1.33                       
+            break a
+          case 3:
+            a = window.bunnyTurtleSpeed    
+            break a
+          case 4:
+            a = .45                        
+            break a
+          case 5:
+            a = 1.85                       
+            break a
+          case 6:
+            a = window.lightningSnailSpeed 
+            break a
+          case 7:
+            a = 18.5                       
+            break a
+          case 8:
+            a = .35                        
+            break a
+          case 9:
+            a = .25                        
+            break a
+          case 10:
+            a = .15                        
+            break a
+          case 11:
+            a = .05                        
+            break a
+          case 12:
+            a = 26640                      
+            break a
+          case 13:
+            a = .00001                     
+            break a
+          default:
+            a = 1                          
+            break a
+        }`
+      )
+    );
+  
+    const speedIconFunction = code.match(
+      /[a-zA-Z0-9_$]{1,8}\n?=\n?function\n?\(a\)\n?{\n?var b\n?=\n?a\n?\.\n?settings\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?===\n?1\n?;\n?a\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?clearRect\n?\(\n?0\n?,\n?0\n?,\n?[^]*?\n?0\n?\)\n?,\n?0\n?,\n?c\n?,\n?a\n?\.\n?settings\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?}/
+    )[0]
+    const canvWidth = speedIconFunction.match(
+      /var c\n?=\n?a\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?width/
+    )[0].assertReplace(/var c\n?=/, '')
+    const canv = speedIconFunction.match(
+      /a\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?render/g
+    )[1].assertReplace(/.\n?render/, '')
+    const selectedSpeed1 = speedIconFunction.match(
+      /a\n?\.\n?settings\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?===\n?1/g
+    )[1].assertReplace(/\n?===\n?1/, '')
+  
+    code = code.assertReplace(speedIconFunction,
+      speedIconFunction.assertReplace(
+        '&&', '?'
+      ).assertReplace(
+        /\)\n?\)\n?;/,
+        `)) : ${selectedSpeed1} !== 0 && (${canv}.context.drawImage(document.querySelector('#speed').children[${selectedSpeed1}], ${canvWidth} - 80, d.y - 80, 80, 80));`
+      )
+    )
+  
+  
+    const sizeHandleFunction = code.match(
+      /[a-zA-Z0-9_$]{1,8}\n?\(\n?\)\n?{\n?var(\n|\n? \n?)a\n?=\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\("JI3Aqc[^]*?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?}\n?}/
+    )[0]
+    const selectedSize = sizeHandleFunction.match(
+      /switch\n?\(\n?this\n?\.\n?settings\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?{\n?case 2\n?:/
+    )[0].match(/this\n?\.\n?settings\n?\.\n?[a-zA-Z0-9_$]{1,8}/)[0]
+    const sizeHold = sizeHandleFunction.match(
+      /[a-zA-Z0-9_$]\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?=\n?new(\n? \n?|\n)_\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?Math\n?\.\n?floor\n?\(\n?[a-zA-Z0-9_$]\n?\/\n?[a-zA-Z0-9_$]\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?,\n?Math\n?\.\n?floor\n?\(\n?[a-zA-Z0-9_$]\n?\/\n?[a-zA-Z0-9_$]\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?\)\n?[^]*?;/
+    )[0]
+    const sizeHolder = sizeHold.match(/[a-zA-Z0-9_$]\n?\.\n?[a-zA-Z0-9_$]{1,8}/)[0]
+    const dim = sizeHold.match(/[a-zA-Z0-9_$]\n?\/\n?[a-zA-Z0-9_$]\n?\.\n?[a-zA-Z0-9_$]{1,8}/)[0].replace(/[a-zA-Z0-9_$]\n?\//, '')
+    const e = sizeHandleFunction.match(/[a-zA-Z0-9_$]\n?=\n?512/)[0][0]
+  
+    code = code.assertReplace(sizeHandleFunction,
+      sizeHandleFunction
+      .assertReplace(
+        `Math.floor(Math.sqrt(${e}))`, `Math.max(1, Math.floor(Math.sqrt(${e})))`
+      )
+      .assertReplace(
+        /new(\n|\n? \n?)_\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?Math\n?\.\n?floor[^]*?\)\n?\)/,
+        `
+        {
+          width:  ${selectedSize} === 3 ? 5 : ${selectedSize} === 4 ? 7 : ${selectedSize} === 5 ? 12 : Math.floor(a / ${dim}),
+          height: ${selectedSize} === 3 ? 4 : ${selectedSize} === 4 ? 6 : ${selectedSize} === 5 ? 11 : Math.floor(c / ${dim})
+        }
+        `
+      )
+      .assertReplace(
+        `default:${e}=256}`,
+        `
+        case 3:
+          ${e} = 20
+          break
+        case 4:
+          ${e} = 42
+          break
+        case 5:
+          ${e} = 132
+          break
+        case 6:
+          ${e} = 1200
+          break
+        case 7:
+          ${e} = 3600
+          break
+        case 8:
+          ${e} = 9700
+          break
+        case 9:
+          ${e} = 25000
+          break
+        case 10:
+          ${e} = 318000
+          break
+        default:
+          ${e} = 256
+        }
+        `
+      )
+      .assertReplace(
+        /21\n?\)\n?}/,
+        `
+          21)
+          break
+        case 3:
+          ${sizeHolder} = { width: 5, height: 4 }
+          break
+        case 4:
+          ${sizeHolder} = { width: 7, height: 6 }
+          break
+        case 5:
+          ${sizeHolder} = { width: 12, height: 11 }
+          break
+        case 6:
+          ${sizeHolder} = { width: 37, height: 32 }
+          break
+        case 7:
+          ${sizeHolder} = { width: 64, height: 56 }
+          break
+        case 8:
+          ${sizeHolder} = { width: 105, height: 92 }
+          break
+        case 9:
+          ${sizeHolder} = { width: 168, height: 147 }
+          break
+        case 10:
+          ${sizeHolder} = { width: 600, height: 530 }
+          break
+        }
+        if(this.settings.isMobile && [3, 4, 5].includes(${selectedSize})) {
+          let squareSize = a / ${sizeHolder}.width
+          if(squareSize * ${sizeHolder}.height > c)
+            squareSize = c / ${sizeHolder}.height
+          squareSize *= .98
+          if(squareSize > 1) squareSize = ~~squareSize
+          ${dim} = squareSize
+          if(window.innerWidth / window.innerHeight < .55) {
+            squareSize *= window.innerWidth / window.innerHeight * 1.75
+            if(squareSize > 1) squareSize = ~~squareSize
+            ${dim} = squareSize
+          }
+        }
+        `
+      )
+    )
+    
+  
+    const menuUpdateFunction = code.match(
+      /[a-zA-Z0-9_$]{1,8}\n?\(\n?\)\n?{\n?if\n?\(\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?this\n?\)\n?\)\n?[^]*?"thso6e"\n?\)\n?}\n?}/
+    )[0]
+    const selectedAppleCount1 = `([...document.querySelector('#count').children].indexOf(document.querySelector('#count').getElementsByClassName('tuJOWd')[0]))`
+  
+  
+    code = code.assertReplace(
+      menuUpdateFunction,
+      menuUpdateFunction.assertReplace(
+        '}}',
+        `}
+          const appleCountDisplay = document.body.getElementsByClassName('UJhXPd wSwbef EWyEF')[0]
+  
+          // [...appleCountDisplay.children].forEach((e, i) => i > 1 && (appleCountDisplay.removeChild(appleCountDisplay.children[i])))
+          for(let i = 2; i < appleCountDisplay.children.length; i++) {
+            appleCountDisplay.removeChild(appleCountDisplay.children[i])
+          }
+
+          if(${selectedAppleCount1} > 3) {
+            const __src = document.querySelector('#count').children[${selectedAppleCount1}].src
+            const __img = window.uiImage(__src)
+            __img.style.position = 'relative'
+            __img.style.left = '50px'
+            appleCountDisplay.appendChild(__img)
+          }
+        } 
+        `
+      )
+    )
+  
+  
+    const pixelIssueFunction = code.match(
+      /[a-zA-Z0-9_$]{1,8}\n?=\n?function\n?\(\n?a\n?\)\n?{\n?var(\n| )b\n?=\n?a\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?;\n?if[^]*?10\n?}\n?}\n?}/
+    )[0]
+    const pixelIssueB = pixelIssueFunction.match(
+      /var(\n| )b\n?=\n?a\n?\.\n?[a-zA-Z0-9_$]{1,8}/
+    )[0].replace(/var(\n| )b\n?=\n?/, '')
+    const boardDimensions = pixelIssueFunction.match(
+      /b\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?height/
+    )[0].replace('b', pixelIssueB).replace(/\n?\.\n?height/, '')
+    const boardThing = pixelIssueFunction.match(
+      /b\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\[\n?d\n?\.\n?y\n?\]\n?\[\n?d\n?\.\n?x\n?\]/
+    )[0].replace(/\n?\[\n?d\n?\.\n?y\n?\]\n?\[\n?d\n?\.\n?x\n?\]/, '')
+    code = code.assertReplaceAll(
+      RegExp(`${boardThing}\\n?\\[\\n?c\\n?\\.\\n?y\\n?\\]\\n?\\[\\n?c\\n?\\.\\n?x\\n?\\]\\n?=\\n?e`, 'g'),
+      `c.y >= 0 && c.y < ${boardDimensions}.height && c.x >= 0 && c.x < ${boardDimensions}.width && (${boardThing}[c.y][c.x] = e)`
+    )
+  
+  
+    code = code.assertReplace(
+      /switch\n?\(\n?Math\n?\.\n?floor\n?\(\n?Math\n?\.\n?random\n?\(\n?\)\n?\*\n?6\n?\)\n?\)\n?{\n?default\n?:\n?case[^}]*?}/,
+      'h = Math.floor(12 * Math.random());'
+    ).assertReplace(
+      /f\n?=\n?Math\n?\.\n?random\n?\(\n?\)\n?<\n?\.25\n?\?\n?Math\n?\.\n?random\n?\(\n?\)\n?<\n?\.25\n?\?\n?2\n?:\n?1\n?:\n?0/,
+      'f = Math.floor(14 * Math.random())'
+    ).assertReplace(
+      /g\n?=\n?Math\n?\.\n?random\n?\(\n?\)\n?<\n?\.25\n?\?\n?Math\n?\.\n?random\n?\(\n?\)\n?<\n?\.25\n?\?\n?2\n?:\n?1\n?:\n?0/,
+      'g = Math.floor(11 * Math.random())'
+    )
+  
+  
+  
+    const appleTypeChosen = code.match(
+      /for\n?\(\n?a\n?=\n?a\n?\.\n?settings\n?\.\n?[a-zA-Z0-9_$]{1,8}/
+    )[0].match(/a\n?\.\n?settings\n?\.\n?[a-zA-Z0-9_$]{1,8}/)[0]
+
+    code = code.assertReplace(
+      RegExp(`for\\n?\\(\\n?a\\n?=\\n?${appleTypeChosen}\\n?;\\n?c\\.has\\n?\\(\\n?a\\n?\\)\\n?;\\n?\\)`),
+      `for(a = ${appleTypeChosen}, __i = 0; c.has(a) && __i < 24; __i++)`
+    )
+
+    // pause mod code
+    const pauseCondition = code.match(
+      /\(\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?direction\n?!==\n?"NONE"\n?\|\|\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?\)/
+    )[0]
+
+    code = code.assertReplace(
+      pauseCondition,
+      `(${pauseCondition} && !window.pauseGame)`
+    )
+  
+  
+    return code
+  },
+  runCodeAfter: () => {
+    const modIndicator = document.createElement('div')
+    modIndicator.style = `
+      position: absolute;
+      font-family: Roboto, Arial, sans-serif;
+      color: white;
+      font-size: 14px;
+      padding-top: 4px;
+      padding-left: 30px;
+      user-select: none;
+    `
+    modIndicator.textContent = 'More Menu Mod'
+    const canvasNode = document.getElementsByClassName('jNB0Ic')[0]
+    document.getElementsByClassName('EjCLSb')[0].insertBefore(modIndicator, canvasNode)
+
+    // pause mod code
+    document.addEventListener('keydown', evt => {
+      if(evt.code === 'KeyQ') {
+        window.pauseGame = !window.pauseGame
+
+        const pausedDarkOverlayDiv = document.getElementsByClassName('wjOYOd')[0]
+        const menuDiv = pausedDarkOverlayDiv.children[0]
+
+        if(window.pauseGame) {
+          pausedDarkOverlayDiv.style.visibility = "visible"
+          pausedDarkOverlayDiv.style.opacity = 1
+          menuDiv.style.visibility = "hidden"
+        } else {
+          setTimeout(() => {
+            if(!window.pauseGame) {
+              menuDiv.style.visibility = "visible"
+            }
+          }, 500)
+          pausedDarkOverlayDiv.style.visibility = "hidden"
+          pausedDarkOverlayDiv.style.opacity = 0
+        }
+      }
+    })
+  }
+}
+window.VisibilityModCode = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+window.VisibilityModCode.runCodeBefore = function () {
+  window.catchError = function catchError(culprit_regex, code) {
+    try {
+      something = code.match(culprit_regex)[0];
+    } catch (e) {
+      console.log("I caught it!")
+      if (window.NepDebug) {
+        console.log(culprit_regex)
+        console.log(code)
+      }
+      return true;
+    } return false;
+
+  }
+
+  function loadAndRunCodeSynchronous(url) {
+    let req = new XMLHttpRequest();
+    req.open('GET', url, false);
+    req.onload = function () {
+      if (this.status === 200) {
+        (1, eval)(this.responseText);
+      } else {
+        console.log(`Loading selected mod returned non-200 status. Received: ${this.status}`);
+      }
+    };
+    req.onerror = function (event) {
+      console.error(`Error when attempting to retrieve mod code from ${url}`);
+      console.log(event);
+    };
+    req.send();
+  }
+
+  //loadAndRunCodeSynchronous('https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakePudding/main/PuddingMod.js');
+  //window.PuddingMod.runCodeBefore();
+
+  console.log("Enabling Visibility Mod");
+
+  window.checkboxes = {
+    checkboxStatuses: {
+      leftEye: true, rightEye: true, body: true, snoot: true, nose: true,
+      lightTiles: true, darkTiles: true, eatAnimation: true, fruit: true, poison: true, shadow: true,
+      border: true, die: true, lumps: true, portals: true, flashSnake: false, shadowIncluded: true,
+      keys: true, walls: true, locks: true, hotdogWalls: true, sokobanBox: true, sokobanGoal: true,
+      mines: true, statue: true, brokenStatue: true, mineRadius: true, tongue: true,
+      bridges: true, arrows: true, gates: true, shields: true,
+      lightSnake: true, lightFruit: true,
+    },
+  };
+
+  // The game builds the shadow as a silhouette of the sprite layer partway through a frame, so
+  // anything we skip drawing would lose its shadow too. When Shadow Included is off, that part of
+  // the frame runs twice: once with every silhouette gate forced open (what the shadow is taken
+  // from), then the sprite layer is rewound and drawn again honouring the checkboxes. When it is
+  // on, hidden parts simply are not drawn and their shadows go with them.
+  window.visiFullPass = false;
+  window.visiShadowScratch = null;
+  window.visiShadowPassKeys = ['body', 'fruit', 'poison', 'lumps', 'leftEye', 'rightEye', 'snoot', 'nose',
+    'eatAnimation', 'tongue', 'die', 'keys', 'sokobanBox'];
+
+  window.visiBeginShadowPass = function visiBeginShadowPass(renderer, isInfinity) {
+    window.visiFullPass = false;
+
+    //Infinity mode composites the shadow from wrapped copies further down the frame, so the rewind
+    //point here would land in the wrong place.
+    let statuses = window.checkboxes.checkboxStatuses;
+    if (isInfinity || !statuses.shadow || statuses.shadowIncluded) { return; }
+
+    let anyHidden = false;
+    for (let i = 0; i < window.visiShadowPassKeys.length; i++) {
+      if (!statuses[window.visiShadowPassKeys[i]]) { anyHidden = true; break; }
+    }
+    if (!anyHidden) { return; }
+
+    let source = renderer.ka.canvas;
+    let scratch = window.visiShadowScratch;
+    if (!scratch) {
+      scratch = window.visiShadowScratch = document.createElement('canvas').getContext('2d');
+    }
+    if (scratch.canvas.width !== source.width || scratch.canvas.height !== source.height) {
+      scratch.canvas.width = source.width;
+      scratch.canvas.height = source.height;
+    }
+    scratch.setTransform(1, 0, 0, 1, 0, 0);
+    scratch.globalAlpha = 1;
+    scratch.globalCompositeOperation = 'copy';
+    scratch.drawImage(source, 0, 0);
+    scratch.globalCompositeOperation = 'source-over';
+
+    window.visiFullPass = true;
+  };
+
+  window.visiEndShadowPass = function visiEndShadowPass(renderer) {
+    if (!window.visiFullPass) { return false; }
+    window.visiFullPass = false;
+
+    let ctx = renderer.ka;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'copy';
+    ctx.drawImage(window.visiShadowScratch.canvas, 0, 0);
+    ctx.restore();
+    return true;
+  };
+
+  // Border is also painted as CSS background-color on the canvas chrome; keep handles so the
+  // checkbox can toggle it live without restarting.
+  window.visiBorderEls = [];
+  window.visiBorderColor = "";
+  window.applyVisiBorder = function applyVisiBorder() {
+    let color = window.checkboxes.checkboxStatuses.border ? (window.visiBorderColor || "") : "transparent";
+    for (let i = 0; i < window.visiBorderEls.length; i++) {
+      let el = window.visiBorderEls[i];
+      if (el && el.style) { el.style.backgroundColor = color; }
+    }
+  };
+
+  window.flashSnakeStatus = { flashCount: 0, currentlyFlashingSnake: false, durationMillisecond: 1000 };
+
+  window.dragHandler = {
+    dragItem: null,
+    dragContainer: null,
+    dragObject: null,
+    active: false,
+    currentX: 0,
+    currentY: 0,
+    initialX: 0,
+    initialY: 0,
+    xOffset: 0,
+    yOffset: 0,
+    dragStart: (e) => {
+      if (e.target === window.dragHandler.dragItem) {
+        window.dragHandler.initialX = e.clientX - window.dragHandler.xOffset;
+        window.dragHandler.initialY = e.clientY - window.dragHandler.yOffset;
+        window.dragHandler.active = true;
+      }
+    },
+    dragEnd: (e) => {
+      window.dragHandler.initialX = window.dragHandler.currentX;
+      window.dragHandler.initialY = window.dragHandler.currentY;
+      window.dragHandler.active = false;
+    },
+    drag: (e) => {
+      if (window.dragHandler.active) {
+
+        //Enforce coordinates being within viewport
+        let restrictedClientX = Math.max(Math.min(e.clientX, window.innerWidth - 5), 5);
+        let restrictedClientY = Math.max(Math.min(e.clientY, window.innerHeight - 5), 5);
+
+        e.preventDefault();
+        window.dragHandler.currentX = restrictedClientX - window.dragHandler.initialX;
+        window.dragHandler.currentY = restrictedClientY - window.dragHandler.initialY;
+        window.dragHandler.xOffset = window.dragHandler.currentX;
+        window.dragHandler.yOffset = window.dragHandler.currentY;
+
+        window.dragHandler.setTranslate(window.dragHandler.currentX, window.dragHandler.currentY, window.dragHandler.dragObject);
+      }
+    },
+    setTranslate: function (xPos, yPos, el) {
+      el.style.transform = "translate3d(" + xPos + "px, " + yPos + "px, 0)";
+    },
+    initialiseDragHandler: function () {
+      this.dragItem = document.getElementById('drag-handle');
+      this.dragContainer = window;
+      this.dragObject = document.getElementById('delete-stuff-draggable');
+
+      //If it isn't fbx snake, then start at the left edge
+      if (!/fbx\?fbx=snake_arcade/.test(document.location.href)) {
+        this.dragObject.style.left = '5px';
+      }
+
+      this.dragContainer.addEventListener("mousedown", this.dragStart, false);
+      this.dragContainer.addEventListener("mouseup", this.dragEnd, false);
+      this.dragContainer.addEventListener("mousemove", this.drag, false);
+    }
+  };
+
+  function setupEventListeners() {
+    document.getElementById('delete-stuff-close').onclick = function () {
+      document.getElementById('delete-stuff-popup').hidden = true;
+    };
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key == 'i') {
+        document.getElementById('delete-stuff-popup').hidden = !document.getElementById('delete-stuff-popup').hidden;
+      }
+    });
+
+    document.getElementById('left-eye').onchange = function () {
+      window.checkboxes.checkboxStatuses.leftEye = this.checked;
+    }
+
+    document.getElementById('right-eye').onchange = function () {
+      window.checkboxes.checkboxStatuses.rightEye = this.checked;
+    }
+
+    document.getElementById('snake-body').onchange = function () {
+      window.checkboxes.checkboxStatuses.body = this.checked;
+    }
+
+    document.getElementById('snoot').onchange = function () {
+      window.checkboxes.checkboxStatuses.snoot = this.checked;
+    }
+
+    document.getElementById('nose').onchange = function () {
+      window.checkboxes.checkboxStatuses.nose = this.checked;
+    }
+
+    document.getElementById('light-tiles').onchange = function () {
+      window.checkboxes.checkboxStatuses.lightTiles = this.checked;
+    }
+
+    document.getElementById('dark-tiles').onchange = function () {
+      window.checkboxes.checkboxStatuses.darkTiles = this.checked;
+    }
+
+    document.getElementById('eat-animation').onchange = function () {
+      window.checkboxes.checkboxStatuses.eatAnimation = this.checked;
+    }
+
+    document.getElementById('tongue').onchange = function () {
+      window.checkboxes.checkboxStatuses.tongue = this.checked;
+    }
+    document.getElementById('fruit').onchange = function () {
+      window.checkboxes.checkboxStatuses.fruit = this.checked;
+    }
+    document.getElementById('poison').onchange = function () {
+      window.checkboxes.checkboxStatuses.poison = this.checked;
+    }
+    document.getElementById('shadow').onchange = function () {
+      window.checkboxes.checkboxStatuses.shadow = this.checked;
+    }
+    document.getElementById('border').onchange = function () {
+      window.checkboxes.checkboxStatuses.border = this.checked;
+      window.applyVisiBorder();
+    }
+    document.getElementById('die').onchange = function () {
+      window.checkboxes.checkboxStatuses.die = this.checked;
+    }
+    document.getElementById('lumps').onchange = function () {
+      window.checkboxes.checkboxStatuses.lumps = this.checked;
+    }
+    document.getElementById('portals').onchange = function () {
+      window.checkboxes.checkboxStatuses.portals = this.checked;
+    }
+    document.getElementById('flash-snake').onchange = function () {
+      window.checkboxes.checkboxStatuses.flashSnake = this.checked;
+    }
+    //Handle dropdown for controlling duration of snake flashes
+    document.getElementById('flash-snake-timing').onchange = function () {
+      window.flashSnakeStatus.durationMillisecond = this.value;
+    }
+    document.getElementById('shadow-included').onchange = function () {
+      window.checkboxes.checkboxStatuses.shadowIncluded = this.checked;
+    }
+    document.getElementById('keys').onchange = function () {
+      window.checkboxes.checkboxStatuses.keys = this.checked;
+    }
+    document.getElementById('walls').onchange = function () {
+      window.checkboxes.checkboxStatuses.walls = this.checked;
+    }
+    document.getElementById('locks').onchange = function () {
+      window.checkboxes.checkboxStatuses.locks = this.checked;
+    }
+    document.getElementById('hotdog-walls').onchange = function () {
+      window.checkboxes.checkboxStatuses.hotdogWalls = this.checked;
+    }
+    document.getElementById('sokoban-box').onchange = function () {
+      window.checkboxes.checkboxStatuses.sokobanBox = this.checked;
+    }
+    document.getElementById('sokoban-goal').onchange = function () {
+      window.checkboxes.checkboxStatuses.sokobanGoal = this.checked;
+    }
+    document.getElementById('mines').onchange = function () {
+      window.checkboxes.checkboxStatuses.mines = this.checked;
+      if (this.checked) {
+        eval("window.MinesRef." + window.minesDefined + "=window.DefaultMines;")
+      }
+      else {
+        eval("window.MinesRef." + window.minesDefined + "=window.NoMines;")
+      }
+    }
+    document.getElementById('mine-radius').onchange = function () {
+      window.checkboxes.checkboxStatuses.mineRadius = this.checked;
+    }
+    document.getElementById('broken-statue').onchange = function () {
+      window.checkboxes.checkboxStatuses.brokenStatue = this.checked;
+    }
+    document.getElementById('statue').onchange = function () {
+      window.checkboxes.checkboxStatuses.statue = this.checked;
+    }
+    document.getElementById('bridges').onchange = function () {
+      window.checkboxes.checkboxStatuses.bridges = this.checked;
+    }
+    document.getElementById('arrows').onchange = function () {
+      window.checkboxes.checkboxStatuses.arrows = this.checked;
+    }
+    document.getElementById('gates').onchange = function () {
+      window.checkboxes.checkboxStatuses.gates = this.checked;
+    }
+    document.getElementById('shields').onchange = function () {
+      window.checkboxes.checkboxStatuses.shields = this.checked;
+    }
+    document.getElementById('light-snake').onchange = function () {
+      window.checkboxes.checkboxStatuses.lightSnake = this.checked;
+    }
+    document.getElementById('light-fruit').onchange = function () {
+      window.checkboxes.checkboxStatuses.lightFruit = this.checked;
+    }
+    document.getElementById('spin').onchange = spinHandler;
+  }
+
+  function injectInitialHtml() {
+    let initialHtml =
+      `<div id="delete-stuff-popup" style="margin:0px;position:fixed;z-index:9001;width:100%;">
+  <div id="delete-stuff-draggable" style="width: 370px; background-color: rgb(87, 138, 52); z-index: 9002; border-color: rgb(87, 138, 52); border-style: solid; border-width: 4px; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.4) 0px 3px 10px; position: fixed; left: 5px; top: 5px;border-width: 0px;">
+    <div id="drag-handle" style="width: 22px; height: 22px; background-color: rgb(77, 193, 249); position: absolute; border-top-left-radius: 10px; border-bottom-right-radius: 18px; border-right: 3px solid rgb(87, 138, 52); border-bottom: 3px solid rgb(87, 138, 52); cursor: move; border-top-color: rgb(87, 138, 52); border-left-color: rgb(87, 138, 52);"></div>
+    <div style="padding:10px;width:350px;margin:0;">
+      <div id="visi-title" class="form-check-label" style="text-align: center; padding: 5px; background-color: rgb(74, 117, 44); color: white; font-size: 20px;">Visibility Mod</div>
+      <div id="visi-boxes" style="background-color: rgb(74, 117, 44); margin-top: 5px; padding: 0px 0px 10px;">
+        <!--Begin test area-->
+        <!--Snake body Section-->
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 45%;display:inline-block;float:left">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="left-eye" type="checkbox" checked>Left Eye</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="right-eye" type="checkbox" checked>Right Eye</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="snoot" type="checkbox" checked>Snoot</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="nose" type="checkbox" checked>Nostrils</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="snake-body" type="checkbox" checked>Body</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="lumps" type="checkbox" checked>Lumps</label>
+            </li>
+          </ul>
+        </div>
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 55%;display:inline-block;float:right;">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="eat-animation" type="checkbox" checked>Eat Anim.</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="tongue" type="checkbox" checked>Tongue</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="die" type="checkbox" checked>Die Anim.</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="shadow" type="checkbox" checked>Shadow</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="shadow-included" type="checkbox" checked>Shadow Included</label>
+            </li>
+          </ul>
+        </div>
+        <hr style="clear:both;width:90%;margin-bottom:0">
+        <!--Background Section-->
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 50%;display:inline-block;float:left">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="light-tiles" type="checkbox" checked>Light Tiles</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="dark-tiles" type="checkbox" checked>Dark Tiles</label>
+            </li>
+          </ul>
+        </div>
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 50%;display:inline-block;float:right;">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="border" type="checkbox" checked>Border</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="spin" type="checkbox">Spin</label>
+            </li>
+          </ul>
+        </div>
+        <hr style="clear:both;width:90%;margin-bottom:0">
+        <!--Fruits Section-->
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 45%;display:inline-block;float:left">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="fruit" type="checkbox" checked>Fruit</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="poison" type="checkbox" checked>Poison</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="portals" type="checkbox" checked>Portals</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="keys" type="checkbox" checked>Keys</label>
+            </li>
+            <li>
+            <label class="form-check-label"><input class="form-check-input" id="statue" type="checkbox" checked>Statue</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="mines" type="checkbox" checked>Mines</label>
+            </li>
+          </ul>
+        </div>
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 55%;display:inline-block;float:right;">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="walls" type="checkbox" checked>Walls</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="locks" type="checkbox" checked>Locks</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="sokoban-box" type="checkbox" checked>Sokobox</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="sokoban-goal" type="checkbox" checked>Sokogoal</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="broken-statue" type="checkbox" checked>Cracks</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="mine-radius" type="checkbox" checked>Mine Radius</label>
+            </li>
+          </ul>
+        </div>
+        <hr style="clear:both;width:90%;margin-bottom:0">
+        <!--Newer modes Section-->
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 45%;display:inline-block;float:left">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="bridges" type="checkbox" checked>Bridges</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="arrows" type="checkbox" checked>Arrows</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="gates" type="checkbox" checked>Gates</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="shields" type="checkbox" checked>Shields</label>
+            </li>
+          </ul>
+        </div>
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 55%;display:inline-block;float:right;">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="hotdog-walls" type="checkbox" checked>Hotdog Walls</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="light-snake" type="checkbox" checked>Light Snake</label>
+            </li>
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="light-fruit" type="checkbox" checked>Light Fruit</label>
+            </li>
+          </ul>
+        </div>
+        <hr style="clear:both;width:90%;margin-bottom:0">
+        <!--Flash Section-->
+        <div style="box-sizing: border-box;padding:5px;margin: 0px;width: 45%;display:inline-block;float:left">
+          <ul style="list-style-type: none;padding:5px;margin-top:0;margin-bottom:0">
+            <li>
+              <label class="form-check-label"><input class="form-check-input" id="flash-snake" type="checkbox">Flash eat</label>
+            </li>
+          </ul>
+        </div>
+        <div style="box-sizing: border-box;padding:2px;margin: 0px;width: 55%;display:inline-block;">
+          <label class="form-check-label" style="padding-top:5px;display:inline-block;float:left;">Flash time:</label>
+            <select id="flash-snake-timing" style="margin-top: 9px; margin-right: 10px;background-color:#1155CC;color:white;font-family:Roboto,Arial,sans-serif;display:flex; justify-content: space-evenly; align-items: center; text-align: center;border-radius:0.375rem;float:right;">
+              <option value="20">0.05s</option>
+              <option value="200">0.2s</option>
+              <option value="500">0.5s</option>
+              <option value="1000" selected="">1s</option>
+              <option value="2000">2s</option>
+              <option value="3000">3s</option>
+            </select>
+        </div>
+        <!--End test area-->
+        <div style="text-align:center; clear:both" class="form-check-label"><a id="delete-stuff-close" href="#">Close</a> (Press i to show again)</div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+<template id="tooltiptemplate">
+  <div style="position:relative;display:inline-block;color: white;float:right;border: 1px solid white;border-radius:50%;width:1em;height:1em;text-align:center;font-family:Roboto,Arial,sans-serif;line-height:1em;" class="tooltip">
+  ?
+  <div style="position:absolute;top:0;left:120%;background-color:black;color:white;border-radius:0.5em;padding:0.5em;font-weight:normal;box-shadow:0 3px 10px rgba(0,0,0,0.4);width:110px;z-index:9003;visibility:hidden;opacity:0;transition: opacity 0.8s;" class="tooltiptext">
+  </div>
+  </div>
+</template>`;
+
+    let intialElement = document.createElement('div');
+    intialElement.style.backgroundColor = 'transparent';
+    intialElement.style.position = 'fixed';
+    intialElement.style.zIndex = '9001';
+    intialElement.innerHTML = initialHtml;
+
+    document.getElementsByTagName('body')[0].prepend(intialElement);
+  };
+
+  function setupCss() {
+    let customStyle = document.createElement('style');
+    customStyle.type = 'text/css';
+    customStyle.innerHTML = `.tooltip:hover .tooltiptext:not(:hover){visibility:visible!important;opacity:1!important;}
+  #drag-handle:hover{background-color:rgb(17, 85, 204)!important;}
+  #delete-stuff-popup label,#delete-stuff-popup div{user-select:none;}
+
+  :root {--rotation-period: 30s;}
+  .cer0Bd[data-spin='true']{animation: spin var(--rotation-period) linear infinite;}
+  .cer0Bd[data-spin='x']{animation: spinx var(--rotation-period) linear infinite;}
+  @keyframes spin { 100% { transform:rotate(360deg); } }
+  @keyframes spinx { 100% { transform:rotateX(360deg); } }
+  `;
+    document.getElementsByTagName('head')[0].appendChild(customStyle);
+  }
+
+  function addTooltip(id, helpText) {
+    let tooltipTemplate = document.getElementById('tooltiptemplate').content;
+    let tooltipToInsert = tooltipTemplate.cloneNode(true);
+    tooltipToInsert.querySelector('.tooltiptext').textContent = helpText;
+    document.getElementById(id).parentElement.parentElement.appendChild(tooltipToInsert);
+  }
+
+  function loadTooltips() {
+    let tooltipText = {
+      'left-eye': "Left eye of snake. Looks towards the nearest fruit.",
+      'right-eye': "Right eye of snake. Looks towards the nearest fruit.",
+      'snoot': "Filled circle at the tip of the snake's head.",
+      'nose': "The small nostril dots under the eyes.",
+      'snake-body': "The lines and curves that make up the snake's body.",
+      'lumps': "The swallowed fruit that pass through the snake.",
+      'eat-animation': "The snake's mouth animation when eating fruit.",
+      'tongue': "Animation when the snake sticks out it's tongue.",
+      'die': "Animation when the snake dies. Also used in sokoban mode.",
+      'shadow': "Toggles the snake/fruit/key shadow layer. Off = no shadows at all. Default colour is dark green.",
+      'shadow-included': "When on (default), hiding something also removes that part's shadow. When off, hiding something still keeps its shadow.",
+      'light-tiles': "The light tiles used for the background. You may need to restart (press esc and then play) for this to take effect. This is actually just a big rectangle that the dark tiles get drawn on top of. Has a glitchy visual effect when removed.",
+      'dark-tiles': "The dark tiles used for the background. You may need to restart (press esc and then play) for this to take effect. These are individually drawn squares that get drawn on top of the light tile background.",
+      'border': "The dark green border around the board (canvas fill and chrome background).",
+      'fruit': "Regular fruit. Poison fruit is controlled separately.",
+      'poison': "Poison fruit in poison mode.",
+      'portals': "The portals that can be found in portal mode.",
+      'keys': "The keys that can be found in key mode.",
+      'walls': "The walls that can be found in wall mode.",
+      'locks': "The locks that can be found in key mode (wall blocks with lock icons).",
+      'hotdog-walls': "The side walls that spawn along the snake in hotdog mode.",
+      'sokoban-box': "The box that can be found in the mode where you push around a box into a goal.",
+      'sokoban-goal': "The goal that can be found in the mode where you push around a box into a goal.",
+      'flash-snake': "When this setting is turned on, the snake will briefly show whenever a fruit is eaten. The amount of time it shows for is controlled by the Flash Time setting. This only has a noticable effect if parts of the snake are hidden to begin with.",
+      'mines': "The mines (flags) in minesweeper mode.",
+      'statue': "The statue in statue mode. Including broken statue.",
+      'broken-statue': "The broken statues in statue mode.",
+      'spin': "Spin the entire board.",
+      'mine-radius': "The mine's radius in minesweeper mode. Dashed lines. Also includes confetti from explosion.",
+      'bridges': "Bridge tiles and the dashed bridge path in bridge mode.",
+      'arrows': "Direction arrows painted on the board in arrow mode.",
+      'gates': "Dashed gate rectangles in gate mode.",
+      'shields': "Directional shield bars drawn on fruit in shield mode.",
+      'light-snake': "The glow around the snake's head in light mode.",
+      'light-fruit': "The glow around apples in light mode.",
+    };
+
+    for (let inputElementId in tooltipText) {
+      addTooltip(inputElementId, tooltipText[inputElementId]);
+    }
+  }
+
+  function spinHandler() {
+    let canvasElement = document.getElementsByClassName('cer0Bd')[0];
+    if (!this.checked) {
+      canvasElement.dataset.spin = 'false';
+    } else {
+      let r = document.querySelector(':root');
+      let promptResponse = prompt('How many seconds should a spin take? Enter a number', '30');
+      promptResponse = parseFloat(promptResponse);
+      if (isNaN(promptResponse) || promptResponse <= 0) {
+        alert('Invalid value entered. Defaulting to 30');
+        r.style.setProperty('--rotation-period', '30s');
+      } else {
+        alert(`Spinning every ${promptResponse} seconds.`);
+        r.style.setProperty('--rotation-period', promptResponse + 's');
+      }
+      let spinAroundZ = confirm('Spin around z axis?');//Spin around x or z axis.
+      canvasElement.dataset.spin = spinAroundZ ? 'true' : 'x';
+    }
+  }
+
+  injectInitialHtml();
+  setupCss();
+  loadTooltips();
+  setupEventListeners();
+  window.dragHandler.initialiseDragHandler();
+
+}
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.VisibilityModCode.alterSnakeCode = function (code) {
+
+  //code = window.PuddingMod.alterSnakeCode(code);
+  let deleteModDebug = false;
+  if (localStorage.getItem('snakeChosenMod') === "customUrl") {
+    console.log("Detected customUrl - enabling debug mode and printing initial code")
+    deleteModDebug = true;
+    console.log(code)
+  }
+  window.snakeScale = { tailStart: 1, tailEnd: 1, face: 1, eyes: 1 };
+
+  /*
+Same as replace, but throws an error if nothing is changed
+*/
+  function assertReplace(baseText, regex, replacement) {
+    if (typeof baseText !== 'string') {
+      throw new Error('String argument expected for assertReplace');
+    }
+    let outputText = baseText.replace(regex, replacement);
+
+    //Throw warning if nothing is replaced
+    if (baseText === outputText) {
+      diagnoseRegexError(baseText, regex);
+    }
+
+    return outputText;
+  }
+
+  function swapInMainClassPrototype(mainClass, functionText) {
+    functionText = assertReplace(functionText, /^[$a-zA-Z0-9_]{0,6}/, `${mainClass}.prototype`);
+    return functionText;
+  }
+
+  /*
+  Same as replaceAll, but throws an error if nothing is changed
+  */
+  function assertReplaceAll(baseText, regex, replacement) {
+    if (typeof baseText !== 'string') {
+      throw new Error('String argument expected for assertReplace');
+    }
+    let outputText = baseText.replaceAll(regex, replacement);
+
+    //Throw warning if nothing is replaced
+    if (baseText === outputText) {
+      diagnoseRegexError(baseText, regex);
+    }
+
+    return outputText;
+  }
+
+
+  function diagnoseRegexError(baseText, regex) {
+    if (!(regex instanceof RegExp)) {
+      throw new Error('Failed to find match using string argument. No more details available');
+    }
+
+    //see if removing line breaks works - in that case we can give a more useful error message
+    let oneLineText = baseText.replaceAll(/\n/g, '');
+    let res = regex.test(oneLineText);
+
+    //If line breaks don't solve the issue then throw a general error
+    if (!res) {
+      throw new Error('Failed to find match for regex.');
+    }
+
+    //Try to suggest correct regex to use for searching
+    let regexSource = regex.source;
+    let regexFlags = regex.flags;
+
+    //Look at all the spots where line breaks might occur and try adding \n? there to see if it makes a difference
+    //It might be easier to just crudely brute force putting \n? at each possible index?
+    for (let breakableChar of ["%", "&", "\\*", "\\+", ",", "-", "\\/", ":", ";", "<", "=", ">", "\\?", "{", "\\|", "}"]) {
+      for (let pos = regexSource.indexOf(breakableChar); pos !== -1; pos = regexSource.indexOf(breakableChar, pos + 1)) {
+        //Remake the regex with a new line at the candidate position
+        let candidateRegexSource = `${regexSource.slice(0, pos + breakableChar.length)}\\n?${regexSource.slice(pos + breakableChar.length)}`;
+        let candidateRegex;
+
+        try {
+          candidateRegex = new RegExp(candidateRegexSource, regexFlags);
+        } catch (err) {
+          continue;
+        }
+
+        //See if the new regex works
+        let testReplaceResult = candidateRegex.test(baseText);
+        if (testReplaceResult) {
+          //Success we found the working regex! Give descriptive error message to user and log suggested regex with new line in correct place
+          console.log(`Suggested regex improvement:
+  ${candidateRegex}`);
+          throw new Error('Suggested improvement found! Error with line break, failed to find match for regex. See logged output for regex to use instead that should hopefully fix this.');
+        }
+      }
+    }
+
+    throw new Error('Line break error! Failed to failed to find match for regex - most likely caused by a new line break. No suggestions provided');
+  }
+
+  window.brieflyShowSnake = function brieflyShowSnake() {
+    if (window.flashSnakeStatus.flashCount < 0) {
+      throw new Error('Error with flashing snake');
+    }
+    window.flashSnakeStatus.flashCount++;
+    window.flashSnakeStatus.currentlyFlashingSnake = true;
+
+    //Clear flashed snake after a duration
+    setTimeout(
+      function () {
+        window.flashSnakeStatus.flashCount--; if (window.flashSnakeStatus.flashCount === 0) { window.flashSnakeStatus.currentlyFlashingSnake = false; }
+      },
+      window.flashSnakeStatus.durationMillisecond
+    );
+  }
+
+  //Function for body parts
+  //let rightEyeRegex = /(\([a-z]\?[a-z]\.[$a-zA-Z0-9_]{0,6}:[a-z]\.[$a-zA-Z0-9_]{0,6}\)\.render\([a-z],\n?[a-z],\n?[a-z],\n?[a-z]\.[$a-zA-Z0-9_]{0,6},\n?[a-z])(\),)/;
+  let rightEyeRegex = /(\([a-z]\?[a-z]\.[$a-zA-Z0-9_]{0,6}:[a-z]\.[$a-zA-Z0-9_]{0,6}\)\.render\([a-z],\n?[a-z],\n?[a-z],\n?[a-z],\n?[a-z]\*[a-z])(\),)/;
+
+  if (deleteModDebug) {
+    console.log(code)
+  }
+
+  let funcWithBodyParts_Origin = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e\)$/,
+    rightEyeRegex,
+    deleteModDebug);
+
+  let funcWithBodyParts = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e\)$/,
+    rightEyeRegex,
+    deleteModDebug);
+
+  //Die anim. The dying face is die.png, which the sprite class instantiates three times:
+  //normal, mirrored, and a recoloured copy used while the snake is fading. Gate all of them.
+  let dieSpriteProps = [];
+  code.replace(/this\.([$a-zA-Z0-9_]{1,6})=new [$a-zA-Z0-9_]{1,6}\([$a-zA-Z0-9_.]{1,20},\n?"[^"]*die\.png"/g,
+    function (whole, prop) {
+      if (dieSpriteProps.indexOf(prop) === -1) { dieSpriteProps.push(prop); }
+      return whole;
+    });
+  if (dieSpriteProps.length === 0) {
+    throw new Error('Visibility mod: could not find the die.png sprite properties');
+  }
+
+  let dieGateCount = 0;
+  funcWithBodyParts = funcWithBodyParts.replace(
+    /(?:\([$a-zA-Z0-9_]{1,6}\?[$a-zA-Z0-9_]{1,6}\.([$a-zA-Z0-9_]{1,6}):[$a-zA-Z0-9_]{1,6}\.([$a-zA-Z0-9_]{1,6})\)|[$a-zA-Z0-9_]{1,6}\.([$a-zA-Z0-9_]{1,6}))\.render\(/g,
+    function (whole, ternaryLeft, ternaryRight, plain) {
+      let usesDieSprite = [ternaryLeft, ternaryRight, plain].some(function (prop) {
+        return prop && dieSpriteProps.indexOf(prop) !== -1;
+      });
+      if (!usesDieSprite) { return whole; }
+      dieGateCount++;
+      return '(window.flashSnakeStatus.currentlyFlashingSnake || window.checkboxes.checkboxStatuses.die || window.visiFullPass) && ' + whole;
+    });
+  if (dieGateCount === 0) {
+    throw new Error('Visibility mod: could not gate any die.png renders');
+  }
+
+  //Left/Right Eye. Both eyes come from the same sprite, drawn back to back in one comma expression
+  funcWithBodyParts = assertReplace(funcWithBodyParts, /(\(([$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}:[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6})\)\.render\([$a-zA-Z0-9_]{0,6},\n?[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},\n?[$a-zA-Z0-9_*]{0,6})(\)),(\(\2\)\.render\([$a-zA-Z0-9_]{0,6},\n?[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},\n?[$a-zA-Z0-9_*]{0,6})(\))/,
+    '(window.flashSnakeStatus.currentlyFlashingSnake || window.checkboxes.checkboxStatuses.leftEye || window.visiFullPass) && $1 * window.snakeScale.eyes $3,' +
+    '(window.flashSnakeStatus.currentlyFlashingSnake || window.checkboxes.checkboxStatuses.rightEye || window.visiFullPass) && $4 * window.snakeScale.eyes $5');
+
+  //Eye offsets
+  funcWithBodyParts = assertReplaceAll(funcWithBodyParts, /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\+=\n?Math\.(?:cos|sin)\([$a-zA-Z0-9_]{0,6}[+-][$a-zA-Z0-9_]{0,6}\)\*[$a-zA-Z0-9_]{0,6}/g,
+    '$& * window.snakeScale.eyes');
+
+  //Eat / Nostrils share eat.png. Resting frame (d3===0) is nostrils; any other frame is the mouth.
+  let eatSpriteProps = [];
+  code.replace(/this\.([$a-zA-Z0-9_]{1,6})=new [$a-zA-Z0-9_]{1,6}\([$a-zA-Z0-9_.]{1,20},\n?"[^"]*eat\.png"/g,
+    function (whole, prop) {
+      if (eatSpriteProps.indexOf(prop) === -1) { eatSpriteProps.push(prop); }
+      return whole;
+    });
+  if (eatSpriteProps.length === 0) {
+    throw new Error('Visibility mod: could not find the eat.png sprite properties');
+  }
+
+  let eatGateCount = 0;
+  funcWithBodyParts = funcWithBodyParts.replace(
+    /(?:\([$a-zA-Z0-9_]{1,6}\?[$a-zA-Z0-9_]{1,6}\.([$a-zA-Z0-9_]{1,6}):[$a-zA-Z0-9_]{1,6}\.([$a-zA-Z0-9_]{1,6})\)|[$a-zA-Z0-9_]{1,6}\.([$a-zA-Z0-9_]{1,6}))\.render\(Math\.floor\(([$a-zA-Z0-9_.]{1,12})\)/g,
+    function (whole, ternaryLeft, ternaryRight, plain, frameExpr) {
+      let usesEatSprite = [ternaryLeft, ternaryRight, plain].some(function (prop) {
+        return prop && eatSpriteProps.indexOf(prop) !== -1;
+      });
+      if (!usesEatSprite) { return whole; }
+      eatGateCount++;
+      return '(window.flashSnakeStatus.currentlyFlashingSnake||window.visiFullPass||(Math.floor(' + frameExpr + ')===0?window.checkboxes.checkboxStatuses.nose:window.checkboxes.checkboxStatuses.eatAnimation))&&' + whole;
+    });
+  if (eatGateCount === 0) {
+    throw new Error('Visibility mod: could not gate any eat.png renders');
+  }
+
+  //Tongue
+  funcWithBodyParts = assertReplace(funcWithBodyParts, /(\([$a-zA-Z0-9_]{0,6}\?[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}:[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)\.render\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6})(\)\))/,
+    '(window.checkboxes.checkboxStatuses.tongue || window.visiFullPass) && $1 * window.snakeScale.face $2');
+
+  //Snoot
+  funcWithBodyParts = assertReplace(funcWithBodyParts, /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.fill\(\)/,
+    '(window.flashSnakeStatus.currentlyFlashingSnake || window.checkboxes.checkboxStatuses.snoot || window.visiFullPass) && $&');
+
+  //Snoot scale
+  funcWithBodyParts = assertReplace(funcWithBodyParts, /\.4/, 'window.snakeScale.face * 0.4');
+
+  //eval(funcWithBodyParts);
+
+  //Function for fruit (ES6 class method render(a,b) on v12+)
+  let fruitRegex = /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\([$a-zA-Z0-9_]{0,6},0,0,[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},-[$a-zA-Z0-9_]{0,6}\/2,-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/;
+
+  let funcWithFruit_Origin = findFunctionInCode(code, /render\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)$/,
+    fruitRegex,
+    deleteModDebug);
+
+  let funcWithFruit = findFunctionInCode(code, /render\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)$/,
+    fruitRegex,
+    deleteModDebug);
+
+  //Regular fruit vs poison fruit. `nla` marks the poisonous half of the fruit set in poison mode.
+  funcWithFruit = assertReplace(funcWithFruit, fruitRegex,
+    '(window.visiFullPass || (b.nla ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit)) && $&');
+
+  //Mirrored copy (in twin/infinity layouts), using the same poison marker.
+  funcWithFruit = assertReplace(funcWithFruit, /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\([$a-zA-Z0-9_]{0,6},0,0,[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},-\([$a-zA-Z0-9_]{0,6}\/2\),-\([$a-zA-Z0-9_]{0,6}\/2\),[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/,
+    '(window.visiFullPass || (b.nla ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit)) && $&');
+
+  //For compatitibilty, also change this code for animatedSnakeColours
+  /*
+  //Commented out until I find a new way to do animated Snake Colours
+  funcWithFruit = assertReplaceAll(funcWithFruit,'"#578A34"', '((typeof animateSnakeGlobals !== "undefined" && animateSnakeGlobals.voice.isBorderSet) ? animateSnakeGlobals.voice.borderColour : "#578A34")');
+  */
+
+  //eval(funcWithFruit);
+
+
+  // Walls / locks (ES6 class render(a) over Ca.Aa values)
+  let wallInsideRegex = /this\.[$a-zA-Z0-9_]{0,6}\.Ca\.Aa\.values\(\)/;
+
+  let funcWithRenderWall_Origin = findFunctionInCode(code, /render\([$a-zA-Z0-9_]{0,6}\)$/,
+    wallInsideRegex,
+    deleteModDebug);
+
+  let funcWithRenderWall = findFunctionInCode(code, /render\([$a-zA-Z0-9_]{0,6}\)$/,
+    wallInsideRegex,
+    deleteModDebug);
+
+  //for walls / locks / hotdog walls (same renderer; distinguished by k.ez and k.XNa)
+  funcWithRenderWall = assertReplace(funcWithRenderWall, /this\.[$a-zA-Z0-9_]{0,6}\.fillRect\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/,
+    '(k.ez?window.checkboxes.checkboxStatuses.hotdogWalls:(k.XNa!==void 0&&k.XNa>=0?window.checkboxes.checkboxStatuses.locks:window.checkboxes.checkboxStatuses.walls))&&$&');
+
+  //lock icon on wall
+  funcWithRenderWall = assertReplace(funcWithRenderWall, /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\([$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6}\)\.[$a-zA-Z0-9_]{0,6}\.canvas,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\*128,0,128,128,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/,
+    'window.checkboxes.checkboxStatuses.locks && $&');
+
+
+  //Sokoban box (TaF-style helper)
+  let sokobanInsideRegex = /[$a-zA-Z0-9_]{0,6}\([a-z]\.settings,7\)&&![a-z]\)\{[a-z]=new/;
+
+  let funcWithSokoban_Origin = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)$/,
+    sokobanInsideRegex,
+    deleteModDebug);
+
+  let funcWithSokoban = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)$/,
+    sokobanInsideRegex,
+    deleteModDebug);
+
+  //Sokoban mirrored
+  funcWithSokoban = assertReplace(funcWithSokoban, /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.drawImage\([$a-zA-Z0-9_]{0,6}\([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)\.[$a-zA-Z0-9_]{0,6}\.canvas,128,0,128,128,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/,
+    '(window.checkboxes.checkboxStatuses.sokobanBox || window.visiFullPass) && $&');
+
+  //Sokoban normal
+  funcWithSokoban = assertReplace(funcWithSokoban, /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.drawImage\([$a-zA-Z0-9_]{0,6}\([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)\.[$a-zA-Z0-9_]{0,6}\.canvas,0,0,128,128,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/,
+    '(window.checkboxes.checkboxStatuses.sokobanBox || window.visiFullPass) && $&');
+
+  //  eval(funcWithSokoban);
+
+  SokoGoalRegex = /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.drawImage\([$a-zA-Z0-9_]{0,6}\([$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)\.[$a-zA-Z0-9_]{0,6}\.canvas,[$a-zA-Z0-9_]{0,6}\*128,0,128,128,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\/2\+[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\/2\+[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/
+
+  //Sokoban goal func
+  let funcWithSokobanGoal_Origin = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e\)$/,
+    SokoGoalRegex,
+    deleteModDebug);
+
+  let funcWithSokobanGoal = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a,b,c,d,e\)$/,
+    SokoGoalRegex,
+    deleteModDebug);
+
+  //Sokoban goal
+  funcWithSokobanGoal = assertReplace(funcWithSokobanGoal, SokoGoalRegex,
+    'window.checkboxes.checkboxStatuses.sokobanGoal && $&');
+
+  //eval(funcWithSokobanGoal);
+
+
+  //Shadow
+  let funcWithShadow_Origin = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\([$a-zA-Z0-9_]{0,6}\)$/, /destination-atop/, deleteModDebug);
+
+  let funcWithShadow = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\([$a-zA-Z0-9_]{0,6}\)$/, /destination-atop/, deleteModDebug);
+
+  funcWithShadow = assertReplace(funcWithShadow, /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.globalCompositeOperation="destination-atop";/, 'if(!window.checkboxes.checkboxStatuses.shadow){return}$&')
+
+
+  //Normal background (i.e not on infinity)
+
+  let funcWithBackground_Origin = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a\)$/,
+    /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.fillRect\(0,0,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.canvas\.width,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.canvas\.height\);for/,
+    deleteModDebug);
+
+  let funcWithBackground = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\(a\)$/,
+    /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.fillRect\(0,0,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.canvas\.width,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.canvas\.height\);for/,
+    deleteModDebug);
+
+  funcWithBackground = assertReplace(funcWithBackground, /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.fillRect\(0,0,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.canvas\.width,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.canvas\.height\);/,
+    'if(window.checkboxes.checkboxStatuses.lightTiles){$&}');
+
+  funcWithBackground = assertReplace(funcWithBackground, /[a-z]\.[$a-zA-Z0-9_]{0,6}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6},[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)/,
+    'window.checkboxes.checkboxStatuses.darkTiles && $&');
+
+  //eval(funcWithBackground);
+
+  let funcWithMiscRendering_Origin = findFunctionInCode(code, /render\(a,b\)$/,
+    /this\.context\.fillRect\(0,0,this\.context\.canvas\.width,this\.context\.canvas\.height\);/,
+    deleteModDebug);
+
+  let funcWithMiscRendering = findFunctionInCode(code, /render\(a,b\)$/,
+    /this\.context\.fillRect\(0,0,this\.context\.canvas\.width,this\.context\.canvas\.height\);/,
+    deleteModDebug);
+
+  //Background for infinity is also contained in funcWithFruit
+  //For outer wall. This is the full canvas fill that everything else is drawn on top of
+  funcWithMiscRendering = assertReplace(funcWithMiscRendering, /this\.context\.fillRect\(0,0,this\.context\.canvas\.width,this\.context\.canvas\.height\);/,
+    'window.checkboxes.checkboxStatuses.border && $&');
+
+  //Border strips drawn around the board on mobile layouts
+  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /this\.context\.fillRect\((?!0,0,this\.context\.canvas\.width,this\.context\.canvas\.height\))[^)]*\)/g,
+    'window.checkboxes.checkboxStatuses.border && $&');
+
+  //For light tiles (infinity). The infinity board renders through a local alias rather than `this`
+  funcWithMiscRendering = assertReplace(funcWithMiscRendering, /(?<![$a-zA-Z0-9_.])(?!this\.)[$a-zA-Z0-9_]{1,6}\.context\.fillRect\(0,0,[$a-zA-Z0-9_]{1,6}\.context\.canvas\.width,[$a-zA-Z0-9_]{1,6}\.context\.canvas\.height\);/,
+    'window.checkboxes.checkboxStatuses.lightTiles && $&');
+
+  //For dark tiles (infinity)
+  funcWithMiscRendering = assertReplace(funcWithMiscRendering, /[$a-zA-Z0-9_]{1,6}\.context\.fillRect\([$a-zA-Z0-9_]{1,6}\*[$a-zA-Z0-9_.]{1,24}-[$a-zA-Z0-9_]{1,6}\.x\+[$a-zA-Z0-9_]{1,6}\.x,[$a-zA-Z0-9_]{1,6}\*[$a-zA-Z0-9_.]{1,24}-[$a-zA-Z0-9_]{1,6}\.y\+[$a-zA-Z0-9_]{1,6}\.y,[$a-zA-Z0-9_.]{1,24},[$a-zA-Z0-9_.]{1,24}\)/,
+    'window.checkboxes.checkboxStatuses.darkTiles && $&');
+
+  //Light mode: snake-head glow (TbF) vs apple glow (fruit list loop)
+  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /TbF\(/g,
+    'window.checkboxes.checkboxStatuses.lightSnake&&TbF(');
+
+  funcWithMiscRendering = assertReplace(funcWithMiscRendering, /(for\(let [$a-zA-Z0-9_]{1,6} of [$a-zA-Z0-9_]{1,6}\.wb\.wa\.ka\)\{)/,
+    'if(window.checkboxes.checkboxStatuses.lightFruit)$1');
+
+  //Inline active bridges/gates drawn in the compositor (not only via helper functions)
+  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /f7\(this\.settings,20\)/g,
+    'f7(this.settings,20)&&window.checkboxes.checkboxStatuses.bridges');
+  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /f7\(this\.settings,19\)/g,
+    'f7(this.settings,19)&&window.checkboxes.checkboxStatuses.gates');
+
+  //Snake, fruit, keys and boxes are drawn into the sprite layer, and the shadow is taken straight
+  //off that layer's silhouette. When Shadow Included is off and something is hidden, duplicating
+  //that stretch keeps a complete silhouette for the shadow while the visible pass honours the
+  //checkboxes. Everything in the stretch only paints the sprite layer, so running it twice has no
+  //other effect.
+  let shadowFnName = funcWithShadow_Origin.match(/^([$a-zA-Z0-9_]{1,6})=function/)[1];
+  let sceneRegionRegex = new RegExp(
+    '(this\\.[$a-zA-Z0-9_]{1,6}\\.render\\(a,b,[$a-zA-Z0-9_]{1,6}\\(this\\)\\);[\\s\\S]*?)' +
+    '(f7\\(this\\.settings,4\\)\\|\\|' + shadowFnName.replace(/\$/g, '\\$') + '\\(this\\);)');
+
+  funcWithMiscRendering = assertReplace(funcWithMiscRendering, sceneRegionRegex,
+    'window.visiBeginShadowPass(this,f7(this.settings,4));$1$2if(window.visiEndShadowPass(this)){$1}');
+
+  //eval(funcWithMiscRendering);
+
+  let funcWithLockRendering_Origin = findFunctionInCode(code, /render\(\)$/,
+    /this\.[$a-zA-Z0-9_]{0,6}\.hb\.particles/,
+    false);
+
+  let funcWithLockRendering = findFunctionInCode(code, /render\(\)$/,
+    /this\.[$a-zA-Z0-9_]{0,6}\.hb\.particles/,
+    false);
+
+  //background for falling lock piece
+  funcWithLockRendering = assertReplace(funcWithLockRendering, /this\.[$a-zA-Z0-9_]{0,6}\.fillRect\(-\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\/2\)\*[$a-zA-Z0-9_]{0,6},-\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\/2\)\*[$a-zA-Z0-9_]{0,6},this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\*[$a-zA-Z0-9_]{0,6},this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\*[$a-zA-Z0-9_]{0,6}\)/,
+    'window.checkboxes.checkboxStatuses.locks && $&');
+
+  //lock icon and sokoban icon falling
+  funcWithLockRendering = assertReplace(funcWithLockRendering, /(drawImage\()([a-z]\.type===\n?0\?)([$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)\.[$a-zA-Z0-9_]{0,6}\.canvas):([$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\)\.[$a-zA-Z0-9_]{0,6}\.canvas)/,
+    '$1$2(window.checkboxes.checkboxStatuses.locks ? $3 : new Image()) : (window.checkboxes.checkboxStatuses.sokobanBox ? $4 : new Image())');
+
+  //eval(funcWithLockRendering);
+
+  let funcWithKeyRendering_Origin = findFunctionInCode(code, /render\([$a-zA-Z0-9_]{0,6}\)$/,
+    /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\(\),128\*[a-z]\.type,0,128,128,/,
+    deleteModDebug);
+
+  let funcWithKeyRendering = findFunctionInCode(code, /render\([$a-zA-Z0-9_]{0,6}\)$/,
+    /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\(\),128\*[a-z]\.type,0,128,128,/,
+    deleteModDebug);
+
+  //keys
+  funcWithKeyRendering = assertReplace(funcWithKeyRendering, /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\(\),128\*[a-z]\.type,0,128,128,[a-z]\.[a-z]-[a-z]\/2,[a-z]\.[a-z]-[a-z]\/2,[a-z],[a-z]\)/,
+    '(window.checkboxes.checkboxStatuses.keys || window.visiFullPass) && $&');
+
+  //keys upside down
+  funcWithKeyRendering = assertReplace(funcWithKeyRendering, /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\(\),128\*[a-z]\.type,0,128,128,-\([a-z]\/2\),-\([a-z]\/2\),[a-z],[a-z]\)/,
+    '(window.checkboxes.checkboxStatuses.keys || window.visiFullPass) && $&');
+
+
+  //eval(funcWithKeyRendering);
+
+  let funcWithBodyLines_Origin = findFunctionInCode(code, /render\(a,b,c\)$/,
+    /quadraticCurveTo/,
+    deleteModDebug);
+  let funcWithBodyLines = findFunctionInCode(code, /render\(a,b,c\)$/,
+    /quadraticCurveTo/,
+    deleteModDebug);
+
+if(window.NepDebug){
+  console.log(funcWithBodyLines)
+}
+
+  //Lumps get drawn two different ways depending on the mode: normally as a circle wider than
+  //the body stroke, and in modes that skip those circles as a bulge in the stroke width.
+
+  //Circle version, the only arc that gets its own fillStyle before being filled
+  funcWithBodyLines = assertReplace(funcWithBodyLines, /(this\.[$a-zA-Z0-9_]{0,6}\.beginPath\(\),this\.[$a-zA-Z0-9_]{0,6}\.arc\([$a-zA-Z0-9_]{0,6}\.x,[$a-zA-Z0-9_]{0,6}\.y,[$a-zA-Z0-9_]{0,6},0,2\*Math\.PI\),)(this\.[$a-zA-Z0-9_]{0,6}\.fill\(\))/,
+    '$1(window.flashSnakeStatus.currentlyFlashingSnake || window.checkboxes.checkboxStatuses.lumps || window.visiFullPass) && $2');
+
+  //Stroke width version, the only place the body line width is scaled after being set
+  funcWithBodyLines = assertReplace(funcWithBodyLines, /(this\.[$a-zA-Z0-9_]{0,6}\.lineWidth\*=[$a-zA-Z0-9_]{1,6};)/,
+    'if(window.flashSnakeStatus.currentlyFlashingSnake || window.checkboxes.checkboxStatuses.lumps || window.visiFullPass){$1}');
+
+  funcWithBodyLines = assertReplaceAll(funcWithBodyLines, /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.lineTo\(\n?[$a-zA-Z0-9_]{0,6}\.x,\n?[$a-zA-Z0-9_]{0,6}\.y\)/g,
+    '(window.flashSnakeStatus.currentlyFlashingSnake || window.checkboxes.checkboxStatuses.body || window.visiFullPass) && $&');
+
+  funcWithBodyLines = assertReplaceAll(funcWithBodyLines, /[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.quadraticCurveTo\(\n?[$a-zA-Z0-9_]{0,6}\.x,\n?[$a-zA-Z0-9_]{0,6}\.y,\n?[$a-zA-Z0-9_]{0,6}\.x,\n?[$a-zA-Z0-9_]{0,6}\.y\)/g,
+    '(window.flashSnakeStatus.currentlyFlashingSnake || window.checkboxes.checkboxStatuses.body || window.visiFullPass) && $&');
+
+  //Body scale
+  //funcWithBodyLines = assertReplace(funcWithBodyLines, /\.8/, '(window.snakeScale.tailStart * 0.8)');
+  //funcWithBodyLines = assertReplace(funcWithBodyLines, /\.4/, '(window.snakeScale.tailEnd * 0.4)');
+
+
+  //eval(funcWithBodyLines);
+
+  //Portals
+  let portalInsideRegex = /Math\.cos\([$a-zA-Z0-9_]{0,6}\*2\*Math\.PI\)/;
+
+  let funcWithPortals_Origin = findFunctionInCode(code, /render\([$a-zA-Z0-9_]{0,6}\)$/,
+    portalInsideRegex,
+    deleteModDebug);
+
+  let funcWithPortals = findFunctionInCode(code, /render\([$a-zA-Z0-9_]{0,6}\)$/,
+    portalInsideRegex,
+    deleteModDebug);
+
+  funcWithPortals = assertReplaceAll(funcWithPortals, /[$a-zA-Z0-9_]{0,6}\.fill\(\)/g,
+    'window.checkboxes.checkboxStatuses.portals && $&');
+
+  //eval(funcWithPortals);
+
+  //For flashing snake body when we eat an apple
+  let eatInsideRegex = /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){(?:var|let|const) [$a-zA-Z0-9_]{0,6}=[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=!0/;
+
+  let funcWithEat_Origin = findFunctionInCode(code, /tick\(\)$/,
+    eatInsideRegex,
+    deleteModDebug);
+
+  let funcWithEat = findFunctionInCode(code, /tick\(\)$/,
+    eatInsideRegex,
+    deleteModDebug);
+
+  funcWithEat = assertReplace(funcWithEat, /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){/,
+    '$& window.checkboxes.checkboxStatuses.flashSnake && window.brieflyShowSnake();');
+
+  //funcWithEat = swapInMainClassPrototype(mainClass, funcWithEat);
+  //eval(funcWithEat);
+
+  //Mine radius: the dashed red circle plus its fading blast preview. Both are helper calls
+  //shaped `helper(renderer, centre, offsetX, offsetY, radius)`, once for the board and once per
+  //wrapped copy in infinity mode.
+  let mineRadiusInsideRegex = /strokeStyle="#f23606"/;
+
+  let funcWithMineRadius_Origin = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)$/,
+    mineRadiusInsideRegex,
+    deleteModDebug);
+
+  let funcWithMineRadius = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}=function\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)$/,
+    mineRadiusInsideRegex,
+    deleteModDebug);
+
+  funcWithMineRadius = assertReplaceAll(funcWithMineRadius, /[$a-zA-Z0-9_]{1,6}\([$a-zA-Z0-9_]{1,6},[$a-zA-Z0-9_]{1,6},(?:0,0|[$a-zA-Z0-9_]{1,6}\.x,[$a-zA-Z0-9_]{1,6}\.y),[$a-zA-Z0-9_]{1,6}\)/g,
+    'window.checkboxes.checkboxStatuses.mineRadius && $&');
+
+  //Arrows (mode 16): triangle/stroke tiles (zaF)
+  let arrowsFnMatch = code.match(/([$a-zA-Z0-9_]{1,6})=function\(([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6})\)\{[$a-zA-Z0-9_.]{1,6}\.ka\.save\(\)/);
+  if (!arrowsFnMatch) {
+    throw new Error('Visibility mod: could not find arrow tile drawer (zaF)');
+  }
+  let arrowsFnName = arrowsFnMatch[1];
+  code = assertReplace(code, new RegExp(arrowsFnName + '=function\\(([$a-zA-Z0-9_,]+)\\)\\{'),
+    arrowsFnName + '=function($1){if(!window.checkboxes.checkboxStatuses.arrows)return;');
+
+  //Shields (mode 15): directional bars on fruit via S$E
+  let shieldsFnMatch = code.match(/([$a-zA-Z0-9_$]{1,6})=function\(([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6})=!1\)\{var [$a-zA-Z0-9_]{1,6}=Math\.round\([$a-zA-Z0-9_.]{1,20}\/5\)/);
+  if (!shieldsFnMatch) {
+    throw new Error('Visibility mod: could not find shield drawer (S$E)');
+  }
+  let shieldsFnName = shieldsFnMatch[1];
+  code = assertReplace(code, new RegExp(shieldsFnName.replace(/\$/g, '\\$') + '=function\\(([$a-zA-Z0-9_=!,]+)\\)\\{'),
+    shieldsFnName + '=function($1){if(!window.checkboxes.checkboxStatuses.shields)return;');
+
+  //Gates (mode 19): BbF dashed rectangles
+  let gatesFnMatch = code.match(/([$a-zA-Z0-9_]{1,6})=function\(([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6})\)\{for\(let [$a-zA-Z0-9_]{1,6} of [$a-zA-Z0-9_.]{1,20}\.Yfa\)/);
+  if (!gatesFnMatch) {
+    throw new Error('Visibility mod: could not find gate drawer (BbF)');
+  }
+  let gatesFnName = gatesFnMatch[1];
+  code = assertReplace(code, new RegExp(gatesFnName + '=function\\(([$a-zA-Z0-9_,]+)\\)\\{'),
+    gatesFnName + '=function($1){if(!window.checkboxes.checkboxStatuses.gates)return;');
+
+  //Bridges (mode 20): obF static tiles
+  let bridgesFnMatch = code.match(/([$a-zA-Z0-9_]{1,6})=function\(([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6})\)\{[$a-zA-Z0-9_]{1,6}\.ka\.save\(\);[$a-zA-Z0-9_]{1,6}===0&&[$a-zA-Z0-9_]{1,6}===0\|\|/);
+  if (!bridgesFnMatch) {
+    throw new Error('Visibility mod: could not find bridge drawer (obF)');
+  }
+  let bridgesFnName = bridgesFnMatch[1];
+  code = assertReplace(code, new RegExp(bridgesFnName + '=function\\(([$a-zA-Z0-9_,]+)\\)\\{'),
+    bridgesFnName + '=function($1){if(!window.checkboxes.checkboxStatuses.bridges)return;');
+
+  //Border chrome CSS background-color (same palette index as the canvas border fill)
+  code = assertReplaceAll(code,
+    /_\.on\(([$a-zA-Z0-9_.()]{1,40}),"background-color",([$a-zA-Z0-9_]{1,6}\([$a-zA-Z0-9_.]{1,20},[$a-zA-Z0-9_.]{1,20},3\))\)/g,
+    '($1&&window.visiBorderEls.push($1),window.visiBorderColor=$2,_.on($1,"background-color",window.checkboxes.checkboxStatuses.border?$2:"transparent"))'
+  );
+
+    // Mines
+    /*
+  let funcWithMines_Origin = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.render=function\(a\)$/,
+    /7/,
+    deleteModDebug);
+
+  let funcWithMines = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.render=function\(a\)$/,
+    /7/,
+    deleteModDebug);
+
+    funcWithMines = assertReplaceAll(funcWithMines, /a.Aa.drawImage\(a.oa.canvas,0,a.ka.ka.ka\/6\)/g,
+    'window.checkboxes.checkboxStatuses.mines && $&');
+*/
+
+    // Statue Cracks (best-effort — pattern may be absent on some builds)
+  if (!window.catchError(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.drawImage\([a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\(\),[a-z]\.[$a-zA-Z0-9_]{0,6}\*[a-z],0,[a-z],[a-z],-[a-z]\/2,-[a-z]\/2,[a-z],[a-z]\),[a-z]\.[$a-zA-Z0-9_]{0,6}\.globalAlpha=[a-z]\)/g, code)) {
+  code = code.assertReplace(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.drawImage\([a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\(\),[a-z]\.[$a-zA-Z0-9_]{0,6}\*[a-z],0,[a-z],[a-z],-[a-z]\/2,-[a-z]\/2,[a-z],[a-z]\),[a-z]\.[$a-zA-Z0-9_]{0,6}\.globalAlpha=[a-z]\)/g,
+     'window.checkboxes.checkboxStatuses.brokenStatue && $&')
+  }
+
+     // Statue (including cracks)
+  code = code.assertReplace(/[$a-zA-Z0-9_]{0,6}\(this,[a-z],[a-z],[a-z]\.[$a-zA-Z0-9_]{0,6}\.angle,[a-z]\.[$a-zA-Z0-9_]{0,6}\)/g,
+     `window.checkboxes.checkboxStatuses.statue && $&`)
+
+
+
+  minesDefinition_Origin = code.match(/this\.[a-zA-Z0-9_$]{1,8}=new [a-zA-Z0-9_$]{1,8}\(this.[a-zA-Z0-9_$]{1,8},"snake_arcade\/mine\.png\",10,this\.[a-zA-Z0-9_$]{1,8},"snake_arcade\/pixel\/px_mine\.png\"\)/g)[0]
+
+  window.minesDefined = minesDefinition_Origin.split('=')[0].split('.')[1]
+  window.minesEmptySrc = 'https://i.postimg.cc/LhKWc2Wb/Empty.png'
+  minesDefinition_NewCode = `${minesDefinition_Origin};
+    window.MinesRef=this;
+    window.DefaultMines=${minesDefinition_Origin}
+    window.NoMines=${minesDefinition_Origin.split('=')[1].split('"')[0]} "${window.minesEmptySrc}" ${minesDefinition_Origin.split('"')[2]} "${window.minesEmptySrc}" ${minesDefinition_Origin.split('"')[4]}
+    `
+
+/*
+  mineRadiusWidth_Origin = code.match(/[a-z]\.[$a-zA-Z0-9_]{0,6}\.lineWidth=[a-z]\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\/12;/)[0]
+  mineRadiusWidth = mineRadiusWidth_Origin;
+
+  mineRadiusWidth_Code = `
+  if(window.checkboxes.checkboxStatuses.mineRadius) {
+    ${mineRadiusWidth_Origin}
+  }
+  else {
+    ${mineRadiusWidth_Origin.split('=')[0]}=0;
+  }
+  `
+  */
+  //code = code.assertReplace(/[$a-zA-Z0-9_]{0,6}\(this,[a-z],[a-z],[a-z]\.[$a-zA-Z0-9_]{0,6}\.angle,[a-z]\.[$a-zA-Z0-9_]{0,6}\)/g,
+  //   `window.checkboxes.checkboxStatuses.mines && $&`)
+
+  //code = code.assertReplace(mineRadiusWidth_Origin, mineRadiusWidth_Code)
+  code = code.assertReplace(minesDefinition_Origin, minesDefinition_NewCode)
+  code = code.assertReplace(funcWithMineRadius_Origin, funcWithMineRadius)
+  code = code.assertReplace(funcWithFruit_Origin, funcWithFruit)
+  code = code.assertReplace(funcWithBodyParts_Origin, funcWithBodyParts)
+  code = code.assertReplace(funcWithRenderWall_Origin, funcWithRenderWall)
+  code = code.assertReplace(funcWithSokoban_Origin, funcWithSokoban)
+  code = code.assertReplace(funcWithSokobanGoal_Origin, funcWithSokobanGoal)
+  code = code.assertReplace(funcWithShadow_Origin, funcWithShadow)
+  code = code.assertReplace(funcWithBackground_Origin, funcWithBackground)
+  code = code.assertReplace(funcWithMiscRendering_Origin, funcWithMiscRendering)
+  code = code.assertReplace(funcWithLockRendering_Origin, funcWithLockRendering)
+  code = code.assertReplace(funcWithKeyRendering_Origin, funcWithKeyRendering)
+  code = code.assertReplace(funcWithBodyLines_Origin, funcWithBodyLines)
+  code = code.assertReplace(funcWithPortals_Origin, funcWithPortals)
+  code = code.assertReplace(funcWithEat_Origin, funcWithEat)
+
+  // Disables statue break animation
+  if (!window.catchError(/[$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6},[a-z],new _\.[$a-zA-Z0-9_]{0,6}\([a-z],[a-z]\),[a-z],[a-z]\.[$a-zA-Z0-9_]{0,6}\)/g, code)) {
+  code = code.assertReplace(/[$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6},[a-z],new _\.[$a-zA-Z0-9_]{0,6}\([a-z],[a-z]\),[a-z],[a-z]\.[$a-zA-Z0-9_]{0,6}\)/g,
+     `window.checkboxes.checkboxStatuses.statue && $&`)
+  }
+
+  // Disable minesweeper break animation
+  if (!window.catchError(/[a-z]=_\.[$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\);for\([a-z]=a\.next\(\);/, code)) {
+  code = code.assertReplace(/[a-z]=_\.[$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\);for\([a-z]=a\.next\(\);/,
+  `$& window.checkboxes.checkboxStatuses.mineRadius &&`)
+  }
+
+  //console.log(code)
+  window.isVisi = true;
+
+  return code;
+}
+
+window.VisibilityModCode.runCodeAfter = function () {
+
+};window.MorePudding = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+window.MorePudding.runCodeBefore = function() {
+
+  /*
+    function loadAndRunCodeSynchronous(url) {
+        let req = new XMLHttpRequest();
+        req.open('GET', url, false);
+        req.onload = function() {
+          if(this.status === 200) {
+            (1,eval)(this.responseText);
+          } else {
+            console.log(`Loading selected mod returned non-200 status. Received: ${this.status}`);
+          }
+        };
+        req.onerror = function(event) {
+          console.error(`Error when attempting to retrieve mod code from ${url}`);
+          console.log(event);
+        };
+        req.send();
+      }
+*/
+    //loadAndRunCodeSynchronous('https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakePudding/main/PuddingMod.js');
+    //loadAndRunCodeSynchronous('https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeCustomMenuStuff/main/modloadercode.js');
+
+    console.log("Enabling Pudding Mod");
+    window.PuddingMod.runCodeBefore();
+    window.VisibilityModCode.runCodeBefore();
+    window.moreMenu.runCodeBefore();
+
+}
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.MorePudding.alterSnakeCode = function(code) {
+  return window.moreMenu.alterSnakeCode(window.VisibilityModCode.alterSnakeCode(window.PuddingMod.alterSnakeCode(code)));
+}
+
+
+window.MorePudding.runCodeAfter = function() {
+  //window.moreMenu.runCodeAfter();
+  let modIndicator = document.createElement('div');
+  modIndicator.style='position:absolute;font-family:roboto;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;';
+  modIndicator.textContent = 'More Pudding Mod';
+  let canvasNode = document.getElementsByClassName('jNB0Ic')[0];
+  document.getElementsByClassName('EjCLSb')[0].insertBefore(modIndicator, canvasNode);
+};
+
+window.CandyMod = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+window.CandyMod.runCodeBefore = function () {
+  // MoreMenu intentionally omitted until it supports v12.
+  // Future: window.moreMenu.runCodeBefore();
+
+  console.log("Adding Candy Mode (v12)");
+
+  window.CANDY_ICON = "https://i.postimg.cc/rsSFx6gg/candy.png";
+
+  window.uiImage =
+    window.uiImage ||
+    function (src) {
+      let img = new Image();
+      img.src = src;
+      img.classList.add("DqMRee");
+      img.classList.add("SsAred");
+      return img;
+    };
+
+  document.querySelector("#trophy").appendChild(uiImage(window.CANDY_ICON));
+  window.CANDY_MODE = document.querySelector("#trophy").children.length - 1;
+
+  let trophyEl = document.querySelector('img[src$="trophy_00.png"]');
+  if (trophyEl) {
+    let trophy_jsname = trophyEl.getAttribute("jsname");
+    window.trophy_src =
+      window.trophy_src ||
+      `document.querySelector('img[jsname="${trophy_jsname}"]').src `;
+  }
+
+  window.candy_blending = false;
+
+  window.toggle_candy_blender = function () {
+    window.candy_blending = !window.candy_blending;
+    window.correct_candy_selection();
+  };
+
+  window.correct_candy_selection = function correct_candy_selection() {
+    let el = document.getElementById("remix-candy-blend");
+    if (!el) return;
+    if (window.candy_blending) {
+      el.setAttribute("class", "vuOknd lH9Ipd blender_icon blender_icon_on");
+      el.innerHTML =
+        `<img class="DEvgAc FMN3L blender_icon_img blender_icon_img_selected" src="` +
+        window.CANDY_ICON +
+        `" alt="">`;
+    } else {
+      el.setAttribute("class", "vuOknd blender_icon");
+      el.innerHTML =
+        `<img class="DEvgAc blender_icon_img" src="` +
+        window.CANDY_ICON +
+        `" alt="">`;
+    }
+  };
+
+  window.add_candy_blender_toggle = function add_candy_blender_toggle() {
+    if (document.getElementById("remix-candy-blend")) return;
+    if (!window.populateRemixBlenderSlot) return;
+    window.populateRemixBlenderSlot({
+      id: "remix-candy-blend",
+      slotIndex: 0,
+      icon: window.CANDY_ICON,
+      ariaLabel: "Toggle Candy in Blender",
+      onToggle: window.toggle_candy_blender,
+    });
+    window.correct_candy_selection();
+  };
+
+  window.add_candy_blender_toggle();
+};
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.CandyMod.alterSnakeCode = function (code) {
+  // MoreMenu intentionally omitted until it supports v12.
+  // Future: code = window.moreMenu.alterSnakeCode(code);
+
+  console.log("Coding Candy Mode into the game (v12)");
+
+  window.updateCandyTrophySRC = function updateCandyTrophySRC() {
+    if (window.trophy_src) {
+      eval(window.trophy_src + `= window.CANDY_ICON`);
+    }
+  };
+
+  window.isCandyActive = function isCandyActive() {
+    return (
+      window.CurrentModeNum === window.CANDY_MODE ||
+      (window.CurrentModeNum === 22 && window.candy_blending)
+    );
+  };
+
+  // Death-screen / header trophy URL for custom candy mode
+  let deathscreen_trophy = new RegExp(
+    /a\.settings\.Zb=`https:\/\/www\.google\.com\/logos\/fnbx\/\$\{a\.settings\.Ba===1\?`snake_arcade\/pixel\/v22\/px_trophy_\$\{b\}\.png`:`snake_arcade\/v22\/trophy_\$\{b\}\.png`\}`/
+  );
+  // `b` here is j$E(a.settings.ob) — a zero-padded string, so compare against the
+  // raw numeric mode id instead.
+  if (code.match(deathscreen_trophy)) {
+    code = code.assertReplace(
+      deathscreen_trophy,
+      `a.settings.Zb=(a.settings.ob===window.CANDY_MODE)?window.CANDY_ICON:(a.settings.ob===window.CHESS_MODE)?window.CHESS_ICON:\`https://www.google.com/logos/fnbx/\${a.settings.Ba===1?\`snake_arcade/pixel/v22/px_trophy_\${b}.png\`:\`snake_arcade/v22/trophy_\${b}.png\`}\``
+    );
+  }
+
+  // Blender's mode summary strip builds trophy_NN.png per selected mode; custom
+  // modes have no such file, so point them at their own icons.
+  let blender_mode_icons = new RegExp(
+    /m\$E\(d,`https:\/\/www\.google\.com\/logos\/fnbx\/\$\{`snake_arcade\/v22\/trophy_\$\{j\$E\(c\)\}\.png`\}`\)/
+  );
+  if (code.match(blender_mode_icons)) {
+    code = code.assertReplace(
+      blender_mode_icons,
+      `m$E(d,(c===window.CANDY_MODE)?window.CANDY_ICON:(c===window.CHESS_MODE)?window.CHESS_ICON:\`https://www.google.com/logos/fnbx/\${\`snake_arcade/v22/trophy_\${j$E(c)}.png\`}\`)`
+    );
+  }
+
+  // Refresh topbar trophy when starting a candy game
+  let reset_regex = new RegExp(/a\.ub=a\.ob;a\.ka=a\.Ca;/);
+  if (code.match(reset_regex)) {
+    code = code.assertReplace(
+      reset_regex,
+      `a.ub=a.ob;a.ka=a.Ca;if(window.CurrentModeNum===window.CANDY_MODE){window.updateCandyTrophySRC();}`
+    );
+  }
+
+  // +1..+6 extra length on candy (and blender with candy toggle)
+  let candy_logic = new RegExp(
+    /f7\(this\.settings,3\)\?this\.oa\.Ta\+=2:this\.oa\.Ta\+=1;/
+  );
+  let candy_match = code.match(candy_logic);
+  if (candy_match) {
+    let snake_length = candy_match[0].split("+=")[0].split("?")[1] || "this.oa.Ta";
+    // Prefer the +=1 target: this.oa.Ta
+    snake_length = "this.oa.Ta";
+    let candy_logic_set = `${candy_match[0]}
+    if(window.isCandyActive && window.isCandyActive()) {
+        ${snake_length} += Math.floor(Math.random() * 6);
+    }
+    `;
+    code = code.assertReplace(candy_logic, candy_logic_set);
+  } else {
+    console.error("CandyMod: failed to find length increment regex");
+  }
+
+  // Inject candy/chess into blender mode set builder
+  let blender_foreach = new RegExp(
+    /a\.Ta\.forEach\(\(c,d\)=>\{_\.zm\(c,"lH9Ipd"\)&&b\.push\(d\)\}\)/
+  );
+  if (code.match(blender_foreach)) {
+    code = code.assertReplace(
+      blender_foreach,
+      `a.Ta.forEach((c,d)=>{_.zm(c,"lH9Ipd")&&b.push(d)});if(window.candy_blending&&window.CANDY_MODE!=null)b.push(window.CANDY_MODE);if(window.chess_blending&&window.CHESS_MODE!=null)b.push(window.CHESS_MODE)`
+    );
+  } else {
+    console.error("CandyMod: failed to find blender forEach regex");
+  }
+
+  // Map custom blender panel icons into Ta with correct mode ids.
+  // Must stay an expression (ternary false-branch) — a bare {let ...} block is a SyntaxError.
+  let ta_fallback = new RegExp(
+    /this\.Ta\.set\(22,e\),this\.kl\.set\(e,22\)/
+  );
+  if (code.match(ta_fallback)) {
+    code = code.assertReplace(
+      ta_fallback,
+      `((function(el){var s=el.children[0]&&el.children[0].src||"",m=22;if(window.CANDY_MODE!=null&&s.indexOf("rsSFx6gg")>=0)m=window.CANDY_MODE;else if(window.CHESS_MODE!=null&&s.indexOf("ZqK0CB95")>=0)m=window.CHESS_MODE;this.Ta.set(m,el);this.kl.set(el,m);}).call(this,e))`
+    );
+  }
+
+  return code;
+};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEAFTER
+////////////////////////////////////////////////////////////////////
+
+window.CandyMod.runCodeAfter = function () {
+  window.add_candy_blender_toggle && window.add_candy_blender_toggle();
+};
+
+window.ChessMod = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+window.ChessMod.runCodeBefore = function () {
+  console.log("Adding Chess Mode (v12, independent mode)");
+
+  window.CHESS_ICON = "https://i.postimg.cc/ZqK0CB95/bn.png";
+
+  window.uiImage =
+    window.uiImage ||
+    function (src) {
+      let img = new Image();
+      img.src = src;
+      img.classList.add("DqMRee");
+      img.classList.add("SsAred");
+      return img;
+    };
+
+  // Inject chess piece fruits into Pudding's new_fruit (hidden from fruit picker)
+  window.injectChessFruits = function injectChessFruits() {
+    if (!window.new_fruit || window._chessFruitsInjected) return;
+    window._chessFruitsInjected = true;
+
+    let pieces = [
+      { Normal: "https://i.postimg.cc/NG8bwZw7/bb.png", Pixel: "https://i.postimg.cc/zvbZcVNz/Chess-bishop.png", Real: "https://i.postimg.cc/NG8bwZw7/bb.png" },
+      { Normal: "https://i.postimg.cc/zGNyYP8W/bk.png", Pixel: "https://i.postimg.cc/tRwHVtdY/Chess-king.png", Real: "https://i.postimg.cc/zGNyYP8W/bk.png" },
+      { Normal: "https://i.postimg.cc/ZqK0CB95/bn.png", Pixel: "https://i.postimg.cc/rwC6bBBr/Chess-knight.png", Real: "https://i.postimg.cc/ZqK0CB95/bn.png" },
+      { Normal: "https://i.postimg.cc/fLVLfGf4/bp.png", Pixel: "https://i.postimg.cc/jjxVr8Tk/Chess-pawn.png", Real: "https://i.postimg.cc/fLVLfGf4/bp.png" },
+      { Normal: "https://i.postimg.cc/g0SjRzRq/bq.png", Pixel: "https://i.postimg.cc/J4XC3DKK/Chess-queen.png", Real: "https://i.postimg.cc/g0SjRzRq/bq.png" },
+      { Normal: "https://i.postimg.cc/fL1b288V/br.png", Pixel: "https://i.postimg.cc/CLTmFLXt/Chess-Rook.png", Real: "https://i.postimg.cc/fL1b288V/br.png" },
+      { Normal: "https://i.postimg.cc/nc4L2YBL/wb.png", Pixel: "https://i.postimg.cc/QtnZmcRY/Chess-bishop-white.png", Real: "https://i.postimg.cc/nc4L2YBL/wb.png" },
+      { Normal: "https://i.postimg.cc/4ytxrp0B/wk.png", Pixel: "https://i.postimg.cc/vTJFFb8W/Chess-king-white.png", Real: "https://i.postimg.cc/4ytxrp0B/wk.png" },
+      { Normal: "https://i.postimg.cc/ncbzqws5/wn.png", Pixel: "https://i.postimg.cc/VkcQKfVw/chess-knight-white.png", Real: "https://i.postimg.cc/ncbzqws5/wn.png" },
+      { Normal: "https://i.postimg.cc/VsbvrcNn/wp.png", Pixel: "https://i.postimg.cc/vBTp4ccr/chess-pawn-white.png", Real: "https://i.postimg.cc/VsbvrcNn/wp.png" },
+      { Normal: "https://i.postimg.cc/mgTg5zyy/wq.png", Pixel: "https://i.postimg.cc/JhPf7b47/chess-queen-white.png", Real: "https://i.postimg.cc/mgTg5zyy/wq.png" },
+      { Normal: "https://i.postimg.cc/kgwg3Jj3/wr.png", Pixel: "https://i.postimg.cc/xCZBMnzW/chess-rook-white.png", Real: "https://i.postimg.cc/kgwg3Jj3/wr.png" },
+    ];
+
+    // last_fruit_num is set by Pudding Fruit.make (vanilla menu count - 1)
+    let base = typeof last_fruit_num !== "undefined" ? last_fruit_num : document.querySelector("#apple").children.length - 1;
+
+    // Pudding addresses its own trailing entries by offset from the end of the
+    // array: goldenIndex = length - 6 (the five secret golden fruits) and the
+    // skull poison sprite = length - 1. Appending after them silently rebinds
+    // both to chess pieces, so slot the pieces in ahead of that tail instead.
+    let secretTail = 6;
+    let insertAt = window.new_fruit.length - secretTail;
+    let skull = window.new_fruit[window.new_fruit.length - 1];
+    if (insertAt < 0 || !skull || !/poison-skull/.test(skull.Real || "")) {
+      console.error("ChessMod: Pudding secret-fruit tail not found, appending at end");
+      insertAt = window.new_fruit.length;
+    }
+    let startType = base + 1 + insertAt;
+
+    for (let i = 0; i < pieces.length; i++) {
+      pieces[i].Poison_values = "b,'#eaca23','#909090',20";
+    }
+    window.new_fruit.splice(insertAt, 0, ...pieces);
+
+    // Order pushed: bbishop, bking, bknight, bpawn, bqueen, brook, wbishop, wking, wknight, wpawn, wqueen, wrook
+    window.bbishop = startType;
+    window.bking = startType + 1;
+    window.bknight = startType + 2;
+    window.bpawn = startType + 3;
+    window.bqueen = startType + 4;
+    window.brook = startType + 5;
+    window.wbishop = startType + 6;
+    window.wking = startType + 7;
+    window.wknight = startType + 8;
+    window.wpawn = startType + 9;
+    window.wqueen = startType + 10;
+    window.wrook = startType + 11;
+
+    console.log("Chess fruits injected, wrook=", window.wrook);
+  };
+
+  // Pudding already ran Fruit.make in its runCodeBefore when called from Remix.
+  // Remix calls MorePudding (Pudding → Visibility → MoreMenu) then Chess, so
+  // new_fruit and the Visibility panel both exist by now.
+  if (window.new_fruit) {
+    window.injectChessFruits();
+  }
+
+  // Adds a "Chess Pieces" row to the Visibility panel that MorePudding bundles,
+  // so pieces can be hidden without hiding ordinary fruit.
+  window.addChessVisibilityToggle = function addChessVisibilityToggle() {
+    if (!window.checkboxes || !window.checkboxes.checkboxStatuses) return;
+    let statuses = window.checkboxes.checkboxStatuses;
+    if (statuses.chessPieces === undefined) statuses.chessPieces = true;
+
+    // Pieces are drawn in the same pass as fruit, so the shadow silhouette pass
+    // has to know about the key too or hidden pieces keep their shadows.
+    if (Array.isArray(window.visiShadowPassKeys) && !window.visiShadowPassKeys.includes("chessPieces")) {
+      let at = window.visiShadowPassKeys.indexOf("poison");
+      window.visiShadowPassKeys.splice(at < 0 ? window.visiShadowPassKeys.length : at + 1, 0, "chessPieces");
+    }
+
+    if (document.getElementById("chess-pieces")) return;
+    let lightFruit = document.getElementById("light-fruit");
+    if (!lightFruit) return;
+    let row = lightFruit.closest("li");
+    if (!row || !row.parentElement) return;
+
+    let item = document.createElement("li");
+    item.innerHTML =
+      '<label class="form-check-label"><input class="form-check-input" id="chess-pieces" type="checkbox">Chess Pieces</label>';
+    row.parentElement.insertBefore(item, row.nextSibling);
+
+    let box = item.querySelector("#chess-pieces");
+    box.checked = statuses.chessPieces;
+    box.onchange = function () {
+      window.checkboxes.checkboxStatuses.chessPieces = this.checked;
+    };
+
+    let template = document.getElementById("tooltiptemplate");
+    if (template) {
+      let tooltip = template.content.cloneNode(true);
+      tooltip.querySelector(".tooltiptext").textContent =
+        "Chess pieces spawned by Chess mode. Uncheck to hide pieces while keeping normal fruit visible.";
+      box.parentElement.parentElement.appendChild(tooltip);
+    }
+  };
+
+  window.addChessVisibilityToggle();
+
+  // Own trophy slot (do not wipe other modes / do not steal Shield)
+  document.querySelector("#trophy").appendChild(uiImage(window.CHESS_ICON));
+  window.CHESS_MODE = document.querySelector("#trophy").children.length - 1;
+
+  let trophyEl = document.querySelector('img[src$="trophy_00.png"]');
+  if (trophyEl) {
+    let trophy_jsname = trophyEl.getAttribute("jsname");
+    window.trophy_src =
+      window.trophy_src ||
+      `document.querySelector('img[jsname="${trophy_jsname}"]').src `;
+  }
+
+  // Capture sound
+  fetch(
+    "https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeRemix/main/ChessCapture.mp3"
+  )
+    .then(function (response) {
+      return response.arrayBuffer();
+    })
+    .then(function (buffer) {
+      window.capture_sound = new Audio();
+      window.capture_sound.src = URL.createObjectURL(new Blob([buffer]));
+    })
+    .catch(function () {
+      // Fallback to Chess repo URL while Remix audio may not be published yet
+      fetch(
+        "https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeChess/main/ChessCapture.mp3"
+      )
+        .then(function (r) {
+          return r.arrayBuffer();
+        })
+        .then(function (buffer) {
+          window.capture_sound = new Audio();
+          window.capture_sound.src = URL.createObjectURL(new Blob([buffer]));
+        })
+        .catch(function (err) {
+          console.error("Error loading chess capture sound:", err);
+        });
+    });
+
+  window.chess_blending = false;
+
+  window.toggle_chess_blender = function () {
+    window.chess_blending = !window.chess_blending;
+    window.correct_chess_selection();
+  };
+
+  window.correct_chess_selection = function correct_chess_selection() {
+    let el = document.getElementById("remix-chess-blend");
+    if (!el) return;
+    if (window.chess_blending) {
+      el.setAttribute("class", "vuOknd lH9Ipd blender_icon blender_icon_on");
+      el.innerHTML =
+        `<img class="DEvgAc FMN3L blender_icon_img blender_icon_img_selected" src="` +
+        window.CHESS_ICON +
+        `" alt="">`;
+    } else {
+      el.setAttribute("class", "vuOknd blender_icon");
+      el.innerHTML =
+        `<img class="DEvgAc blender_icon_img" src="` +
+        window.CHESS_ICON +
+        `" alt="">`;
+    }
+  };
+
+  window.add_chess_blender_toggle = function add_chess_blender_toggle() {
+    if (document.getElementById("remix-chess-blend")) return;
+    if (!window.populateRemixBlenderSlot) return;
+    window.populateRemixBlenderSlot({
+      id: "remix-chess-blend",
+      slotIndex: 1,
+      icon: window.CHESS_ICON,
+      ariaLabel: "Toggle Chess in Blender",
+      onToggle: window.toggle_chess_blender,
+    });
+    window.correct_chess_selection();
+  };
+
+  window.add_chess_blender_toggle();
+};
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.ChessMod.alterSnakeCode = function (code) {
+  console.log("Coding Chess Mode into the game (v12)");
+
+  // Ensure fruits exist if alter runs in odd order
+  if (window.new_fruit && !window._chessFruitsInjected) {
+    window.injectChessFruits();
+  }
+
+  // Visibility gates fruit drawing on one checkbox for everything that is not
+  // poison. Split pieces out of that branch so the Chess Pieces row applies.
+  // Both the normal and the twin/infinity mirrored draw carry the same guard.
+  let fruitGate =
+    "(window.visiFullPass || (b.nla ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit))";
+  if (code.includes(fruitGate)) {
+    code = code.replaceAll(
+      fruitGate,
+      "(window.visiFullPass || (b.nla ? window.checkboxes.checkboxStatuses.poison : (b.isPiece ? window.checkboxes.checkboxStatuses.chessPieces : window.checkboxes.checkboxStatuses.fruit)))"
+    );
+  } else {
+    console.error("ChessMod: failed to find Visibility fruit gate for chess pieces");
+  }
+
+  window.PiecesDict = {
+    [window.wrook]: "https://i.postimg.cc/kgwg3Jj3/wr.png",
+    [window.wqueen]: "https://i.postimg.cc/mgTg5zyy/wq.png",
+    [window.wpawn]: "https://i.postimg.cc/VsbvrcNn/wp.png",
+    [window.wknight]: "https://i.postimg.cc/ncbzqws5/wn.png",
+    [window.wking]: "https://i.postimg.cc/4ytxrp0B/wk.png",
+    [window.wbishop]: "https://i.postimg.cc/nc4L2YBL/wb.png",
+    [window.brook]: "https://i.postimg.cc/fL1b288V/br.png",
+    [window.bqueen]: "https://i.postimg.cc/g0SjRzRq/bq.png",
+    [window.bpawn]: "https://i.postimg.cc/fLVLfGf4/bp.png",
+    [window.bknight]: "https://i.postimg.cc/ZqK0CB95/bn.png",
+    [window.bking]: "https://i.postimg.cc/zGNyYP8W/bk.png",
+    [window.bbishop]: "https://i.postimg.cc/NG8bwZw7/bb.png",
+  };
+
+  window.updateTrophySRC = function updateTrophySRC(type) {
+    if (!window.trophy_src) return;
+    if (typeof type === "undefined") {
+      eval(window.trophy_src + `= window.CHESS_ICON`);
+    } else {
+      eval(window.trophy_src + `= window.PiecesDict[` + type + `]`);
+    }
+  };
+
+  window.isChessActive = function isChessActive() {
+    return (
+      window.CurrentModeNum === window.CHESS_MODE ||
+      (window.CurrentModeNum === 22 && window.chess_blending)
+    );
+  };
+
+  window.head_pos = [{ y: 0, x: 0 }];
+  window.head_dir = "RIGHT";
+  window.head_state = "OPEN";
+  window.head_color = "NONE";
+  window.color_turn = "w";
+  window.just_ate = "fruit";
+  window.appleArray = [];
+  window.selectedFruit = 0;
+  window.dice_doubler = 1;
+  window.muted = false;
+
+  // Shield field name on apple objects in v12
+  window.chess_shield_field = "Oba";
+
+  window.shield_all = function shield_all() {
+    if (!window.appleArray) return;
+    // Original Chess: lock EVERY apple (fruit and pieces) while carrying a piece
+    window.appleArray.forEach(function (apple) {
+      apple[window.chess_shield_field] = new Set([
+        "UP",
+        "DOWN",
+        "LEFT",
+        "RIGHT",
+      ]);
+    });
+  };
+
+  window.shield_empty_all = function shield_empty_all() {
+    if (!window.appleArray) return;
+    window.appleArray.forEach(function (apple) {
+      apple[window.chess_shield_field] = undefined;
+    });
+  };
+
+  // Original order: shield_all first, then unlock attempts; OPEN empties shields
+  window.chess_tick_logic = function chess_tick_logic() {
+    if (!window.isChessActive()) return;
+
+    window.shield_all();
+    switch (window.head_state) {
+      case "pawn":
+        window.pawn_open(window.head_pos[0]);
+        break;
+      case "rook":
+        window.rook_open(window.head_pos[0]);
+        break;
+      case "bishop":
+        window.bishop_open(window.head_pos[0]);
+        break;
+      case "knight":
+        window.knight_open(window.head_pos[0]);
+        break;
+      case "king":
+        window.king_open(window.head_pos[0]);
+        break;
+      case "queen":
+        if (!window.rook_open(window.head_pos[0])) {
+          window.bishop_open(window.head_pos[0]);
+        }
+        break;
+      case "OPEN":
+      default:
+        window.shield_empty_all();
+        break;
+    }
+  };
+
+  window.capture_attempt = function capture_attempt(x, y) {
+    // Unlock is not eat: convert exactly one opposite piece to fruit, then OPEN.
+    if (window.head_state === "OPEN") return false;
+    for (let index = 0; index < window.appleArray.length; index++) {
+      let apple = window.appleArray[index];
+      if (
+        apple.isPiece &&
+        apple.pos.x == x &&
+        apple.pos.y == y &&
+        window.head_color != apple.ChessColor
+      ) {
+        window.head_state = "OPEN";
+        if (window.selectedFruit == 22) {
+          let randomNumber = Math.floor(Math.random() * 51 + 1) % 52;
+          let finalResult =
+            randomNumber === 22 ? (randomNumber + 1) % 52 : randomNumber;
+          apple.type = finalResult;
+        } else {
+          apple.type = window.selectedFruit;
+        }
+        apple.isPiece = false;
+        window.shield_empty_all();
+
+        if (!window.muted && window.capture_sound) {
+          window.capture_sound.play();
+        }
+        return true;
+      }
+    }
+    return false;
+  };
+
+  window.capture_loop = function capture_loop(headPos, possibleMoves) {
+    for (let index = 0; index < possibleMoves.length; index++) {
+      let element = possibleMoves[index];
+      if (
+        window.capture_attempt(headPos.x + element.dx, headPos.y - element.dy)
+      ) {
+        break;
+      }
+    }
+  };
+
+  window.pawn_open = function pawn_open(headPos) {
+    window.capture_loop(headPos, [
+      { dx: -1, dy: -1 },
+      { dx: -1, dy: 1 },
+      { dx: 1, dy: 1 },
+      { dx: 1, dy: -1 },
+    ]);
+  };
+
+  window.king_open = function king_open(headPos) {
+    window.capture_loop(headPos, [
+      { dx: -1, dy: -1 },
+      { dx: -1, dy: 1 },
+      { dx: 1, dy: 1 },
+      { dx: 1, dy: -1 },
+      { dx: 0, dy: -1 },
+      { dx: -1, dy: 0 },
+      { dx: 1, dy: 0 },
+      { dx: 0, dy: 1 },
+    ]);
+  };
+
+  window.knight_open = function knight_open(headPos) {
+    window.capture_loop(headPos, [
+      { dx: -1, dy: 2 },
+      { dx: -2, dy: 1 },
+      { dx: -2, dy: -1 },
+      { dx: -1, dy: -2 },
+      { dx: 2, dy: 1 },
+      { dx: 1, dy: 2 },
+      { dx: 1, dy: -2 },
+      { dx: 2, dy: -1 },
+    ]);
+  };
+
+  function getClosestPiecesToRook(rookPos, pieces) {
+    const closestPieces = {
+      up: { piece: null, distance: Infinity },
+      down: { piece: null, distance: Infinity },
+      left: { piece: null, distance: Infinity },
+      right: { piece: null, distance: Infinity },
+    };
+
+    pieces.forEach(function (piece) {
+      const distance =
+        Math.abs(piece.pos.x - rookPos.x) + Math.abs(piece.pos.y - rookPos.y);
+
+      if (
+        piece.pos.x === rookPos.x &&
+        piece.pos.y < rookPos.y &&
+        distance < closestPieces.up.distance
+      ) {
+        closestPieces.up = { piece: piece, distance: distance };
+      } else if (
+        piece.pos.x === rookPos.x &&
+        piece.pos.y > rookPos.y &&
+        distance < closestPieces.down.distance
+      ) {
+        closestPieces.down = { piece: piece, distance: distance };
+      } else if (
+        piece.pos.y === rookPos.y &&
+        piece.pos.x < rookPos.x &&
+        distance < closestPieces.left.distance
+      ) {
+        closestPieces.left = { piece: piece, distance: distance };
+      } else if (
+        piece.pos.y === rookPos.y &&
+        piece.pos.x > rookPos.x &&
+        distance < closestPieces.right.distance
+      ) {
+        closestPieces.right = { piece: piece, distance: distance };
+      }
+    });
+
+    return Object.values(closestPieces)
+      .map(function (o) {
+        return o.piece;
+      })
+      .filter(function (piece) {
+        return piece !== null;
+      });
+  }
+
+  window.rook_open = function rook_open(headPos) {
+    let closestPieces = getClosestPiecesToRook(headPos, window.appleArray);
+    for (let index = 0; index < closestPieces.length; index++) {
+      let element = closestPieces[index];
+      if (element.ChessColor != window.head_color) {
+        return window.capture_attempt(element.pos.x, element.pos.y);
+      }
+    }
+    return false;
+  };
+
+  function getDistance(dx, dy) {
+    return Math.abs(dx) + Math.abs(dy);
+  }
+
+  function getClosestPiecesToBishop(bishopPos, pieces) {
+    const closestPieces = {};
+
+    pieces.forEach(function (piece) {
+      const dx = piece.pos.x - bishopPos.x;
+      const dy = piece.pos.y - bishopPos.y;
+
+      if (Math.abs(dx) === Math.abs(dy)) {
+        const direction =
+          (dx < 0 ? "left-" : "right-") + (dy < 0 ? "up" : "down");
+
+        if (
+          !closestPieces[direction] ||
+          getDistance(dx, dy) <
+            getDistance(
+              closestPieces[direction].pos.x - bishopPos.x,
+              closestPieces[direction].pos.y - bishopPos.y
+            )
+        ) {
+          closestPieces[direction] = piece;
+        }
+      }
+    });
+
+    return Object.values(closestPieces).sort(function (a, b) {
+      return (
+        getDistance(a.pos.x - bishopPos.x, a.pos.y - bishopPos.y) -
+        getDistance(b.pos.x - bishopPos.x, b.pos.y - bishopPos.y)
+      );
+    });
+  }
+
+  window.bishop_open = function bishop_open(headPos) {
+    let closestPieces = getClosestPiecesToBishop(headPos, window.appleArray);
+    for (let index = 0; index < closestPieces.length; index++) {
+      let element = closestPieces[index];
+      if (element.ChessColor != window.head_color) {
+        return window.capture_attempt(element.pos.x, element.pos.y);
+      }
+    }
+    return false;
+  };
+
+  window.getRandomPiece = function getRandomPiece() {
+    const randomNumber = Math.floor(Math.random() * 16) + 1;
+    if (randomNumber <= 8) return "pawn";
+    if (randomNumber <= 10) return "knight";
+    if (randomNumber <= 12) return "bishop";
+    if (randomNumber <= 14) return "rook";
+    if (randomNumber === 15) return "queen";
+    return "king";
+  };
+
+  window.SwitchTurn = function SwitchTurn() {
+    window.color_turn = window.color_turn == "b" ? "w" : "b";
+  };
+
+  window.randomize_pieces = function randomize_pieces() {
+    for (let index = 0; index < window.appleArray.length; index++) {
+      let element = window.appleArray[index];
+      element.ChessPiece = window.getRandomPiece();
+      element.ChessColor = window.color_turn;
+      element.isPiece = true;
+      element.type = window[window.color_turn + element.ChessPiece];
+      window.SwitchTurn();
+    }
+  };
+
+  window.findApple = function findApple(headPos, appleArray) {
+    for (let index = 0; index < appleArray.length; index++) {
+      let element = appleArray[index];
+      if (element.pos.x == headPos.x && element.pos.y == headPos.y) {
+        element.myIndex = index;
+        return element;
+      }
+    }
+    return null;
+  };
+
+  // --- Legal spawn helpers (board bounds, snake, fruits/pieces) ---
+  window.chess_pos_key = function chess_pos_key(pos) {
+    if (!pos || pos.x == null || pos.y == null) return null;
+    return (pos.x << 16) | (pos.y & 65535);
+  };
+
+  window.chess_board_size = function chess_board_size(board) {
+    const box = board && board.oa;
+    if (!box) return null;
+    return { width: box.width | 0, height: box.height | 0 };
+  };
+
+  window.chess_in_bounds = function chess_in_bounds(board, pos) {
+    const size = window.chess_board_size(board);
+    if (!size || !pos || pos.x == null || pos.y == null) return false;
+    return (
+      pos.x >= 0 &&
+      pos.y >= 0 &&
+      pos.x < size.width &&
+      pos.y < size.height
+    );
+  };
+
+  // Occupied keys: snake segments + every apple except skipIndexes.
+  window.chess_occupied_keys = function chess_occupied_keys(
+    game,
+    apples,
+    skipIndexes
+  ) {
+    const keys = new Set();
+    const skip =
+      skipIndexes instanceof Set
+        ? skipIndexes
+        : new Set(skipIndexes || []);
+    if (game && game.oa && Array.isArray(game.oa.ka)) {
+      for (let i = 0; i < game.oa.ka.length; i++) {
+        const seg = game.oa.ka[i];
+        const k = window.chess_pos_key(seg);
+        if (k != null) keys.add(k);
+      }
+    }
+    const list = apples || [];
+    for (let i = 0; i < list.length; i++) {
+      if (skip.has(i)) continue;
+      const k = window.chess_pos_key(list[i] && list[i].pos);
+      if (k != null) keys.add(k);
+    }
+    return keys;
+  };
+
+  window.chess_is_legal_spawn = function chess_is_legal_spawn(
+    board,
+    pos,
+    occupiedKeys
+  ) {
+    if (!window.chess_in_bounds(board, pos)) return false;
+    if (!occupiedKeys) return true;
+    const k = window.chess_pos_key(pos);
+    return k == null || !occupiedKeys.has(k);
+  };
+
+  // Native Tb bans cells with l7(board, head, cell) <= 3 when portal/shield
+  // spawn (b===2). Chess enables shield via f7(..., 15), so new piece spawns
+  // must keep the same head radius. Start-layout (iaF) positions are exempt.
+  window.chess_spawn_radius = 3;
+
+  window.chess_spawn_dist = function chess_spawn_dist(board, from, to) {
+    if (!from || !to) return Infinity;
+    if (typeof l7 === "function" && board) {
+      try {
+        return l7(board, from, to);
+      } catch (_e) {}
+    }
+    return Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
+  };
+
+  window.chess_outside_spawn_radius = function chess_outside_spawn_radius(
+    game,
+    pos,
+    maxDist
+  ) {
+    if (!pos || pos.x == null || pos.y == null) return false;
+    const limit =
+      maxDist == null ? window.chess_spawn_radius : maxDist;
+    const snake = game && game.oa;
+    const head = snake && snake.ka && snake.ka[0];
+    if (!head) return true;
+    const board = game.ka || (game.wa && game.wa.oa) || null;
+    if (window.chess_spawn_dist(board, head, pos) <= limit) return false;
+    // Twin snake: also ban the head-radius mirror, matching Tb.
+    if (
+      snake &&
+      snake.settings &&
+      typeof f7 === "function" &&
+      f7(snake.settings, 7) &&
+      typeof k7 === "function" &&
+      board
+    ) {
+      try {
+        const twin = k7(board, pos);
+        if (
+          twin &&
+          window.chess_spawn_dist(board, head, twin) <= limit
+        ) {
+          return false;
+        }
+      } catch (_e) {}
+    }
+    return true;
+  };
+
+  window.chess_make_pos = function chess_make_pos(x, y) {
+    if (typeof _ !== "undefined" && _ && typeof _.Sd === "function") {
+      return new _.Sd(x, y);
+    }
+    return { x: x, y: y };
+  };
+
+  // Prefer native freePos/Tb (spawn radius); validate; fall back to board scan
+  // that still enforces the same head radius (never unrestricted).
+  window.chess_find_legal_spawn = function chess_find_legal_spawn(
+    board,
+    freePos,
+    occupiedKeys,
+    excludeRef
+  ) {
+    const game = window.__remixGame;
+    const ok = function (p) {
+      return (
+        p &&
+        window.chess_is_legal_spawn(board, p, occupiedKeys) &&
+        window.chess_outside_spawn_radius(game, p)
+      );
+    };
+    if (typeof freePos === "function" && board) {
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const p = freePos(board, excludeRef || null, 2);
+        if (ok(p)) return p;
+      }
+    }
+    if (game && typeof game.Tb === "function") {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const p = game.Tb(excludeRef || null, 2);
+        if (ok(p)) return p;
+      }
+    }
+    const size = window.chess_board_size(board);
+    if (!size || size.width <= 0 || size.height <= 0) return null;
+    const total = size.width * size.height;
+    const start = Math.floor(Math.random() * total);
+    for (let n = 0; n < total; n++) {
+      const i = (start + n) % total;
+      const x = i % size.width;
+      const y = (i / size.width) | 0;
+      const pos = window.chess_make_pos(x, y);
+      if (ok(pos)) return pos;
+    }
+    return null;
+  };
+
+  window.chess_assign_piece = function chess_assign_piece(el) {
+    el.ChessPiece = window.getRandomPiece();
+    el.ChessColor = window.color_turn;
+    el.isPiece = true;
+    el.type = window[window.color_turn + el.ChessPiece];
+    el.Oba = undefined;
+    window.SwitchTurn();
+  };
+
+  // Drop or relocate any apple whose cell is off-board / on snake / overlapping.
+  // Returns false if the list had to shrink to stay even and legal.
+  window.chess_sanitize_spawns = function chess_sanitize_spawns(
+    mgr,
+    freePos,
+    fromIndex
+  ) {
+    if (!mgr || !mgr.ka) return true;
+    const board = mgr.oa;
+    const game = window.__remixGame;
+    const start = fromIndex == null ? 0 : fromIndex;
+    let ok = true;
+    for (let i = start; i < mgr.ka.length; i++) {
+      const el = mgr.ka[i];
+      if (!el || !el.pos) continue;
+      const occ = window.chess_occupied_keys(game, mgr.ka, new Set([i]));
+      if (window.chess_is_legal_spawn(board, el.pos, occ)) continue;
+      const fixed = window.chess_find_legal_spawn(board, freePos, occ, null);
+      if (!fixed) {
+        mgr.ka.splice(i, 1);
+        i--;
+        ok = false;
+        continue;
+      }
+      if (typeof el.pos.clone === "function" && fixed.clone) {
+        el.pos = fixed.clone();
+      } else {
+        el.pos.x = fixed.x;
+        el.pos.y = fixed.y;
+      }
+    }
+    window.appleArray = mgr.ka;
+    return ok;
+  };
+
+  // Fruit eat: the game removes the eaten fruit (we skip its reposition), and this
+  // spawns exactly 2 new pieces. All-or-nothing: if either cell is unavailable
+  // under the spawn radius, neither spawns. Returns how many were added.
+  window.chess_fruit_respawn = function chess_fruit_respawn(
+    mgr,
+    makeApple,
+    freePos,
+    pickType
+  ) {
+    if (!mgr || !mgr.ka) return 0;
+    if (typeof makeApple !== "function") return 0;
+    const board = mgr.oa;
+    const game = window.__remixGame;
+    window.appleArray = mgr.ka;
+
+    const occ = window.chess_occupied_keys(game, mgr.ka, new Set());
+    const posA = window.chess_find_legal_spawn(board, freePos, occ, null);
+    if (!posA) return 0;
+    const keyA = window.chess_pos_key(posA);
+    occ.add(keyA);
+    const posB = window.chess_find_legal_spawn(board, freePos, occ, null);
+    if (!posB || window.chess_pos_key(posB) === keyA) return 0;
+
+    const mk = function (pos) {
+      let dup = makeApple(mgr, 0, 0);
+      if (typeof pos.clone === "function") {
+        dup.pos = pos.clone();
+      } else {
+        dup.pos.x = pos.x;
+        dup.pos.y = pos.y;
+      }
+      if (typeof pickType === "function") dup.type = pickType(mgr);
+      // Cm is the game's spawn-in animation flag (cleared by manager refresh()).
+      dup.Cm = true;
+      dup.cM = 0;
+      dup.nD = 0;
+      window.chess_assign_piece(dup);
+      return dup;
+    };
+    mgr.ka.push(mk(posA), mk(posB));
+
+    // Re-validate the committed pair; drop both together if anything is off.
+    const iA = mgr.ka.length - 2;
+    const iB = mgr.ka.length - 1;
+    const occA = window.chess_occupied_keys(game, mgr.ka, new Set([iA]));
+    const occB = window.chess_occupied_keys(game, mgr.ka, new Set([iB]));
+    const okA =
+      window.chess_is_legal_spawn(board, mgr.ka[iA].pos, occA) &&
+      window.chess_outside_spawn_radius(game, mgr.ka[iA].pos);
+    const okB =
+      window.chess_is_legal_spawn(board, mgr.ka[iB].pos, occB) &&
+      window.chess_outside_spawn_radius(game, mgr.ka[iB].pos);
+    const same =
+      window.chess_pos_key(mgr.ka[iA].pos) ===
+      window.chess_pos_key(mgr.ka[iB].pos);
+    if (!okA || !okB || same) {
+      mgr.ka.splice(iA, 2);
+      window.appleArray = mgr.ka;
+      return 0;
+    }
+    window.appleArray = mgr.ka;
+    return 2;
+  };
+
+  // Convert newly spawned apples (trailing count from qaF) into alternating pieces.
+  // Relocate illegal cells; drop what cannot be placed; keep an even count.
+  window.chess_convert_new_apples = function chess_convert_new_apples(mgr, added) {
+    if (!mgr || !mgr.ka || !added || added <= 0) return;
+    window.appleArray = mgr.ka;
+    let start = mgr.ka.length - added;
+    for (let i = start; i < mgr.ka.length; i++) {
+      window.chess_assign_piece(mgr.ka[i]);
+    }
+    // Prefer native freePos via game.Tb when sanitizing qaF results.
+    const freePos =
+      window.__remixGame && typeof window.__remixGame.Tb === "function"
+        ? function (board, excl, radius) {
+            return window.__remixGame.Tb(excl, radius);
+          }
+        : null;
+    window.chess_sanitize_spawns(mgr, freePos, start);
+    window.appleArray = mgr.ka;
+  };
+
+  // True while the snake head is standing on a chess piece (checked live, before
+  // the score hook splices it out of appleArray).
+  window.chess_eating_piece = function chess_eating_piece() {
+    if (!window.isChessActive || !window.isChessActive()) return false;
+    if (!window.head_pos || !window.appleArray) return false;
+    let apple = window.findApple(window.head_pos[0], window.appleArray);
+    return !!(apple && apple.isPiece);
+  };
+
+  // --- Code patches for v12 ---
+
+  // Make Chess activate Shield physics via f7(..., 15)
+  let f7_regex = new RegExp(
+    /f7=function\(a,b\)\{return a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b\}/
+  );
+  if (code.match(f7_regex)) {
+    code = code.assertReplace(
+      f7_regex,
+      `f7=function(a,b){var r=a.Qa?a.Jc.has(b):a.ub===22&&a.ZSa.has(b)?!0:a.ub===b;if(!r&&b===15&&window.CHESS_MODE!=null){if(a.ub===window.CHESS_MODE)return!0;if(a.ub===22&&a.ZSa&&a.ZSa.has(window.CHESS_MODE))return!0;}return r}`
+    );
+  } else {
+    console.error("ChessMod: failed to patch f7");
+  }
+
+  // Inject into game tick: track head + run chess unlock logic BEFORE other updates.
+  // Visibility may have already patched this tick(); keep the matcher loose.
+  // Also expose __remixGame for the Playwright harness.
+  let tick_regex = /\}tick\(\)\{/;
+  if (code.match(/\}tick\(\)\{var a=this\.Aa,b=this\.lj;/)) {
+    code = code.assertReplace(
+      /\}tick\(\)\{var a=this\.Aa,b=this\.lj;/,
+      `}tick(){window.__remixGame=this;if(window.isChessActive&&window.isChessActive()){try{window.head_pos=this.oa.ka;window.head_dir=this.oa.direction;window.appleArray=this.wa.ka;window.chess_tick_logic();}catch(_ce){console.error("ChessMod: tick failed",_ce);}}var a=this.Aa,b=this.lj;`
+    );
+  } else if (code.match(tick_regex)) {
+    code = code.assertReplace(
+      tick_regex,
+      `}tick(){window.__remixGame=this;if(window.isChessActive&&window.isChessActive()){try{window.head_pos=this.oa.ka;window.head_dir=this.oa.direction;window.appleArray=this.wa.ka;window.chess_tick_logic();}catch(_e){}}`
+    );
+  } else {
+    console.error("ChessMod: failed to find tick()");
+  }
+
+  // On apple manager reset: chess state + Portal pair layout (iaF force).
+  // Pudding prepends timer code to reset(){ so we must NOT match reset(){this.ka=[] —
+  // only the inner this.ka=[] / iaF line that still exists after Pudding.
+  if (code.match(/this\.ka=\[\];var a=iaF\(this\.settings\)/)) {
+    code = code.assertReplace(
+      /this\.ka=\[\];var a=iaF\(this\.settings\)/,
+      `this.ka=[];window.appleArray=this.ka;window.head_dir="RIGHT";window.head_state="OPEN";window.head_color="NONE";window.color_turn="w";window.just_ate="fruit";var a=iaF(this.settings)||!!(window.isChessActive&&window.isChessActive())`
+    );
+  } else if (code.match(/var a=iaF\(this\.settings\)/)) {
+    code = code.assertReplace(
+      /var a=iaF\(this\.settings\)/,
+      `var a=iaF(this.settings)||!!(window.isChessActive&&window.isChessActive())`
+    );
+  } else {
+    console.error("ChessMod: failed to find iaF apple-layout flag");
+  }
+
+  // After shield Oba init on reset: turn the apples into alternating pieces, start OPEN
+  // Note: Pudding rewrites $$E -> doubleDE before this runs
+  let after_shield_init = new RegExp(
+    /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);/
+  );
+  if (code.match(after_shield_init)) {
+    code = code.assertReplace(
+      after_shield_init,
+      `if(f7(this.settings,15))for(let q of this.ka)q.Oba=doubleDE(this,q.pos);if(window.isChessActive&&window.isChessActive()){try{window.appleArray=this.ka;window.randomize_pieces();window.shield_empty_all();}catch(_ce){console.error("ChessMod: reset failed",_ce);}}`
+    );
+  } else {
+    console.error("ChessMod: failed to find shield init on reset");
+  }
+
+  // Collision cleanup: remove doomed apples in pairs while chess (keep even count)
+  let pair_splice = new RegExp(
+    /f7\(this\.settings,2\)\?n%2===0\?\(this\.ka\.splice\(n,2\),n--\):\(this\.ka\.splice\(n-\s*1,2\),n-=2\)/
+  );
+  if (code.match(pair_splice)) {
+    code = code.assertReplace(
+      pair_splice,
+      `(f7(this.settings,2)||(window.isChessActive&&window.isChessActive()))?n%2===0?(this.ka.splice(n,2),n--):(this.ka.splice(n-1,2),n-=2)`
+    );
+  } else {
+    console.error("ChessMod: failed to find pair-splice on reset");
+  }
+
+  // Portal pair-spawn in qaF: include chess so fruit eats / dice / bomb double via all-or-nothing pairs
+  let qaf_pair = new RegExp(
+    /f7\(a\.settings,\s*2\)&&!f\?/
+  );
+  if (code.match(qaf_pair)) {
+    code = code.assertReplace(
+      qaf_pair,
+      `(f7(a.settings,2)||(window.isChessActive&&window.isChessActive()))&&!f?`
+    );
+  } else {
+    console.error("ChessMod: failed to find qaF portal pair condition");
+  }
+
+  // After qaF adds apples (+ optional shields), convert new ones to chess pieces
+  let qaf_after_oba = new RegExp(
+    /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(f7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.Oba=doubleDE\(a,c\.pos\);/
+  );
+  if (code.match(qaf_after_oba)) {
+    code = code.assertReplace(
+      qaf_after_oba,
+      `g=a.ka.length-g;if(e!==void 0)for(c=0;c<g;c++)a.ka[a.ka.length-1-c].sequenceNumber=e;if(f7(a.settings,15))for(e=0;e<g;e++)c=a.ka[a.ka.length-1-e],c.Oba=doubleDE(a,c.pos);if(window.isChessActive&&window.isChessActive()&&g>0){window.chess_convert_new_apples(a,g);}`
+    );
+  } else {
+    console.error("ChessMod: failed to find qaF trailing convert hook");
+  }
+
+  // Track selected fruit
+  let case_apple = new RegExp(/case "apple":/);
+  if (code.match(case_apple)) {
+    code = code.assertReplace(
+      case_apple,
+      `case "apple":window.selectedFruit=d;`
+    );
+  }
+
+  // Mute tracking
+  let muted = new RegExp(/this\.muted=!this\.muted;/);
+  if (code.match(muted)) {
+    code = code.assertReplace(
+      muted,
+      `this.muted=!this.muted;window.muted=this.muted;`
+    );
+  }
+
+  // Do NOT multiply dice roll by 2 — Portal pairing already doubles (R apples -> 2R pieces).
+
+  // Score / eat: pieces never score; fruit scores; native qaF pairing handles respawn pieces
+  let score_regex = new RegExp(/this\.Oh\+\+;/);
+  if (code.match(score_regex)) {
+    code = code.assertReplace(
+      score_regex,
+      `if(window.isChessActive&&window.isChessActive()){let _ae=window.findApple(window.head_pos[0],window.appleArray);if(_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;}else if(_ae&&_ae.isPiece){window.just_ate='piece';window.head_state=_ae.ChessPiece;window.updateTrophySRC(_ae.type);window.head_color=_ae.ChessColor;window.shield_all();}else{window.just_ate='fruit';this.Oh++;}}else{this.Oh++;}`
+    );
+  } else {
+    console.error("ChessMod: failed to find score increment");
+  }
+
+  // Don't grow when eating a chess piece. This runs before the score hook, so the
+  // piece is still in appleArray and can be detected live.
+  let snakeLength = new RegExp(
+    /f7\(this\.settings,3\)\?this\.oa\.Ta\+=2:this\.oa\.Ta\+=1;/
+  );
+  if (code.match(snakeLength)) {
+    code = code.assertReplace(
+      snakeLength,
+      `f7(this.settings,3)?this.oa.Ta+=2:this.oa.Ta+=1;if(window.chess_eating_piece&&window.chess_eating_piece()){this.oa.Ta-=f7(this.settings,3)?2:1;}`
+    );
+  }
+
+  // Also block Candy's random length bonus on chess piece pickup
+  let candy_len_bonus = new RegExp(
+    /if\(window\.isCandyActive && window\.isCandyActive\(\)\) \{\s*this\.oa\.Ta \+= Math\.floor\(Math\.random\(\) \* 6\);\s*\}/
+  );
+  if (code.match(candy_len_bonus)) {
+    code = code.assertReplace(
+      candy_len_bonus,
+      `if(window.isCandyActive && window.isCandyActive() && !(window.chess_eating_piece&&window.chess_eating_piece())) {this.oa.Ta += Math.floor(Math.random() * 6);}`
+    );
+  }
+
+  // Prevent native shield clear from fighting chess shields:
+  // f7(this.settings,15)&&(maF(this.wa,Wd),...)
+  let shield_clear = new RegExp(
+    /f7\(this\.settings,15\)&&\(maF\(this\.wa,([a-zA-Z0-9_$]+)\),/
+  );
+  if (code.match(shield_clear)) {
+    code = code.assertReplace(
+      shield_clear,
+      `f7(this.settings,15)&&!(window.isChessActive&&window.isChessActive())&&(maF(this.wa,$1),`
+    );
+  }
+
+  // Chess never uses the native reposition (Mn): Xh=!1 makes the game splice the
+  // eaten apple, so a piece eat removes only that piece and a fruit eat spawns
+  // exactly 2 fresh pieces through chess_fruit_respawn.
+  // Dice (ka 4), Tally (ka 6) and pre-first-explosion Bomb (ka 5) keep their own
+  // refills, which the game fires when the board empties; Key/Soko spawn elsewhere.
+  let spawn = new RegExp(
+    /else\{let Ni=e7\(this\.settings\)\|\|f7\(this\.settings,7\);Xh=this\.Mn\(vd,!Ni,null\)\}/
+  );
+  if (code.match(spawn)) {
+    code = code.assertReplace(
+      spawn,
+      `else{if(window.isChessActive&&window.isChessActive()){Xh=!1;if(window.just_ate==='fruit'&&!(this.settings.ka===4||this.settings.ka===6||(this.settings.ka===5&&!this.hc)||f7(this.settings,8)||f7(this.settings,9))){window.chess_fruit_respawn(this.wa,h7,oaF,aaF);}}else{let Ni=e7(this.settings)||f7(this.settings,7);Xh=this.Mn(vd,!Ni,null);}}`
+    );
+  } else {
+    console.error("ChessMod: failed to find Mn respawn path");
+  }
+
+  // Tally wave refill (sdF) spawns 5 slots; Chess needs 10 pieces per wave.
+  // Each slot gets its own tally index, so we raise the slot count instead of
+  // routing through iaF pairing — paired slots share one sequence number, and
+  // since every Chess eat advances the tally counter the twin would never
+  // become edible again. Fewer than 10 spawn when the board has no room.
+  let tally_wave = new RegExp(
+    /var b=f7\(a\.settings,11\)\?10:5;a\.wa\.wa=1;/
+  );
+  if (code.match(tally_wave)) {
+    code = code.assertReplace(
+      tally_wave,
+      `var b=(f7(a.settings,11)||(window.isChessActive&&window.isChessActive()))?10:5;a.wa.wa=1;`
+    );
+  } else {
+    console.error("ChessMod: failed to find tally wave size");
+  }
+
+  // New piece placement after fruit eaten — handled by qaF pair spawn + chess_convert_new_apples
+
+  // On play start with chess: set trophy icon (dice_doubler unused; pairing doubles)
+  let play_start = new RegExp(/a\.ub=a\.ob;a\.ka=a\.Ca;/);
+  if (code.indexOf("updateCandyTrophySRC") >= 0) {
+    code = code.assertReplace(
+      /if\(window\.CurrentModeNum===window\.CANDY_MODE\)\{window\.updateCandyTrophySRC\(\);\}/,
+      `if(window.CurrentModeNum===window.CANDY_MODE){window.updateCandyTrophySRC();}if(window.CurrentModeNum===window.CHESS_MODE){window.updateTrophySRC();}`
+    );
+  } else if (code.match(play_start)) {
+    code = code.assertReplace(
+      play_start,
+      `a.ub=a.ob;a.ka=a.Ca;if(window.CurrentModeNum===window.CHESS_MODE){window.updateTrophySRC();}`
+    );
+  }
+
+  return code;
+};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEAFTER
+////////////////////////////////////////////////////////////////////
+
+window.ChessMod.runCodeAfter = function () {
+  window.add_chess_blender_toggle && window.add_chess_blender_toggle();
+};
+
+window.BurgerMod = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+window.BurgerMod.runCodeBefore = function () {
+  console.log("Adding Burger Mode (v12)");
+
+  window.BURGER_ICON = "https://i.postimg.cc/13m2Cr16/burger.png";
+
+  window.uiImage =
+    window.uiImage ||
+    function (src) {
+      let img = new Image();
+      img.src = src;
+      img.classList.add("DqMRee");
+      img.classList.add("SsAred");
+      return img;
+    };
+
+  document.querySelector("#trophy").appendChild(uiImage(window.BURGER_ICON));
+  window.BURGER_MODE = document.querySelector("#trophy").children.length - 1;
+
+  let trophyEl = document.querySelector('img[src$="trophy_00.png"]');
+  if (trophyEl) {
+    let trophy_jsname = trophyEl.getAttribute("jsname");
+    window.trophy_src =
+      window.trophy_src ||
+      `document.querySelector('img[jsname="${trophy_jsname}"]').src `;
+  }
+
+  window.burger_blending = false;
+
+  window.toggle_burger_blender = function () {
+    window.burger_blending = !window.burger_blending;
+    window.correct_burger_selection();
+  };
+
+  window.correct_burger_selection = function correct_burger_selection() {
+    let el = document.getElementById("remix-burger-blend");
+    if (!el) return;
+    if (window.burger_blending) {
+      el.setAttribute("class", "vuOknd lH9Ipd blender_icon blender_icon_on");
+      el.innerHTML =
+        `<img class="DEvgAc FMN3L blender_icon_img blender_icon_img_selected" src="` +
+        window.BURGER_ICON +
+        `" alt="">`;
+    } else {
+      el.setAttribute("class", "vuOknd blender_icon");
+      el.innerHTML =
+        `<img class="DEvgAc blender_icon_img" src="` +
+        window.BURGER_ICON +
+        `" alt="">`;
+    }
+  };
+
+  window.add_burger_blender_toggle = function add_burger_blender_toggle() {
+    if (document.getElementById("remix-burger-blend")) return;
+    if (!window.populateRemixBlenderSlot) return;
+    window.populateRemixBlenderSlot({
+      id: "remix-burger-blend",
+      slotIndex: 2,
+      icon: window.BURGER_ICON,
+      ariaLabel: "Toggle Burger in Blender",
+      onToggle: window.toggle_burger_blender,
+    });
+    window.correct_burger_selection();
+  };
+
+  window.add_burger_blender_toggle();
+};
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.BurgerMod.alterSnakeCode = function (code) {
+  console.log("Coding Burger Mode into the game (v12)");
+
+  window.isBurgerActive = function isBurgerActive() {
+    return (
+      window.CurrentModeNum === window.BURGER_MODE ||
+      (window.CurrentModeNum === 22 && window.burger_blending)
+    );
+  };
+
+  window.updateBurgerTrophySRC = function updateBurgerTrophySRC() {
+    if (window.trophy_src) {
+      eval(window.trophy_src + `= window.BURGER_ICON`);
+    }
+  };
+
+  window.burger_fruits_eaten = 0;
+
+  window.burger_board_box = function burger_board_box() {
+    const g = window.__remixGame;
+    if (!g) return null;
+    const box =
+      (g.ka && g.ka.oa) ||
+      (g.wa && g.wa.oa && g.wa.oa.oa) ||
+      (g.oa && g.oa.oa);
+    if (!box) return null;
+    return { width: box.width | 0, height: box.height | 0 };
+  };
+
+  // Body-segment count (not Ta growth queue). Used by timers and late-game.
+  window.burger_snake_length = function burger_snake_length(game) {
+    const g = game || window.__remixGame;
+    if (g && g.oa && g.oa.ka) return g.oa.ka.length | 0;
+    // Apple manager uses .Aa for the snake reference.
+    if (g && g.Aa && g.Aa.ka) return g.Aa.ka.length | 0;
+    return 0;
+  };
+
+  // No stagger. Base is corner-to-corner (W+H) − 7. Timer grows +1 with
+  // snake length until half the board, then shrinks −1 per segment after that.
+  window.burger_timer_roll = function burger_timer_roll(game) {
+    const box = window.burger_board_box();
+    if (!box || box.width <= 0 || box.height <= 0) return 25;
+    const base = box.width + box.height - 7;
+    const half = Math.floor((box.width * box.height) / 2);
+    const L = window.burger_snake_length(game);
+    const delta = L <= half ? L : 2 * half - L;
+    return Math.max(1, base + delta);
+  };
+
+  window.burger_assign_timer = function burger_assign_timer(apple, game) {
+    if (!apple || apple.nla) return;
+    const t = window.burger_timer_roll(game);
+    apple.burgerTimer = t;
+    apple.burgerTimerMax = t;
+    apple.burgerGrey = 0;
+  };
+
+  window.burger_assign_timers_all = function burger_assign_timers_all(
+    apples,
+    game
+  ) {
+    if (!apples) return;
+    for (let i = 0; i < apples.length; i++) {
+      window.burger_assign_timer(apples[i], game);
+    }
+  };
+
+  // Cache greyscale on the apple (updated from tick, every 3 ticks). Draw
+  // reads apple.burgerGrey only — no per-frame math or canvas.filter.
+  window.burger_update_grey = function burger_update_grey(apple) {
+    if (!apple || apple.nla || !(apple.burgerTimerMax > 0)) {
+      if (apple) apple.burgerGrey = 0;
+      return;
+    }
+    const elapsed = Math.max(
+      0,
+      apple.burgerTimerMax - Math.max(0, apple.burgerTimer | 0)
+    );
+    const stepped = Math.floor(elapsed / 3) * 3;
+    apple.burgerGrey =
+      stepped <= 0
+        ? 0
+        : Math.min(100, Math.floor((stepped / apple.burgerTimerMax) * 100));
+  };
+
+  window.burger_fresh_count = function burger_fresh_count(apples) {
+    let n = 0;
+    if (!apples) return 0;
+    for (let i = 0; i < apples.length; i++) {
+      if (apples[i] && !apples[i].nla) n++;
+    }
+    return n;
+  };
+
+  // Returns how many poisons were removed from below `beforeIndex`, so callers
+  // holding an index into mgr.ka can shift it back by that much.
+  window.burger_clear_all_poisons = function burger_clear_all_poisons(
+    mgr,
+    beforeIndex
+  ) {
+    if (!mgr || !mgr.ka) return 0;
+    const limit = beforeIndex == null ? mgr.ka.length : beforeIndex;
+    let removedBefore = 0;
+    for (let i = mgr.ka.length - 1; i >= 0; i--) {
+      if (mgr.ka[i] && mgr.ka[i].nla) {
+        mgr.ka.splice(i, 1);
+        if (i < limit) removedBefore++;
+      }
+    }
+    return removedBefore;
+  };
+
+  window.burger_head_neighbor_keys = function burger_head_neighbor_keys(game) {
+    const keys = new Set();
+    const head = game && game.oa && game.oa.ka && game.oa.ka[0];
+    if (!head) return keys;
+    const pts = [
+      [head.x, head.y - 1],
+      [head.x, head.y + 1],
+      [head.x - 1, head.y],
+      [head.x + 1, head.y],
+    ];
+    for (let i = 0; i < pts.length; i++) {
+      keys.add((pts[i][0] << 16) | (pts[i][1] & 65535));
+    }
+    return keys;
+  };
+
+  window.burger_late_game = function burger_late_game(game) {
+    const box = window.burger_board_box();
+    if (!box) return false;
+    const L = window.burger_snake_length(game);
+    return L >= box.width * box.height - 5;
+  };
+
+  // Pick a legal free cell for a new fresh fruit. Returns null if none.
+  window.burger_find_spawn_pos = function burger_find_spawn_pos(game) {
+    if (!game || typeof game.Tb !== "function") return null;
+    const board = game.ka;
+    const box = board && board.oa;
+    if (!box) return null;
+    const late = window.burger_late_game(game);
+    const banned = late ? window.burger_head_neighbor_keys(game) : null;
+    const keyOf = function (p) {
+      return (p.x << 16) | (p.y & 65535);
+    };
+    // Prefer native free-cell picker (spawn radius / occupancy), then filter.
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const p = game.Tb(null, 2);
+      if (!p) break;
+      if (
+        p.x >= 0 &&
+        p.y >= 0 &&
+        p.x < box.width &&
+        p.y < box.height &&
+        (!banned || !banned.has(keyOf(p)))
+      ) {
+        return p;
+      }
+    }
+    // Exhaustive scan fallback (still respect late-game ban).
+    const occupied = new Set();
+    if (game.oa && game.oa.ka) {
+      for (let i = 0; i < game.oa.ka.length; i++) {
+        const s = game.oa.ka[i];
+        if (s) occupied.add(keyOf(s));
+      }
+    }
+    if (game.wa && game.wa.ka) {
+      for (let i = 0; i < game.wa.ka.length; i++) {
+        const a = game.wa.ka[i];
+        if (a && a.pos) occupied.add(keyOf(a.pos));
+      }
+    }
+    const candidates = [];
+    for (let x = 0; x < box.width; x++) {
+      for (let y = 0; y < box.height; y++) {
+        const k = (x << 16) | (y & 65535);
+        if (occupied.has(k)) continue;
+        if (banned && banned.has(k)) continue;
+        candidates.push(
+          typeof _ !== "undefined" && _.Sd ? new _.Sd(x, y) : { x: x, y: y }
+        );
+      }
+    }
+    if (!candidates.length) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  };
+
+  window.burger_trigger_win = function burger_trigger_win(game) {
+    if (!game || game.lj) return;
+    try {
+      if (typeof ybF !== "undefined" && ybF.WIN) ybF.WIN.play();
+    } catch (_e) {}
+    game.ub = true;
+    game.lj = true;
+    try {
+      if (typeof vdF === "function") vdF(game.menu, 1400, game.Oh);
+    } catch (_e2) {}
+  };
+
+  // Type index of Pudding's skull sprite, the one its "Skull Poison Fruit"
+  // setting swaps poisons to. Pudding maps new_fruit[i] to last_fruit_num+1+i.
+  window.burger_skull_type = function burger_skull_type() {
+    const fruits = window.new_fruit;
+    if (!Array.isArray(fruits)) return null;
+    const base =
+      typeof last_fruit_num !== "undefined"
+        ? last_fruit_num
+        : document.querySelector("#apple").children.length - 1;
+    for (let i = 0; i < fruits.length; i++) {
+      if (fruits[i] && /poison-skull/.test(fruits[i].Real || "")) {
+        return base + 1 + i;
+      }
+    }
+    return null;
+  };
+
+  window.burger_make_poison = function burger_make_poison(apple, game) {
+    if (!apple) return;
+    // Poison keeps the fruit's original max as its lifetime — no grey indicator.
+    const life = apple.burgerTimerMax | 0;
+    apple.nla = true;
+    apple.burgerGrey = 0;
+    if (life > 0) {
+      apple.burgerTimer = life;
+      apple.burgerTimerMax = life;
+    } else {
+      const t = window.burger_timer_roll(game);
+      apple.burgerTimer = t;
+      apple.burgerTimerMax = t;
+    }
+    // nla alone only greys the fruit out, and Pudding's skull swap is behind a
+    // user setting. Burger always wants the skull, so set the type directly.
+    const skull = window.burger_skull_type();
+    if (skull != null) apple.type = skull;
+    else console.error("BurgerMod: could not resolve Pudding skull fruit type");
+  };
+
+  window.burger_spawn_fresh = function burger_spawn_fresh(game, sequenceNumber) {
+    const pos = window.burger_find_spawn_pos(game);
+    if (!pos) return false;
+    const mgr = game.wa;
+    if (!mgr) return false;
+    // Prefer native qaF (sets Cm animation, type, etc.) with no-pairing flag.
+    // Pass sequenceNumber through so Tally replacements stay on the open index.
+    if (typeof window.__qaF === "function") {
+      const before = mgr.ka.length;
+      window.__qaF(mgr, pos, void 0, true, sequenceNumber, true);
+      if (mgr.ka.length > before) {
+        const last = mgr.ka[mgr.ka.length - 1];
+        last.nla = false;
+        if (sequenceNumber !== undefined) last.sequenceNumber = sequenceNumber;
+        window.burger_assign_timer(last, game);
+        return true;
+      }
+    }
+    if (typeof window.__h7 === "function") {
+      const apple = window.__h7(mgr, 0, 0);
+      if (typeof pos.clone === "function") apple.pos = pos.clone();
+      else {
+        apple.pos.x = pos.x;
+        apple.pos.y = pos.y;
+      }
+      apple.Cm = true;
+      apple.nla = false;
+      apple.Gh = true;
+      if (sequenceNumber !== undefined) apple.sequenceNumber = sequenceNumber;
+      if (typeof window.__aaF === "function") apple.type = window.__aaF(mgr);
+      window.burger_assign_timer(apple, game);
+      mgr.ka.push(apple);
+      return true;
+    }
+    return false;
+  };
+
+  // Expire one fresh apple to poison, then try to spawn a replacement.
+  window.burger_expire_apple = function burger_expire_apple(game, apple) {
+    const seq = apple && apple.sequenceNumber;
+    window.burger_make_poison(apple, game);
+    const spawned = window.burger_spawn_fresh(game, seq);
+    const freshLeft = window.burger_fresh_count(game.wa.ka);
+    if (!spawned && freshLeft === 0) {
+      window.burger_trigger_win(game);
+    }
+  };
+
+  // Poison timer ran out — just remove it (no replacement, no indicator).
+  window.burger_despawn_poison = function burger_despawn_poison(game, apple) {
+    if (!game || !game.wa || !game.wa.ka || !apple) return;
+    const i = game.wa.ka.indexOf(apple);
+    if (i >= 0) game.wa.ka.splice(i, 1);
+  };
+
+  window.burger_apple_timer_eligible = function burger_apple_timer_eligible(
+    game,
+    apple
+  ) {
+    if (!apple) return false;
+    // Poisons always count down (no tally gate, no grey overlay).
+    if (apple.nla) return true;
+    // Tally: only the current index ages for fresh fruit.
+    if (game.settings && game.settings.ka === 6) {
+      const cur = game.wa ? game.wa.wa : 1;
+      if (apple.sequenceNumber !== undefined && apple.sequenceNumber !== cur) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  window.burger_tick_logic = function burger_tick_logic() {
+    if (!window.isBurgerActive || !window.isBurgerActive()) return;
+    const game = window.__remixGame;
+    if (!game || !game.wa || !game.wa.ka || game.lj) return;
+    const apples = game.wa.ka;
+    const toExpire = [];
+    for (let i = 0; i < apples.length; i++) {
+      const a = apples[i];
+      if (!window.burger_apple_timer_eligible(game, a)) continue;
+      if (a.burgerTimer == null) {
+        if (a.nla) {
+          const t = window.burger_timer_roll(game);
+          a.burgerTimer = t;
+          a.burgerTimerMax = t;
+        } else {
+          window.burger_assign_timer(a, game);
+        }
+      }
+      // Already at zero: resolve once, never keep decrementing past it.
+      if ((a.burgerTimer | 0) <= 0) {
+        a.burgerTimer = 0;
+        toExpire.push(a);
+        continue;
+      }
+      a.burgerTimer = (a.burgerTimer | 0) - 1;
+      if (a.burgerTimer <= 0) {
+        a.burgerTimer = 0;
+        if (!a.nla) a.burgerGrey = 100;
+        toExpire.push(a);
+      } else if (!a.nla && (a.burgerTimerMax - a.burgerTimer) % 3 === 0) {
+        // Only refresh the cached overlay every 3 ticks (fresh fruit only).
+        window.burger_update_grey(a);
+      }
+    }
+    for (let i = 0; i < toExpire.length; i++) {
+      if (game.lj) break;
+      const a = toExpire[i];
+      if (apples.indexOf(a) < 0) continue;
+      if (a.nla) window.burger_despawn_poison(game, a);
+      else window.burger_expire_apple(game, a);
+    }
+  };
+
+  // Poisons are no longer cleared on fresh eat — they keep their own timers.
+  // Still clear the eaten slot's timer so Mn's reused apple gets a new roll.
+  window.burger_on_fresh_eaten = function burger_on_fresh_eaten(
+    game,
+    eatenIndex
+  ) {
+    if (!game || !game.wa) return eatenIndex;
+    window.just_ate = "fruit";
+    window.burger_fruits_eaten = (window.burger_fruits_eaten | 0) + 1;
+    const eaten = game.wa.ka[eatenIndex | 0];
+    if (eaten && !eaten.nla) {
+      eaten.burgerTimer = null;
+      eaten.burgerTimerMax = null;
+      eaten.burgerGrey = 0;
+    }
+    return eatenIndex | 0;
+  };
+
+  window.burger_after_respawn = function burger_after_respawn(game) {
+    if (!game || !game.wa) return;
+    // Only apples that still lack a timer (the Mn-reused eaten slot, or a brand
+    // new spawn) get a roll. Existing countdowns are left alone.
+    for (let i = 0; i < game.wa.ka.length; i++) {
+      const a = game.wa.ka[i];
+      if (a && !a.nla && a.burgerTimer == null) {
+        window.burger_assign_timer(a, game);
+      }
+    }
+  };
+
+  // --- Patches ---
+
+  // Burger patches the output of every earlier mod, so when one stops matching
+  // it helps to see the exact text it was matched against.
+  if (window.RemixDebug) window.__remixPreBurgerCode = code;
+
+  // Extend Chess-patched f7 (or raw) so Burger activates Poison mode (10).
+  if (
+    code.match(
+      /f7=function\(a,b\)\{var r=a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b;if\(!r&&b===15&&window\.CHESS_MODE!=null\)/
+    )
+  ) {
+    code = code.assertReplace(
+      /f7=function\(a,b\)\{var r=a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b;if\(!r&&b===15&&window\.CHESS_MODE!=null\)\{if\(a\.ub===window\.CHESS_MODE\)return!0;if\(a\.ub===22&&a\.ZSa&&a\.ZSa\.has\(window\.CHESS_MODE\)\)return!0;\}return r\}/,
+      `f7=function(a,b){var r=a.Qa?a.Jc.has(b):a.ub===22&&a.ZSa.has(b)?!0:a.ub===b;if(!r&&b===15&&window.CHESS_MODE!=null){if(a.ub===window.CHESS_MODE)return!0;if(a.ub===22&&a.ZSa&&a.ZSa.has(window.CHESS_MODE))return!0;}if(!r&&b===10&&window.BURGER_MODE!=null){if(a.ub===window.BURGER_MODE)return!0;if(a.ub===22&&a.ZSa&&a.ZSa.has(window.BURGER_MODE))return!0;}return r}`
+    );
+  } else if (
+    code.match(
+      /f7=function\(a,b\)\{return a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b\}/
+    )
+  ) {
+    code = code.assertReplace(
+      /f7=function\(a,b\)\{return a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b\}/,
+      `f7=function(a,b){var r=a.Qa?a.Jc.has(b):a.ub===22&&a.ZSa.has(b)?!0:a.ub===b;if(!r&&b===10&&window.BURGER_MODE!=null){if(a.ub===window.BURGER_MODE)return!0;if(a.ub===22&&a.ZSa&&a.ZSa.has(window.BURGER_MODE))return!0;}return r}`
+    );
+  } else {
+    console.error("BurgerMod: failed to patch f7 for poison mode");
+  }
+
+  // Classic layout: iaF must ignore Burger's f7(10).
+  if (code.match(/iaF=function\(a\)\{return f7\(a,2\)\|\|f7\(a,8\)\|\|f7\(a,9\)\|\|f7\(a,10\)\}/)) {
+    code = code.assertReplace(
+      /iaF=function\(a\)\{return f7\(a,2\)\|\|f7\(a,8\)\|\|f7\(a,9\)\|\|f7\(a,10\)\}/,
+      `iaF=function(a){return f7(a,2)||f7(a,8)||f7(a,9)||(f7(a,10)&&!(window.isBurgerActive&&window.isBurgerActive()))}`
+    );
+  } else {
+    console.error("BurgerMod: failed to patch iaF");
+  }
+
+  // Suppress Poison's paF auto-poison twin spawn for Burger.
+  if (code.match(/f7\(a\.settings,10\)&&!f&&paF\(a\)/)) {
+    code = code.assertReplace(
+      /f7\(a\.settings,10\)&&!f&&paF\(a\)/,
+      `f7(a.settings,10)&&!f&&!(window.isBurgerActive&&window.isBurgerActive())&&paF(a)`
+    );
+  } else {
+    console.error("BurgerMod: failed to patch paF gate");
+  }
+
+  // Native Poison pairs every other apple as poison at game start / after some
+  // spawns (uaF). That is exactly the "5a starts with 2 poisons" bug. Gate every
+  // call site and the function itself.
+  {
+    const uaFCalls = code.match(
+      /f7\((?:this|a)\.settings,10\)\s*&&\s*uaF\((?:this|a)\.wa\)/g
+    );
+    if (uaFCalls && uaFCalls.length) {
+      code = code.replace(
+        /f7\((this|a)\.settings,10\)\s*&&\s*uaF\(\1\.wa\)/g,
+        `f7($1.settings,10)&&!(window.isBurgerActive&&window.isBurgerActive())&&uaF($1.wa)`
+      );
+    } else {
+      console.error("BurgerMod: failed to patch uaF call sites");
+    }
+  }
+  if (
+    code.match(
+      /uaF=function\(a\)\{for\(let b=0;b\+1<a\.ka\.length;b\+=2\)\{let c=Math\.random\(\)<\.5;\s*a\.ka\[b\]\.nla=c;a\.ka\[b\+1\]\.nla=!c\}\}/
+    )
+  ) {
+    code = code.assertReplace(
+      /uaF=function\(a\)\{for\(let b=0;b\+1<a\.ka\.length;b\+=2\)\{let c=Math\.random\(\)<\.5;\s*a\.ka\[b\]\.nla=c;a\.ka\[b\+1\]\.nla=!c\}\}/,
+      `uaF=function(a){if(window.isBurgerActive&&window.isBurgerActive())return;for(let b=0;b+1<a.ka.length;b+=2){let c=Math.random()<.5;a.ka[b].nla=c;a.ka[b+1].nla=!c}};window.__uaF=uaF`
+    );
+  } else {
+    console.error("BurgerMod: failed to patch uaF function");
+  }
+
+  // Portal-pair path inside qaF also flips nla on the new pair under Poison.
+  if (
+    code.match(
+      /f7\(a\.settings,10\)&&\(c=Math\.random\(\)<\.5,a\.ka\[a\.ka\.length-1\]\.nla=c,a\.ka\[a\.ka\.length-2\]\.nla=!c\)/
+    )
+  ) {
+    code = code.assertReplace(
+      /f7\(a\.settings,10\)&&\(c=Math\.random\(\)<\.5,a\.ka\[a\.ka\.length-1\]\.nla=c,a\.ka\[a\.ka\.length-2\]\.nla=!c\)/,
+      `f7(a.settings,10)&&!(window.isBurgerActive&&window.isBurgerActive())&&(c=Math.random()<.5,a.ka[a.ka.length-1].nla=c,a.ka[a.ka.length-2].nla=!c)`
+    );
+  } else {
+    console.error("BurgerMod: failed to patch qaF nla pair");
+  }
+
+  // Native Poison also top-ups poisons after a fresh eat (keep ≥ half poisoned).
+  // Burger piles poisons only via timers, so disable that refill.
+  // Only the paF call is rewritten: MoreMenu respaces the operators in this
+  // statement, so matching the whole `if` verbatim is too brittle.
+  const poisonTopUp =
+    /(for\(let Ok of hd\.ka\)Ok\.nla\s*&&\s*Ni\+\+;Ni<hd\.ka\.length\/2\s*&&\s*)paF\(hd\)/;
+  if (code.match(poisonTopUp)) {
+    code = code.assertReplace(
+      poisonTopUp,
+      `$1!(window.isBurgerActive&&window.isBurgerActive())&&paF(hd)`
+    );
+  } else {
+    console.error("BurgerMod: failed to patch poison top-up paF");
+  }
+
+  // Tick: run burger aging after chess hook (match Chess-injected tick).
+  if (
+    code.match(
+      /\}tick\(\)\{window\.__remixGame=this;if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.head_pos=this\.oa\.ka;window\.head_dir=this\.oa\.direction;window\.appleArray=this\.wa\.ka;window\.chess_tick_logic\(\);\}catch\(_ce\)\{console\.error\("ChessMod: tick failed",_ce\);\}\}var a=this\.Aa,b=this\.lj;/
+    )
+  ) {
+    code = code.assertReplace(
+      /\}tick\(\)\{window\.__remixGame=this;if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.head_pos=this\.oa\.ka;window\.head_dir=this\.oa\.direction;window\.appleArray=this\.wa\.ka;window\.chess_tick_logic\(\);\}catch\(_ce\)\{console\.error\("ChessMod: tick failed",_ce\);\}\}var a=this\.Aa,b=this\.lj;/,
+      `}tick(){window.__remixGame=this;if(window.isChessActive&&window.isChessActive()){try{window.head_pos=this.oa.ka;window.head_dir=this.oa.direction;window.appleArray=this.wa.ka;window.chess_tick_logic();}catch(_ce){console.error("ChessMod: tick failed",_ce);}}if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_tick_logic();}catch(_be){console.error("BurgerMod: tick failed",_be);}}var a=this.Aa,b=this.lj;`
+    );
+  } else if (code.match(/\}tick\(\)\{window\.__remixGame=this;/)) {
+    code = code.assertReplace(
+      /\}tick\(\)\{window\.__remixGame=this;/,
+      `}tick(){window.__remixGame=this;if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_tick_logic();}catch(_be){}}`
+    );
+  } else {
+    console.error("BurgerMod: failed to find tick()");
+  }
+
+  // After apple reset / shield init (Chess may have already appended): assign burger timers.
+  // Hook the end of apple manager reset via shield init line (post-Pudding doubleDE).
+  if (
+    code.match(
+      /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);if\(window\.isChessActive&&window\.isChessActive\(\)\)/
+    )
+  ) {
+    code = code.assertReplace(
+      /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.appleArray=this\.ka;window\.randomize_pieces\(\);window\.shield_empty_all\(\);\}catch\(_ce\)\{console\.error\("ChessMod: reset failed",_ce\);\}\}/,
+      `if(f7(this.settings,15))for(let q of this.ka)q.Oba=doubleDE(this,q.pos);if(window.isChessActive&&window.isChessActive()){try{window.appleArray=this.ka;window.randomize_pieces();window.shield_empty_all();}catch(_ce){console.error("ChessMod: reset failed",_ce);}}if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){console.error("BurgerMod: reset failed",_be);}}`
+    );
+  } else if (
+    code.match(
+      /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);/
+    )
+  ) {
+    code = code.assertReplace(
+      /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);/,
+      `if(f7(this.settings,15))for(let q of this.ka)q.Oba=doubleDE(this,q.pos);if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){}}`
+    );
+  } else {
+    console.error("BurgerMod: failed to find reset timer hook");
+  }
+
+  // Also assign timers when no shield mode (classic reset without Oba loop).
+  // After settings.ka===6 tally init on reset:
+  if (code.match(/this\.settings\.ka===6&&\(kaF\(this\),this\.Ca=!1\)\}/)) {
+    code = code.assertReplace(
+      /this\.settings\.ka===6&&\(kaF\(this\),this\.Ca=!1\)\}/,
+      `this.settings.ka===6&&(kaF(this),this.Ca=!1);if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){}}}`
+    );
+  }
+
+  // After qaF adds apples: assign timers to new non-poison ones.
+  // Chess may have appended chess_convert; match either form.
+  if (
+    code.match(
+      /if\(window\.isChessActive&&window\.isChessActive\(\)&&g>0\)\{window\.chess_convert_new_apples\(a,g\);\}/
+    )
+  ) {
+    code = code.assertReplace(
+      /if\(window\.isChessActive&&window\.isChessActive\(\)&&g>0\)\{window\.chess_convert_new_apples\(a,g\);\}/,
+      `if(window.isChessActive&&window.isChessActive()&&g>0){window.chess_convert_new_apples(a,g);}if(window.isBurgerActive&&window.isBurgerActive()&&g>0){for(let _bi=a.ka.length-g;_bi<a.ka.length;_bi++){if(a.ka[_bi]&&!a.ka[_bi].nla)window.burger_assign_timer(a.ka[_bi]);}}`
+    );
+  } else if (
+    code.match(
+      /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(f7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.Oba=doubleDE\(a,c\.pos\);/
+    )
+  ) {
+    code = code.assertReplace(
+      /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(f7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.Oba=doubleDE\(a,c\.pos\);/,
+      `g=a.ka.length-g;if(e!==void 0)for(c=0;c<g;c++)a.ka[a.ka.length-1-c].sequenceNumber=e;if(f7(a.settings,15))for(e=0;e<g;e++)c=a.ka[a.ka.length-1-e],c.Oba=doubleDE(a,c.pos);if(window.isBurgerActive&&window.isBurgerActive()&&g>0){for(let _bi=a.ka.length-g;_bi<a.ka.length;_bi++){if(a.ka[_bi]&&!a.ka[_bi].nla)window.burger_assign_timer(a.ka[_bi]);}}`
+    );
+  } else {
+    console.error("BurgerMod: failed to find qaF trailing hook");
+  }
+
+  // Fresh eat: clear poisons + bump eat count BEFORE score side-effects finish / before Mn.
+  // Hook at this.Oh++ — Chess may have replaced it; handle both.
+
+  // Clearing poisons splices game.wa.ka, so the eat loop's index has to be
+  // corrected in place. Its name is minified, so read it off the saF call that
+  // sits in the same statement (native Poison already decrements it there).
+  const appleIndexMatch = code.match(
+    /f7\(this\.settings,10\)\s*&&\s*saF\(this\.wa,([a-zA-Z0-9_$]{1,6}),[a-zA-Z0-9_$]{1,6},this\.Jc\.bind\(this\)\)\s*&&\s*\1--/
+  );
+  const idx = appleIndexMatch && appleIndexMatch[1];
+  if (!idx) {
+    console.error("BurgerMod: failed to find eat-loop apple index variable");
+  }
+  const onFreshEaten = idx
+    ? `if(window.isBurgerActive&&window.isBurgerActive())${idx}=window.burger_on_fresh_eaten(this,${idx});`
+    : `if(window.isBurgerActive&&window.isBurgerActive())window.burger_on_fresh_eaten(this);`;
+
+  if (
+    code.match(
+      /if\(window\.isChessActive&&window\.isChessActive\(\)\)\{let _ae=window\.findApple\(window\.head_pos\[0\],window\.appleArray\);if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';this\.Oh\+\+;\}else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';this\.Oh\+\+;\}\}else\{this\.Oh\+\+;\}/
+    )
+  ) {
+    code = code.assertReplace(
+      /if\(window\.isChessActive&&window\.isChessActive\(\)\)\{let _ae=window\.findApple\(window\.head_pos\[0\],window\.appleArray\);if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';this\.Oh\+\+;\}else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';this\.Oh\+\+;\}\}else\{this\.Oh\+\+;\}/,
+      `if(window.isChessActive&&window.isChessActive()){let _ae=window.findApple(window.head_pos[0],window.appleArray);if(_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;${onFreshEaten}}else if(_ae&&_ae.isPiece){window.just_ate='piece';window.head_state=_ae.ChessPiece;window.updateTrophySRC(_ae.type);window.head_color=_ae.ChessColor;window.shield_all();}else{window.just_ate='fruit';this.Oh++;${onFreshEaten}}}else{this.Oh++;${onFreshEaten}}`
+    );
+  } else if (code.match(/this\.Oh\+\+;/)) {
+    code = code.assertReplace(
+      /this\.Oh\+\+;/,
+      `this.Oh++;${onFreshEaten}`
+    );
+  } else {
+    console.error("BurgerMod: failed to find score hook");
+  }
+
+  // After Mn / chess fruit respawn path, re-assign timers on new apples.
+  if (
+    code.match(
+      /else\{if\(window\.isChessActive&&window\.isChessActive\(\)\)\{Xh=!1;if\(window\.just_ate==='fruit'&&!\(this\.settings\.ka===4\|\|this\.settings\.ka===6\|\|\(this\.settings\.ka===5&&!this\.hc\)\|\|f7\(this\.settings,8\)\|\|f7\(this\.settings,9\)\)\)\{window\.chess_fruit_respawn\(this\.wa,h7,oaF,aaF\);\}\}else\{let Ni=e7\(this\.settings\)\|\|f7\(this\.settings,7\);Xh=this\.Mn\(vd,!Ni,null\);\}\}/
+    )
+  ) {
+    code = code.assertReplace(
+      /else\{if\(window\.isChessActive&&window\.isChessActive\(\)\)\{Xh=!1;if\(window\.just_ate==='fruit'&&!\(this\.settings\.ka===4\|\|this\.settings\.ka===6\|\|\(this\.settings\.ka===5&&!this\.hc\)\|\|f7\(this\.settings,8\)\|\|f7\(this\.settings,9\)\)\)\{window\.chess_fruit_respawn\(this\.wa,h7,oaF,aaF\);\}\}else\{let Ni=e7\(this\.settings\)\|\|f7\(this\.settings,7\);Xh=this\.Mn\(vd,!Ni,null\);\}\}/,
+      `else{if(window.isChessActive&&window.isChessActive()){Xh=!1;if(window.just_ate==='fruit'&&!(this.settings.ka===4||this.settings.ka===6||(this.settings.ka===5&&!this.hc)||f7(this.settings,8)||f7(this.settings,9))){window.chess_fruit_respawn(this.wa,h7,oaF,aaF);}}else{let Ni=e7(this.settings)||f7(this.settings,7);Xh=this.Mn(vd,!Ni,null);}if(window.isBurgerActive&&window.isBurgerActive()&&window.just_ate==='fruit'){window.burger_after_respawn(this);}}`
+    );
+  }
+
+  // Aging overlay on fruit drawImage.
+  // Expression-safe (Visibility leaves this call after `&&`). Dark circle from
+  // the tick-cached burgerGrey — never canvas.filter. Near expiry it reads as a
+  // near-black disk so the poison transition is obvious.
+  if (code.match(/this\.ka\.drawImage\(f,0,0,g,g,-d\/2,-d\/2,d,d\);/)) {
+    code = code.assertReplace(
+      /this\.ka\.drawImage\(f,0,0,g,g,-d\/2,-d\/2,d,d\);/,
+      `(this.ka.drawImage(f,0,0,g,g,-d/2,-d/2,d,d),b&&!b.nla&&b.burgerGrey>0&&(this.ka.globalAlpha=Math.min(.85,b.burgerGrey/110),this.ka.fillStyle="#1a1a1a",this.ka.beginPath(),this.ka.arc(0,0,d*.32,0,6.283185307179586),this.ka.fill(),this.ka.globalAlpha=1));`
+    );
+  } else {
+    console.error("BurgerMod: failed to find fruit drawImage for greyscale");
+  }
+
+  // Deathscreen / blender icons: extend Candy/Chess patches.
+  if (code.indexOf("window.BURGER_MODE)?window.BURGER_ICON") < 0) {
+    if (code.indexOf("window.CHESS_MODE)?window.CHESS_ICON") >= 0) {
+      code = code.assertReplace(
+        /\(a\.settings\.ob===window\.CANDY_MODE\)\?window\.CANDY_ICON:\(a\.settings\.ob===window\.CHESS_MODE\)\?window\.CHESS_ICON:/,
+        `(a.settings.ob===window.CANDY_MODE)?window.CANDY_ICON:(a.settings.ob===window.CHESS_MODE)?window.CHESS_ICON:(a.settings.ob===window.BURGER_MODE)?window.BURGER_ICON:`
+      );
+      code = code.assertReplace(
+        /\(c===window\.CANDY_MODE\)\?window\.CANDY_ICON:\(c===window\.CHESS_MODE\)\?window\.CHESS_ICON:/,
+        `(c===window.CANDY_MODE)?window.CANDY_ICON:(c===window.CHESS_MODE)?window.CHESS_ICON:(c===window.BURGER_MODE)?window.BURGER_ICON:`
+      );
+    }
+  }
+
+  // Blender forEach: add burger
+  if (
+    code.match(
+      /if\(window\.candy_blending&&window\.CANDY_MODE!=null\)b\.push\(window\.CANDY_MODE\);if\(window\.chess_blending&&window\.CHESS_MODE!=null\)b\.push\(window\.CHESS_MODE\)/
+    )
+  ) {
+    code = code.assertReplace(
+      /if\(window\.candy_blending&&window\.CANDY_MODE!=null\)b\.push\(window\.CANDY_MODE\);if\(window\.chess_blending&&window\.CHESS_MODE!=null\)b\.push\(window\.CHESS_MODE\)/,
+      `if(window.candy_blending&&window.CANDY_MODE!=null)b.push(window.CANDY_MODE);if(window.chess_blending&&window.CHESS_MODE!=null)b.push(window.CHESS_MODE);if(window.burger_blending&&window.BURGER_MODE!=null)b.push(window.BURGER_MODE)`
+    );
+  }
+
+  // Ta fallback: recognize burger icon
+  if (code.indexOf("13m2Cr16") < 0 && code.indexOf("ZqK0CB95") >= 0) {
+    code = code.assertReplace(
+      /else if\(window\.CHESS_MODE!=null&&s\.indexOf\("ZqK0CB95"\)>=0\)m=window\.CHESS_MODE;/,
+      `else if(window.CHESS_MODE!=null&&s.indexOf("ZqK0CB95")>=0)m=window.CHESS_MODE;else if(window.BURGER_MODE!=null&&s.indexOf("13m2Cr16")>=0)m=window.BURGER_MODE;`
+    );
+  }
+
+  // Play start trophy
+  if (code.indexOf("updateBurgerTrophySRC") < 0) {
+    if (code.indexOf("updateCandyTrophySRC") >= 0) {
+      // Chess may have appended CHESS update already
+      if (code.indexOf("CurrentModeNum===window.CHESS_MODE") >= 0) {
+        code = code.assertReplace(
+          /if\(window\.CurrentModeNum===window\.CHESS_MODE\)\{window\.updateTrophySRC\(\);\}/,
+          `if(window.CurrentModeNum===window.CHESS_MODE){window.updateTrophySRC();}if(window.CurrentModeNum===window.BURGER_MODE){window.updateBurgerTrophySRC();}`
+        );
+      } else {
+        code = code.assertReplace(
+          /if\(window\.CurrentModeNum===window\.CANDY_MODE\)\{window\.updateCandyTrophySRC\(\);\}/,
+          `if(window.CurrentModeNum===window.CANDY_MODE){window.updateCandyTrophySRC();}if(window.CurrentModeNum===window.BURGER_MODE){window.updateBurgerTrophySRC();}`
+        );
+      }
+    }
+  }
+
+  // Expose apple helpers after their definitions complete (assignment form).
+  if (code.match(/h7=function\(a,b,c\)\{b=new _\.Sd/)) {
+    code = code.assertReplace(
+      /h7=function\(a,b,c\)\{b=new _\.Sd/,
+      `h7=function(a,b,c){window.__h7=h7;window.__aaF=aaF;window.__qaF=qaF;b=new _.Sd`
+    );
+  } else {
+    console.error("BurgerMod: failed to expose h7/qaF");
+  }
+
+  return code;
+};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEAFTER
+////////////////////////////////////////////////////////////////////
+
+window.BurgerMod.runCodeAfter = function () {
+  window.add_burger_blender_toggle && window.add_burger_blender_toggle();
+};
+
+window.CatSpeed = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+window.CatSpeed.runCodeBefore = function () {
+  window.CAT_SPEED_MULT = 0.85;
+  window.CAT_SPEED_ICON =
+    "https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeIcons/main/Speeds/Cat.png";
+
+  window.uiImage =
+    window.uiImage ||
+    function (src) {
+      const img = new Image();
+      img.src = src;
+      img.width = 40;
+      img.height = 40;
+      img.classList.add("DqMRee");
+      img.classList.add("SsAred");
+      return img;
+    };
+
+  const speedRoot = document.querySelector("#speed");
+  if (speedRoot && !window._catSpeedIconInserted) {
+    // Append after all MoreMenu speeds so we never shift their case indices.
+    const cat = window.uiImage(window.CAT_SPEED_ICON);
+    cat.alt = "Cat Speed";
+    speedRoot.appendChild(cat);
+    window._catSpeedIconInserted = true;
+    window.CAT_SPEED_INDEX = [...speedRoot.children].indexOf(cat);
+  }
+
+  if (typeof window.CAT_SPEED_INDEX !== "number") {
+    window.CAT_SPEED_INDEX = speedRoot ? speedRoot.children.length - 1 : 14;
+  }
+
+  if (window.speed_img_arr && document.querySelector("#speed")) {
+    window.speed_img_arr = Array.from(
+      document.querySelector("#speed").children
+    ).map((el) => el.src);
+  }
+
+  if (!window.speedToTxt) window.speedToTxt = {};
+  window.speedToTxt[window.CAT_SPEED_INDEX] = { name: "Cat" };
+
+  if (typeof window.HandleSpeed === "function" && !window.HandleSpeed.__catPatched) {
+    const orig = window.HandleSpeed;
+    window.HandleSpeed = function (speed) {
+      if (speed === window.CAT_SPEED_INDEX) return "Cat speed, ";
+      return orig(speed);
+    };
+    window.HandleSpeed.__catPatched = true;
+  }
+};
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.CatSpeed.alterSnakeCode = function (code) {
+  const catIdx =
+    typeof window.CAT_SPEED_INDEX === "number" ? window.CAT_SPEED_INDEX : 14;
+
+  // MoreMenu owns cases 3..13. Append Cat as the next case only — no shifting.
+  const tickSwitch = code.match(
+    /let speedMultiplier\s*;?\s*switch\([^)]+\)\s*\{[\s\S]*?default:\s*speedMultiplier\s*=\s*1\s*;?\s*break\s*;?\s*\}/
+  );
+  if (!tickSwitch) {
+    console.error("CatSpeed: failed to find speedMultiplier switch");
+    return code;
+  }
+
+  let body = tickSwitch[0];
+  const catCaseTick = new RegExp(
+    "case\\s+" + catIdx + ":\\s*speedMultiplier\\s*=\\s*window\\.CAT_SPEED_MULT"
+  );
+  if (!catCaseTick.test(body)) {
+    body = body.replace(
+      /default:\s*speedMultiplier\s*=\s*1\s*;?\s*break\s*;?/,
+      `case ${catIdx}:
+              speedMultiplier = window.CAT_SPEED_MULT || .85
+              break
+            default:
+              speedMultiplier = 1
+              break`
+    );
+  }
+  if (!catCaseTick.test(body)) {
+    console.error("CatSpeed: failed to inject case " + catIdx + " into tick switch");
+  } else {
+    code = code.assertReplace(tickSwitch[0], body);
+  }
+
+  // Reset-path speed switch (MoreMenu uses `break a`).
+  const resetSwitch = code.match(
+    /case 1:\s*a\s*=\s*\.66[\s\S]*?default:\s*a\s*=\s*1[\s\S]*?break a\s*\}/
+  );
+  if (resetSwitch) {
+    let rb = resetSwitch[0];
+    const catCaseReset = new RegExp(
+      "case\\s+" + catIdx + ":\\s*a\\s*=\\s*window\\.CAT_SPEED_MULT"
+    );
+    if (!catCaseReset.test(rb)) {
+      rb = rb.replace(
+        /default:\s*a\s*=\s*1[\s\S]*?break a/,
+        `case ${catIdx}:
+            a = window.CAT_SPEED_MULT || .85
+            break a
+          default:
+            a = 1
+            break a`
+      );
+    }
+    if (!catCaseReset.test(rb)) {
+      console.error("CatSpeed: failed to inject case " + catIdx + " into reset switch");
+    } else {
+      code = code.assertReplace(resetSwitch[0], rb);
+    }
+  } else {
+    console.error("CatSpeed: failed to find reset speed switch");
+  }
+
+  return code;
+};
+
+window.DiceCounts = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+window.DiceCounts.runCodeBefore = function () {
+  window.NATIVE_DICE_ICON =
+    "https://www.google.com/logos/fnbx/snake_arcade/v18/count_04.png";
+
+  // Hue-rotate the red native dice → blue/green. Preserve lightness & white pips.
+  window.remixHueShiftDiceIcon = function remixHueShiftDiceIcon(hueRotateDeg, done) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = function () {
+      try {
+        const c = document.createElement("canvas");
+        c.width = 40;
+        c.height = 40;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, 40, 40);
+        const imageData = ctx.getImageData(0, 0, 40, 40);
+        const d = imageData.data;
+
+        function rgbToHsl(r, g, b) {
+          r /= 255;
+          g /= 255;
+          b /= 255;
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const l = (max + min) / 2;
+          if (max === min) return [0, 0, l];
+          const delta = max - min;
+          const s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+          let h;
+          if (max === r) h = ((g - b) / delta + (g < b ? 6 : 0)) / 6;
+          else if (max === g) h = ((b - r) / delta + 2) / 6;
+          else h = ((r - g) / delta + 4) / 6;
+          return [h, s, l];
+        }
+
+        function hslToRgb(h, s, l) {
+          if (s === 0) {
+            const v = Math.round(l * 255);
+            return [v, v, v];
+          }
+          function hue2rgb(p, q, t) {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            return p;
+          }
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          return [
+            Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+            Math.round(hue2rgb(p, q, h) * 255),
+            Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+          ];
+        }
+
+        const delta = (((hueRotateDeg % 360) + 360) % 360) / 360;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 8) continue;
+          const hsl = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+          // Keep white pips / near-gray outlines untouched.
+          if (hsl[1] < 0.12 || hsl[2] > 0.88) continue;
+          const rgb = hslToRgb((hsl[0] + delta) % 1, hsl[1], hsl[2]);
+          d[i] = rgb[0];
+          d[i + 1] = rgb[1];
+          d[i + 2] = rgb[2];
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        done(c.toDataURL("image/png"));
+      } catch (e) {
+        console.error("DiceCounts: hue shift failed", e);
+        done(window.NATIVE_DICE_ICON);
+      }
+    };
+    img.onerror = function () {
+      done(window.NATIVE_DICE_ICON);
+    };
+    img.src = window.NATIVE_DICE_ICON;
+  };
+
+  window.uiImage =
+    window.uiImage ||
+    function (src) {
+      const img = new Image();
+      img.src = src;
+      img.width = 40;
+      img.height = 40;
+      img.classList.add("DqMRee");
+      img.classList.add("SsAred");
+      return img;
+    };
+
+  window.remixIsColoredDice = function remixIsColoredDice(ka) {
+    return (
+      ka === window.BLUE_DICE_COUNT || ka === window.GREEN_DICE_COUNT
+    );
+  };
+
+  window.remixIsDiceLike = function remixIsDiceLike(ka) {
+    return ka === 4 || window.remixIsColoredDice(ka);
+  };
+
+  window.remixColoredDiceRoll = function remixColoredDiceRoll(ka) {
+    if (ka === window.BLUE_DICE_COUNT) {
+      return 1 + Math.floor(Math.random() * 12);
+    }
+    if (ka === window.GREEN_DICE_COUNT) {
+      return 4 + Math.floor(Math.random() * 6);
+    }
+    return null;
+  };
+
+  window.remixDiceSpawnCount = function remixDiceSpawnCount(ka, fallback) {
+    const rolled = window.remixColoredDiceRoll(ka);
+    return rolled == null ? fallback : rolled;
+  };
+
+  window.remixTopBarCountIcon = function remixTopBarCountIcon(src) {
+    const img = document.createElement("img");
+    img.src = src;
+    // Match native scoreboard count sprites (not menu uiImage 40×40).
+    img.className = "XUtzXd WwRsj LaTyvd";
+    img.draggable = false;
+    return img;
+  };
+
+  window.remixRefreshCountImgArr = function remixRefreshCountImgArr() {
+    const root = document.querySelector("#count");
+    if (!root) return;
+    window.count_img_arr = Array.from(root.children).map(function (el) {
+      return el.src;
+    });
+  };
+
+  window.remixRefreshHudCountIcon = function remixRefreshHudCountIcon(index, url) {
+    if (typeof index !== "number" || !url) return;
+    if (window.count_img_arr) {
+      window.count_img_arr[index] = url;
+    } else {
+      window.remixRefreshCountImgArr();
+    }
+
+    let selected = -1;
+    try {
+      const ka =
+        window.__remixGame && window.__remixGame.settings
+          ? window.__remixGame.settings.ka
+          : null;
+      if (typeof ka === "number") selected = ka;
+    } catch (_e) {}
+    try {
+      const root = document.querySelector("#count");
+      if (root) {
+        const fromDom = [...root.children].findIndex(function (c) {
+          return ((c.className || "") + "").indexOf("tuJOWd") >= 0;
+        });
+        if (fromDom >= 0) selected = fromDom;
+      }
+    } catch (_e2) {}
+    if (selected !== index) return;
+
+    try {
+      const disp = document.body.getElementsByClassName("UJhXPd wSwbef EWyEF")[0];
+      if (disp) {
+        let target = null;
+        for (let i = 0; i < disp.children.length; i++) {
+          const child = disp.children[i];
+          if (!child || child.tagName !== "IMG") continue;
+          const cls = child.className || "";
+          const src = child.src || "";
+          const isCountSprite =
+            cls.indexOf("WwRsj") >= 0 ||
+            cls.indexOf("DqMRee") >= 0 ||
+            /count_\d+/.test(src) ||
+            src.indexOf("data:image") === 0;
+          if (!isCountSprite) continue;
+          if (!target) {
+            target = child;
+            child.src = url;
+            child.className = "XUtzXd WwRsj LaTyvd";
+            child.style.display = "";
+            child.style.left = "";
+            child.style.position = "";
+            child.removeAttribute("width");
+            child.removeAttribute("height");
+          } else {
+            // Native scoreboard keeps extra count_* sprites; hide them for colored dice.
+            child.style.display = "none";
+          }
+        }
+        if (!target && window.remixTopBarCountIcon) {
+          disp.appendChild(window.remixTopBarCountIcon(url));
+        }
+      }
+    } catch (_e4) {}
+  };
+
+  if (window._remixDiceCountsInserted) return;
+
+  const countRoot = document.querySelector("#count");
+  if (!countRoot) return;
+
+  const blueImg = window.uiImage(window.NATIVE_DICE_ICON);
+  blueImg.alt = "Blue Dice";
+  const greenImg = window.uiImage(window.NATIVE_DICE_ICON);
+  greenImg.alt = "Green Dice";
+  countRoot.appendChild(blueImg);
+  countRoot.appendChild(greenImg);
+  window.BLUE_DICE_COUNT = [...countRoot.children].indexOf(blueImg);
+  window.GREEN_DICE_COUNT = [...countRoot.children].indexOf(greenImg);
+  window._remixDiceCountsInserted = true;
+
+  // Native dice ~hue 11°. Rotate to blue (~215°) / green (~125°).
+  // TopBar snapshots count_img_arr at alter-time (still red) — refresh on tint.
+  window.remixHueShiftDiceIcon(204, function (url) {
+    blueImg.src = url;
+    window.remixRefreshHudCountIcon(window.BLUE_DICE_COUNT, url);
+  });
+  window.remixHueShiftDiceIcon(114, function (url) {
+    greenImg.src = url;
+    window.remixRefreshHudCountIcon(window.GREEN_DICE_COUNT, url);
+  });
+
+  function onColoredDiceSelected() {
+    const idx = [...countRoot.children].indexOf(this);
+    if (!window.remixIsColoredDice(idx)) return;
+    const src = this.src;
+    if (src) window.remixRefreshHudCountIcon(idx, src);
+  }
+  blueImg.addEventListener("click", onColoredDiceSelected);
+  greenImg.addEventListener("click", onColoredDiceSelected);
+
+  window.remixRefreshCountImgArr();
+
+  if (!window.countToTxt) window.countToTxt = {};
+  window.countToTxt[window.BLUE_DICE_COUNT] = { name: "Blue Dice" };
+  window.countToTxt[window.GREEN_DICE_COUNT] = { name: "Green Dice" };
+
+  if (
+    typeof window.HandleCount === "function" &&
+    !window.HandleCount.__dicePatched
+  ) {
+    const orig = window.HandleCount;
+    window.HandleCount = function (count) {
+      if (count === window.BLUE_DICE_COUNT) return "Blue Dice, ";
+      if (count === window.GREEN_DICE_COUNT) return "Green Dice, ";
+      return orig(count);
+    };
+    window.HandleCount.__dicePatched = true;
+  }
+};
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.DiceCounts.alterSnakeCode = function (code) {
+  // Narrow MoreMenu custom layouts to indices 7..12 so blue/green don't
+  // hit the off-board fallthrough. Then handle colored-dice start placement.
+  if (code.match(/if\(([a-zA-Z0-9_$.]+) > 6\) \{/)) {
+    code = code.assertReplace(
+      /if\(([a-zA-Z0-9_$.]+) > 6\) \{/,
+      "if($1 > 6 && $1 <= 12) {"
+    );
+  } else {
+    console.error("DiceCounts: failed to narrow MoreMenu count > 6 gate");
+  }
+
+  // After MoreMenu's `} else if(a)` — start colored dice with one apple.
+  const countGate = code.match(/if\(([a-zA-Z0-9_$.]+) > 6 && \1 <= 12\)/);
+  const stemMatch = code.match(
+    /(this\.[a-zA-Z0-9_$]{1,8}\.push\([a-zA-Z0-9_$]{1,8}\(this,)/
+  );
+  if (countGate && stemMatch && code.match(/\} else if\(a\)/)) {
+    const countExpr = countGate[1];
+    const stem = stemMatch[1];
+    code = code.assertReplace(
+      /\} else if\(a\)/,
+      `} else if(window.remixIsColoredDice&&window.remixIsColoredDice(${countExpr})) {
+          ${stem} +0, +0));
+        } else if(a)`
+    );
+  } else {
+    console.error("DiceCounts: failed to inject colored-dice start placement");
+  }
+
+  // Native last-apple refill for Dice is NOT Mn — Mn early-returns for dice-like
+  // counts. Refill is: ka===4 ? … || (tdF(this, roll), play) : tally…
+  // Extend that path so blue/green roll 1–12 / 4–9 via tdF.
+  const diceRefill = code.match(
+    /this\.settings\.ka===4\?odF\(this\)!==0\|\|ecF\(this\.settings\)\s*&&\s*rdF\(this\)<=0\|\|\(tdF\(this,Math\.ceil\(Math\.random\(\)\*6\)\),odF\(this\)>0\s*&&\s*([a-zA-Z0-9_$.]+)\.play\(\)\)/
+  );
+  if (diceRefill) {
+    const sound = diceRefill[1];
+    code = code.assertReplace(
+      diceRefill[0],
+      `(this.settings.ka===4||(window.remixIsColoredDice&&window.remixIsColoredDice(this.settings.ka)))?odF(this)!==0||ecF(this.settings) && rdF(this)<=0||(tdF(this,this.settings.ka===4?Math.ceil(Math.random()*6):(window.remixColoredDiceRoll(this.settings.ka)||1)),odF(this)>0 && ${sound}.play())`
+    );
+  } else {
+    console.error("DiceCounts: failed to find native dice tdF refill path");
+  }
+
+  // Mn still early-returns for dice-like; keep spawn-count wrap for safety on
+  // any non-dice path that might still call Mn with a count.
+  if (code.match(/Xh=this\.Mn\(vd,!Ni,null\)/)) {
+    code = code.assertReplace(
+      /Xh=this\.Mn\(vd,!Ni,null\)/g,
+      `Xh=this.Mn(window.remixDiceSpawnCount?window.remixDiceSpawnCount(this.settings.ka,vd):vd,!Ni,null)`
+    );
+  }
+
+  // Chess dice-like gates (skip chess_fruit_respawn for dice/tally/bomb…).
+  if (code.match(/this\.settings\.ka===4\|\|this\.settings\.ka===6/)) {
+    code = code.assertReplace(
+      /this\.settings\.ka===4\|\|this\.settings\.ka===6/g,
+      `(window.remixIsDiceLike?window.remixIsDiceLike(this.settings.ka):this.settings.ka===4)||this.settings.ka===6`
+    );
+  }
+
+  // MoreMenu appends window.uiImage for count>3 — menu-sized, wrong for HUD.
+  if (code.includes("const __img = window.uiImage(__src)")) {
+    code = code.assertReplace(
+      "const __img = window.uiImage(__src)",
+      "const __img = (window.remixTopBarCountIcon||window.uiImage)(__src)"
+    );
+    // Drop the menu-only positioning hack when our scoreboard icon is used.
+    code = code.replace(
+      /__img\.style\.position = 'relative'\s*;\s*__img\.style\.left = '50px'\s*;/g,
+      "if(__img.className.indexOf('WwRsj')<0){__img.style.position='relative';__img.style.left='50px';}"
+    );
+  } else {
+    console.error("DiceCounts: failed to patch MoreMenu scoreboard count icon");
+  }
+
+  // TopBar fruit icon uses count_img_arr snapshotted before async hue-tint.
+  // Prefer live #count src so blue/green stay correct after tint + on reset.
+  const topBarFruit = code.match(
+    /if\s*\(\s*window\.pudding_settings\.TopBar\s*&&\s*!window\.daily_challenge\s*\)\s*\{\s*([^=;\n]+)=\s*window\.count_img_arr\[([^\]]+)\]/
+  );
+  if (topBarFruit) {
+    code = code.assertReplace(
+      topBarFruit[0],
+      `if (window.pudding_settings.TopBar && !window.daily_challenge) {
+    ${topBarFruit[1].trim()}=(document.querySelector("#count").children[${topBarFruit[2]}]&&document.querySelector("#count").children[${topBarFruit[2]}].src)||window.count_img_arr[${topBarFruit[2]}]`
+    );
+  }
+
+  return code;
+};
+
+window.RemixSpeedInfo = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+// Pudding's BootstrapMenu disables SpeedInfo unless snakeChosenMod is
+// "PuddingMod". Remix keeps the toggle usable, but only Chess / Burger show
+// real SpeedInfo data — every other mode shows a switch prompt.
+//
+// TimeKeeper's mode bit → name switch only knows Wall…Peaceful, so Remix
+// trophies rendered as "Unknown". We also fix getCurrentMode: Pudding treated
+// the last trophy as Blender, but Remix appends Candy/Chess/Burger after it.
+//
+// Timer settings (#edit-mode) is hardcoded Classic…Peaceful; we add only
+// Candy/Chess/Burger (index-aligned; gaps stay hidden so PB keys match).
+window.RemixSpeedInfo.runCodeBefore = function () {
+  window.remixNativeBlenderMode = 22;
+
+  window.remixSpeedInfoAllowed = function remixSpeedInfoAllowed() {
+    return !!(
+      (window.isChessActive && window.isChessActive()) ||
+      (window.isBurgerActive && window.isBurgerActive())
+    );
+  };
+
+  window.remixSpeedInfoEnsureModeLabels = function remixSpeedInfoEnsureModeLabels() {
+    if (!window.modeToTxt) window.modeToTxt = {};
+    if (window.CANDY_MODE != null) {
+      window.modeToTxt[window.CANDY_MODE] = { name: "Candy" };
+    }
+    if (window.CHESS_MODE != null) {
+      window.modeToTxt[window.CHESS_MODE] = { name: "Chess" };
+    }
+    if (window.BURGER_MODE != null) {
+      window.modeToTxt[window.BURGER_MODE] = { name: "Burger" };
+    }
+  };
+
+  const VANILLA_BRIDGE = [
+    "Wall",
+    "Portal",
+    "Cheese",
+    "Borderless",
+    "Twin",
+    "Winged",
+    "YinYang",
+    "Key",
+    "Sokoban",
+    "Poison",
+    "Dimension",
+    "Minesweeper",
+    "Statue",
+    "Light",
+    "Shield",
+    "Arrow",
+    "Hotdog",
+    "Magnet",
+    "Gate",
+    "Bridge",
+    "Peaceful",
+  ];
+  const VANILLA_SKIP = VANILLA_BRIDGE.slice();
+  VANILLA_SKIP[19] = "Skip";
+
+  window.remixTimeKeeperNameForBit = function remixTimeKeeperNameForBit(
+    bitIndex
+  ) {
+    const trophyId = bitIndex + 1;
+    if (window.CANDY_MODE != null && trophyId === window.CANDY_MODE) {
+      return "Candy";
+    }
+    if (window.CHESS_MODE != null && trophyId === window.CHESS_MODE) {
+      return "Chess";
+    }
+    if (window.BURGER_MODE != null && trophyId === window.BURGER_MODE) {
+      return "Burger";
+    }
+    if (trophyId === window.remixNativeBlenderMode) return "Blender";
+    const names = window.isBridge ? VANILLA_BRIDGE : VANILLA_SKIP;
+    if (bitIndex >= 0 && bitIndex < names.length) return names[bitIndex];
+    return "Unknown";
+  };
+
+  // Build "Wall, Chess, " style label (trailing comma+space, matching Pudding).
+  window.remixTimeKeeperFormatGamemode = function remixTimeKeeperFormatGamemode(
+    modeStr
+  ) {
+    modeStr = modeStr || "";
+    const trophyMode =
+      typeof window.CurrentModeNum === "number"
+        ? window.CurrentModeNum
+        : typeof window.timeKeeper.getCurrentSetting === "function"
+          ? window.timeKeeper.getCurrentSetting("trophy")
+          : 0;
+
+    if (trophyMode === window.remixNativeBlenderMode) {
+      let gamemode = "";
+      const vanillaLen = Math.min(modeStr.length, 21);
+      for (let i = 0; i < vanillaLen; i++) {
+        if (modeStr.charAt(i) === "1") {
+          gamemode += window.remixTimeKeeperNameForBit(i) + ", ";
+        }
+      }
+      if (window.candy_blending) gamemode += "Candy, ";
+      if (window.chess_blending) gamemode += "Chess, ";
+      if (window.burger_blending) gamemode += "Burger, ";
+      if (!gamemode) gamemode = "Classic, ";
+      return gamemode;
+    }
+
+    let gamemode = "";
+    for (let i = 0; i < modeStr.length; i++) {
+      if (modeStr.charAt(i) === "1") {
+        gamemode += window.remixTimeKeeperNameForBit(i) + ", ";
+      }
+    }
+    if (!gamemode) gamemode = "Classic, ";
+    return gamemode;
+  };
+
+  window.remixSpeedInfoApplyModeLabel = function remixSpeedInfoApplyModeLabel() {
+    const modeLabel = document.getElementById("mode-selected");
+    if (!modeLabel || typeof window.HandleCount !== "function") return;
+    const count = window.timeKeeper.getCurrentSetting("count");
+    const modeStr = window.timeKeeper.getCurrentMode();
+    const gamemode = window.remixTimeKeeperFormatGamemode(modeStr);
+    const countTxt = window.HandleCount(count);
+    modeLabel.innerHTML =
+      gamemode + countTxt.substring(0, countTxt.lastIndexOf(","));
+  };
+
+  window.remixSpeedInfoShowSwitchMessage = function remixSpeedInfoShowSwitchMessage() {
+    const set = function (id, html) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    };
+    set("mode-selected", "Switch to PuddingMod");
+    set("mode-selected2", "");
+    for (const id of [
+      "25",
+      "50",
+      "100",
+      "ALL",
+      "H",
+      "att",
+      "25src",
+      "50src",
+      "100src",
+      "Allsrc",
+      "Hsrc",
+    ]) {
+      set(id, "");
+    }
+  };
+
+  window.remixSpeedInfoEnableCheckbox = function remixSpeedInfoEnableCheckbox() {
+    if (window.isSnakeMobileVersion) return;
+    const cb = document.getElementById("AlwaysOnTimeKeeper");
+    if (!cb) return;
+
+    cb.disabled = false;
+
+    let want = !!(window.pudding_settings && window.pudding_settings.SpeedInfo);
+    try {
+      const raw = JSON.parse(localStorage.getItem("PuddingSettings") || "null");
+      if (raw && raw.SpeedInfo) want = true;
+    } catch (_e) {}
+
+    if (want) {
+      if (window.pudding_settings) window.pudding_settings.SpeedInfo = true;
+      cb.checked = true;
+      const box = document.getElementById("speedinfo-popup-pudding");
+      if (box) {
+        box.style.display = "block";
+        box.style.visibility = "visible";
+      }
+    }
+  };
+
+  // Fix mode bitstring: Blender is always trophy 22, not "last child".
+  if (
+    window.timeKeeper &&
+    typeof window.timeKeeper.getCurrentMode === "function" &&
+    !window.timeKeeper.getCurrentMode.__remixPatched
+  ) {
+    window.timeKeeper.getCurrentMode = function remixGetCurrentMode() {
+      const blenderId = window.remixNativeBlenderMode;
+      // CurrentModeNum is updated on trophy change (and by the harness); prefer it
+      // over the DOM trophy index so labels stay correct during play.
+      const mode =
+        typeof window.CurrentModeNum === "number"
+          ? window.CurrentModeNum
+          : window.timeKeeper.getCurrentSetting("trophy");
+      const trophyRoot = document.getElementById("trophy");
+      const trophyCount = trophyRoot ? trophyRoot.children.length : 0;
+
+      if (mode === blenderId) {
+        let element = null;
+        for (const img of document.querySelectorAll("img")) {
+          if (img.src && img.src.includes("random.png")) {
+            element = img;
+            break;
+          }
+        }
+        let modeStr = "";
+        if (
+          element &&
+          element.parentElement &&
+          element.parentElement.parentElement &&
+          element.parentElement.parentElement.parentElement
+        ) {
+          let counter = -1;
+          for (const child of element.parentElement.parentElement.parentElement
+            .children) {
+            counter++;
+            if (counter === 0) continue;
+            const inner = child.firstElementChild;
+            if (
+              inner &&
+              inner.classList.length > 1 &&
+              inner.children.length > 0
+            ) {
+              modeStr += "1";
+            } else {
+              modeStr += "0";
+            }
+          }
+        }
+        modeStr += window.candy_blending ? "1" : "0";
+        modeStr += window.chess_blending ? "1" : "0";
+        modeStr += window.burger_blending ? "1" : "0";
+        return modeStr;
+      }
+
+      // One bit per trophy after Classic (includes Blender + Remix modes).
+      let modeStr = "";
+      for (let t = 1; t < trophyCount; t++) {
+        modeStr += t === mode ? "1" : "0";
+      }
+      return modeStr;
+    };
+    window.timeKeeper.getCurrentMode.__remixPatched = true;
+  }
+
+  if (
+    window.timeKeeper &&
+    typeof window.timeKeeper.showDialog === "function" &&
+    !window.timeKeeper.showDialog.__remixPatched
+  ) {
+    const origShow = window.timeKeeper.showDialog;
+    window.timeKeeper.showDialog = function remixShowDialog() {
+      origShow.apply(this, arguments);
+      const dialog = document.getElementById("timeKeeperDialog");
+      if (!dialog) return;
+      const nice = window
+        .remixTimeKeeperFormatGamemode(window.timeKeeper.getCurrentMode())
+        .replace(/,\s*$/, "");
+      for (let i = 0; i < dialog.childNodes.length; i++) {
+        const node = dialog.childNodes[i];
+        if (
+          node.nodeType === 3 &&
+          typeof node.textContent === "string" &&
+          node.textContent.indexOf("Mode: ") === 0
+        ) {
+          node.textContent = "Mode: " + nice;
+          break;
+        }
+      }
+    };
+    window.timeKeeper.showDialog.__remixPatched = true;
+  }
+
+  if (
+    typeof window.SpeedInfoUpdate === "function" &&
+    !window.SpeedInfoUpdate.__remixGated
+  ) {
+    const origUpdate = window.SpeedInfoUpdate;
+    window.SpeedInfoUpdate = async function remixSpeedInfoUpdate() {
+      if (!window.pudding_settings || !window.pudding_settings.SpeedInfo) {
+        return;
+      }
+      if (!window.remixSpeedInfoAllowed()) {
+        window.remixSpeedInfoShowSwitchMessage();
+        return;
+      }
+      window.remixSpeedInfoEnsureModeLabels();
+      const result = await origUpdate.apply(this, arguments);
+      window.remixSpeedInfoApplyModeLabel();
+      return result;
+    };
+    window.SpeedInfoUpdate.__remixGated = true;
+  }
+
+  if (typeof window.getAllSrc === "function" && !window.getAllSrc.__remixGated) {
+    const origAll = window.getAllSrc;
+    window.getAllSrc = async function remixGetAllSrc() {
+      if (!window.pudding_settings || !window.pudding_settings.SpeedInfo) {
+        return;
+      }
+      if (!window.remixSpeedInfoAllowed()) {
+        window.remixSpeedInfoShowSwitchMessage();
+        return;
+      }
+      window.remixSpeedInfoEnsureModeLabels();
+      return origAll.apply(this, arguments);
+    };
+    window.getAllSrc.__remixGated = true;
+  }
+
+  if (
+    typeof window.getRecordSRC === "function" &&
+    !window.getRecordSRC.__remixGated
+  ) {
+    const origRec = window.getRecordSRC;
+    window.getRecordSRC = async function remixGetRecordSRC(level) {
+      if (!window.pudding_settings || !window.pudding_settings.SpeedInfo) {
+        return;
+      }
+      if (!window.remixSpeedInfoAllowed()) {
+        window.remixSpeedInfoShowSwitchMessage();
+        return;
+      }
+      window.remixSpeedInfoEnsureModeLabels();
+      return origRec.apply(this, arguments);
+    };
+    window.getRecordSRC.__remixGated = true;
+  }
+
+  // Timer settings (#edit-mode) is hardcoded Classic…Peaceful. Append only
+  // Candy / Chess / Burger. Hidden placeholders fill index gaps (e.g. Blender)
+  // so getSelected indices still match mode ids for PB storage.
+  window.remixEnsureTimerEditModes = function remixEnsureTimerEditModes() {
+    window.remixSpeedInfoEnsureModeLabels();
+    const editMode = document.getElementById("edit-mode");
+    if (!editMode) return;
+
+    const unsBorder = "0.5vh ridge #00000000";
+    const selBorder = "0.5vh ridge #af4490ff";
+    const baseStyle =
+      "cursor: pointer; border-radius: 1vh; width: 3.5vh; height: 3.5vh;";
+
+    const remixModes = [
+      {
+        id: window.CANDY_MODE,
+        icon: window.CANDY_ICON,
+        name: "Candy",
+      },
+      {
+        id: window.CHESS_MODE,
+        icon: window.CHESS_ICON,
+        name: "Chess",
+      },
+      {
+        id: window.BURGER_MODE,
+        icon: window.BURGER_ICON,
+        name: "Burger",
+      },
+    ].filter(function (m) {
+      return typeof m.id === "number" && m.icon;
+    });
+    if (!remixModes.length) return;
+
+    const byId = {};
+    for (const m of remixModes) byId[m.id] = m;
+    const maxId = Math.max.apply(
+      null,
+      remixModes.map(function (m) {
+        return m.id;
+      })
+    );
+
+    function refreshTimesFromMode() {
+      const countSel =
+        document.querySelector("#edit-count .sel") ||
+        document.querySelector("#edit-count img");
+      if (countSel) countSel.click();
+    }
+
+    function paintSelection(selectedIdx) {
+      for (let i = 0; i < editMode.children.length; i++) {
+        const c = editMode.children[i];
+        const on = i === selectedIdx;
+        c.style.border = on ? selBorder : unsBorder;
+        c.className = on ? "sel" : "uns";
+      }
+    }
+
+    function selectModeImg(img) {
+      const idx = [...editMode.children].indexOf(img);
+      paintSelection(idx);
+      refreshTimesFromMode();
+    }
+
+    function ensureSlot(i) {
+      const want = byId[i];
+      let img = editMode.children[i];
+      if (want) {
+        if (!img) {
+          img = document.createElement("img");
+          editMode.appendChild(img);
+        }
+        img.className = img.className === "sel" ? "sel" : "uns";
+        img.style.cssText =
+          baseStyle +
+          " border: " +
+          (img.className === "sel" ? selBorder : unsBorder) +
+          ";";
+        img.style.display = "";
+        img.src = want.icon;
+        img.alt = want.name;
+        img.removeAttribute("data-remix-placeholder");
+        if (!img.__remixModeClick) {
+          img.addEventListener("click", function () {
+            selectModeImg(img);
+          });
+          img.__remixModeClick = true;
+        }
+        return;
+      }
+
+      // Gap (e.g. Blender at 22): keep index alignment, do not show an icon.
+      if (!img) {
+        img = document.createElement("img");
+        img.className = "uns";
+        img.setAttribute("data-remix-placeholder", "1");
+        img.alt = "";
+        img.style.display = "none";
+        editMode.appendChild(img);
+      } else if (
+        img.getAttribute("data-remix-placeholder") === "1" ||
+        i === window.remixNativeBlenderMode
+      ) {
+        img.setAttribute("data-remix-placeholder", "1");
+        img.style.display = "none";
+        img.alt = "";
+        img.removeAttribute("src");
+      }
+    }
+
+    for (let i = editMode.children.length; i <= maxId; i++) {
+      ensureSlot(i);
+    }
+    // Re-apply for slots that already existed from a prior open / old mirror.
+    for (const m of remixModes) ensureSlot(m.id);
+    if (typeof window.remixNativeBlenderMode === "number") {
+      ensureSlot(window.remixNativeBlenderMode);
+    }
+
+    const live =
+      typeof window.CurrentModeNum === "number"
+        ? window.CurrentModeNum
+        : typeof window.getSelected === "function"
+          ? window.getSelected("#trophy")
+          : 0;
+    if (byId[live] && editMode.children[live]) {
+      paintSelection(live);
+    }
+  };
+
+  if (
+    typeof window.editTimer === "function" &&
+    !window.editTimer.__remixModes
+  ) {
+    const origEdit = window.editTimer;
+    window.editTimer = function remixEditTimer() {
+      const opening = !document.getElementById("edit-box");
+      origEdit.apply(this, arguments);
+      if (opening && document.getElementById("edit-box")) {
+        window.remixEnsureTimerEditModes();
+        const countSel = document.querySelector("#edit-count .sel");
+        if (countSel) countSel.click();
+      }
+    };
+    window.editTimer.__remixModes = true;
+  }
+
+  // BootstrapMenu binds click to the pre-wrap editTimer reference — rebind.
+  window.remixBindTimerSettingsButton = function remixBindTimerSettingsButton() {
+    const btn = document.getElementById("TimerSettings");
+    if (!btn || btn.__remixEditBound) return;
+    const fresh = btn.cloneNode(true);
+    btn.parentNode.replaceChild(fresh, btn);
+    fresh.addEventListener("click", function () {
+      window.editTimer();
+    });
+    fresh.__remixEditBound = true;
+  };
+  window.remixBindTimerSettingsButton();
+
+  window.remixSpeedInfoEnableCheckbox();
+  if (
+    window.pudding_settings &&
+    window.pudding_settings.SpeedInfo &&
+    typeof window.SpeedInfoUpdate === "function"
+  ) {
+    window.SpeedInfoUpdate().catch(function (e) {
+      console.error("RemixSpeedInfo: initial update failed", e);
+    });
+  }
+};
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.RemixSpeedInfo.alterSnakeCode = function (code) {
+  if (code.match(/case "trophy":window\.CurrentModeNum = /)) {
+    code = code.assertReplace(
+      /case "trophy":window\.CurrentModeNum = /,
+      `case "trophy":setTimeout(function(){window.SpeedInfoUpdate&&window.SpeedInfoUpdate().catch(function(e){console.error("RemixSpeedInfo: trophy update failed",e);});},0);window.CurrentModeNum = `
+    );
+  } else {
+    console.error("RemixSpeedInfo: failed to find trophy CurrentModeNum hook");
+  }
+  return code;
+};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEAFTER
+////////////////////////////////////////////////////////////////////
+
+window.RemixSpeedInfo.runCodeAfter = function () {
+  window.remixBindTimerSettingsButton && window.remixBindTimerSettingsButton();
+  window.remixSpeedInfoEnableCheckbox && window.remixSpeedInfoEnableCheckbox();
+  if (
+    window.pudding_settings &&
+    window.pudding_settings.SpeedInfo &&
+    typeof window.SpeedInfoUpdate === "function"
+  ) {
+    window.SpeedInfoUpdate().catch(function () {});
+  }
+};
+
+window.RemixMod = {};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+// MorePudding bundles Pudding + Visibility + MoreMenu and runs them in that
+// order. Fall back to the individual mods if a build ever ships without it.
+window.remixBaseRunCodeBefore = function remixBaseRunCodeBefore() {
+  if (window.MorePudding) {
+    window.MorePudding.runCodeBefore();
+    return;
+  }
+  window.PuddingMod.runCodeBefore();
+  window.VisibilityModCode.runCodeBefore();
+};
+
+window.remixBaseAlterSnakeCode = function remixBaseAlterSnakeCode(code) {
+  if (window.MorePudding) return window.MorePudding.alterSnakeCode(code);
+  code = window.PuddingMod.alterSnakeCode(code);
+  return window.VisibilityModCode.alterSnakeCode(code);
+};
+
+window.RemixMod.runCodeBefore = function () {
+  // Shared Blender placement: fill existing empty cells after Peaceful (trophy_21).
+  // The list is cached per panel because claiming a cell drops its "empty"
+  // marker class — rescanning would renumber the slots for every later mode,
+  // which used to leave the third mode with no slot at all.
+  window.claimPeacefulFollowSlot = function claimPeacefulFollowSlot(slotIndex) {
+    let panel = document.querySelector(".PWIidc");
+    if (!panel) return null;
+
+    let cached = window.remixBlenderSlots;
+    if (!cached || cached.panel !== panel) {
+      let peacefulImg = panel.querySelector('img[src$="trophy_21.png"]');
+      if (!peacefulImg) return null;
+      let outer =
+        (peacefulImg.closest &&
+          peacefulImg.closest(".vuOknd") &&
+          peacefulImg.closest(".vuOknd").parentElement) ||
+        (peacefulImg.parentElement && peacefulImg.parentElement.parentElement);
+      if (!outer || outer.parentElement !== panel) return null;
+      let empties = [];
+      let sib = outer.nextElementSibling;
+      while (sib) {
+        let inner = sib.querySelector(":scope > .vuOknd");
+        if (inner && inner.classList.contains("oBBKec")) {
+          empties.push(inner);
+        }
+        sib = sib.nextElementSibling;
+      }
+      cached = window.remixBlenderSlots = { panel: panel, slots: empties };
+    }
+
+    return cached.slots[slotIndex] || null;
+  };
+
+  window.populateRemixBlenderSlot = function populateRemixBlenderSlot(opts) {
+    if (!opts || !opts.id) return null;
+    let existing = document.getElementById(opts.id);
+    if (existing) return existing;
+    let slot = window.claimPeacefulFollowSlot(opts.slotIndex);
+    if (!slot) return null;
+    slot.id = opts.id;
+    slot.setAttribute("aria-label", opts.ariaLabel || "Toggle game mode");
+    slot.setAttribute("role", "button");
+    slot.setAttribute("tabindex", "0");
+    slot.classList.remove("oBBKec");
+    slot.setAttribute("class", "vuOknd blender_icon");
+    slot.innerHTML =
+      `<img class="DEvgAc blender_icon_img" src="` + opts.icon + `" alt="">`;
+    let onToggle = opts.onToggle;
+    slot.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (onToggle) onToggle();
+    });
+    slot.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (onToggle) onToggle();
+      }
+    });
+    return slot;
+  };
+
+  window.remixBaseRunCodeBefore();
+  // Modes claim their trophy slots after MorePudding (incl. MoreMenu) has
+  // finished adding its own, so their ids land at the end.
+  window.CandyMod.runCodeBefore();
+  window.ChessMod.runCodeBefore();
+  window.BurgerMod.runCodeBefore();
+  window.CatSpeed.runCodeBefore();
+  window.DiceCounts.runCodeBefore();
+  // After Chess/Burger helpers exist: re-enable SpeedInfo and gate its data.
+  window.RemixSpeedInfo.runCodeBefore();
+};
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.RemixMod.alterSnakeCode = function (code) {
+  code = window.remixBaseAlterSnakeCode(code);
+  // Candy → Chess → Burger (Burger builds on Chess-patched tick/f7/score)
+  code = window.CandyMod.alterSnakeCode(code);
+  code = window.ChessMod.alterSnakeCode(code);
+  code = window.BurgerMod.alterSnakeCode(code);
+  code = window.CatSpeed.alterSnakeCode(code);
+  code = window.DiceCounts.alterSnakeCode(code);
+  code = window.RemixSpeedInfo.alterSnakeCode(code);
+  return code;
+};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEAFTER
+////////////////////////////////////////////////////////////////////
+
+window.RemixMod.runCodeAfter = function () {
+  // Re-ensure blender toggles exist after DOM settles
+  window.CandyMod.runCodeAfter && window.CandyMod.runCodeAfter();
+  window.ChessMod.runCodeAfter && window.ChessMod.runCodeAfter();
+  window.BurgerMod.runCodeAfter && window.BurgerMod.runCodeAfter();
+  window.RemixSpeedInfo.runCodeAfter && window.RemixSpeedInfo.runCodeAfter();
+
+  let modIndicator = document.createElement("div");
+  modIndicator.style =
+    "position:absolute;font-family:Arial,sans-serif;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;";
+  modIndicator.textContent = "Remix Mod";
+  let canvasNode = document.getElementsByClassName("jNB0Ic")[0];
+  let parent = document.getElementsByClassName("EjCLSb")[0];
+  if (parent && canvasNode) {
+    parent.insertBefore(modIndicator, canvasNode);
+  }
+};
+
+
 window.mouseMode = {};
 
 ////////////////////////////////////////////////////////////////////
 //RUNCODEBEFORE
 ////////////////////////////////////////////////////////////////////
 
-window.mouseMode.runCodeBefore = function() {
-  if(window.PuddingMod) {
+window.mouseMode.runCodeBefore = function () {
+  if (window.RemixMod) {
+    window.RemixMod.runCodeBefore();
+  } else if (window.MorePudding) {
+    window.MorePudding.runCodeBefore();
+  } else if (window.PuddingMod) {
     window.PuddingMod.runCodeBefore();
   }
 
@@ -5111,333 +10540,1329 @@ window.mouseMode.runCodeBefore = function() {
   window.nextHeadY = 10;
   window.aimTrainer = false;
 
-  window.updateMousePos = function(event) {
-    let canvasRect = gameCanvasEl.getBoundingClientRect();
-    if(window.screen.orientation.angle === 0) {
-      const xOffsetFromBorder = globalThis.leftBorderWidth ?? 16;
-      const yOffsetFromBorder = globalThis.topBorderWidth ?? 16;
+  window.mouseCardinalFromAngle = function (angle) {
+    const tau = Math.PI * 2;
+    const a = ((angle % tau) + tau) % tau;
+    const quarter = Math.round(a / (Math.PI / 2)) % 4;
+    return ["RIGHT", "DOWN", "LEFT", "UP"][quarter];
+  };
 
-      mouseX = event.clientX - canvasRect.left - xOffsetFromBorder;
-      mouseY = event.clientY - canvasRect.top - yOffsetFromBorder;
+  window.mouseSnakeRef = function () {
+    const game = window.__remixGame || window.megaWholeSnakeObject;
+    if (!game) return null;
+    if (game.oa && game.oa.ka) return game.oa;
+    if (game.wb && game.wb.oa && game.wb.oa.ka) return game.wb.oa;
+    return null;
+  };
+
+  window.mouseIsChessActive = function () {
+    try {
+      if (typeof window.isChessActive === "function" && window.isChessActive()) {
+        return true;
+      }
+      const game = window.__remixGame || window.megaWholeSnakeObject;
+      if (game && typeof f7 === "function" && f7(game.settings, 24)) {
+        return true;
+      }
+    } catch (_e) {}
+    return false;
+  };
+
+  window.mouseSyncDirectionFromAngle = function () {
+    const snake = window.mouseSnakeRef();
+    if (!snake) return;
+    const dir = window.mouseCardinalFromAngle(window.faceAngle);
+    snake.direction = dir;
+    window.head_dir = dir;
+  };
+
+  // --- Chess (mouse): keep Remix behavior 100%. Only bridge fractional heads. ---
+  // Remix owns: findApple → score (piece→shield_all / fruit→Oh++), chess_tick_logic,
+  // capture_attempt, respawn. We must not reimplement those.
+  window.mouseInstallFindApple = function () {
+    // Remix findApple uses exact pos == head. Mouse: prefer the apple tagged on
+    // collision (do NOT clear here — chess_eating_piece AND the score hook both
+    // call findApple in the same eat), else same rounded tile.
+    window.findApple = function findApple(headPos, appleArray) {
+      if (window.__chessEatenApple) {
+        const tagged = window.__chessEatenApple;
+        if (appleArray) {
+          const ti = appleArray.indexOf(tagged);
+          tagged.myIndex = ti >= 0 ? ti : -1;
+        } else {
+          tagged.myIndex = -1;
+        }
+        return tagged;
+      }
+      if (!appleArray || !headPos) return null;
+      const rx = Math.round(headPos.x);
+      const ry = Math.round(headPos.y);
+      for (let index = 0; index < appleArray.length; index++) {
+        const element = appleArray[index];
+        if (!element || !element.pos) continue;
+        if (
+          Math.round(element.pos.x) === rx &&
+          Math.round(element.pos.y) === ry
+        ) {
+          element.myIndex = index;
+          return element;
+        }
+      }
+      return null;
+    };
+  };
+
+  window.mousePatchChessForMouse = function () {
+    // isChessActive: also detect via settings.ub / blender set (menu edge cases).
+    if (typeof window.isChessActive === "function" && !window.isChessActive.__mouse) {
+      const origIsChess = window.isChessActive;
+      window.isChessActive = function () {
+        if (origIsChess()) return true;
+        try {
+          const g = window.__remixGame || window.megaWholeSnakeObject;
+          const s = g && g.settings;
+          if (!s || window.CHESS_MODE == null) return false;
+          if (s.ub === window.CHESS_MODE) return true;
+          if (s.ZSa && s.ZSa.has(window.CHESS_MODE)) return true;
+          if (s.Jc && s.Jc.has(window.CHESS_MODE)) return true;
+        } catch (_e) {}
+        return false;
+      };
+      window.isChessActive.__mouse = true;
+    }
+
+    // Unlock math needs integer head tiles; restore live body ref afterward
+    // so Remix score findApple(head_pos[0]) still sees the real head.
+    if (typeof window.chess_tick_logic === "function" && !window.chess_tick_logic.__mouse) {
+      const origTick = window.chess_tick_logic;
+      window.chess_tick_logic = function () {
+        // Eat tag is only for the score/length hooks in the previous tick.
+        window.__chessEatenApple = null;
+        if (typeof window.faceAngle === "number") {
+          window.head_dir = window.mouseCardinalFromAngle(window.faceAngle);
+        }
+        const snake = window.mouseSnakeRef && window.mouseSnakeRef();
+        if (snake && snake.direction && snake.direction !== "NONE") {
+          window.head_dir = snake.direction;
+        }
+        const live = window.head_pos;
+        if (live && live[0]) {
+          const h = live[0];
+          window.head_pos = [{ x: Math.round(h.x), y: Math.round(h.y) }];
+          try {
+            return origTick.apply(this, arguments);
+          } finally {
+            window.head_pos = live;
+          }
+        }
+        return origTick.apply(this, arguments);
+      };
+      window.chess_tick_logic.__mouse = true;
+    }
+
+    // capture_attempt: Remix logic with rounded coords (pawn/king/knight).
+    if (typeof window.capture_attempt === "function" && !window.capture_attempt.__mouse) {
+      window.capture_attempt = function capture_attempt(x, y) {
+        if (window.head_state === "OPEN") return false;
+        if (!window.appleArray) return false;
+        x = Math.round(x);
+        y = Math.round(y);
+        for (let index = 0; index < window.appleArray.length; index++) {
+          const apple = window.appleArray[index];
+          if (
+            apple &&
+            apple.isPiece &&
+            Math.round(apple.pos.x) === x &&
+            Math.round(apple.pos.y) === y &&
+            window.head_color != apple.ChessColor
+          ) {
+            window.head_state = "OPEN";
+            if (window.selectedFruit == 22) {
+              let randomNumber = Math.floor(Math.random() * 51 + 1) % 52;
+              apple.type =
+                randomNumber === 22 ? (randomNumber + 1) % 52 : randomNumber;
+            } else {
+              apple.type = window.selectedFruit;
+            }
+            apple.isPiece = false;
+            window.shield_empty_all();
+            if (!window.muted && window.capture_sound) {
+              window.capture_sound.play();
+            }
+            return true;
+          }
+        }
+        return false;
+      };
+      window.capture_attempt.__mouse = true;
+    }
+  };
+  // Back-compat name used by runCodeAfter
+  window.mousePatchChessGenerous = window.mousePatchChessForMouse;
+
+
+  // Letterbox of the board onto the visible canvas (updated each render).
+  globalThis.leftBorderWidth = 16;
+  globalThis.topBorderWidth = 16;
+
+  window.updateMousePos = function (event) {
+    const el = window.gameCanvasEl;
+    if (!el) return true;
+    const canvasRect = el.getBoundingClientRect();
+    // CSS size may not match backing-store pixels — scale into game/canvas space.
+    const scaleX = (el.width || canvasRect.width) / (canvasRect.width || 1);
+    const scaleY = (el.height || canvasRect.height) / (canvasRect.height || 1);
+    const xOffsetFromBorder = globalThis.leftBorderWidth ?? 16;
+    const yOffsetFromBorder = globalThis.topBorderWidth ?? 16;
+
+    if (!window.screen.orientation || window.screen.orientation.angle === 0) {
+      mouseX =
+        (event.clientX - canvasRect.left) * scaleX - xOffsetFromBorder;
+      mouseY =
+        (event.clientY - canvasRect.top) * scaleY - yOffsetFromBorder;
     } else {
-      //Assume window.screen.orientation.angle === 90, although it's possible this might not be the case?
-      //Whole screen is rotated 90 deg, so calculations are a bit different
-      const topOfGameOffsetFromBorder = globalThis.leftBorderWidth ?? 16;
-      const sidesOfGameOffsetFromBorder = globalThis.topBorderWidth ?? 16;
+      mouseX =
+        (canvasRect.bottom - event.clientY) * scaleY - xOffsetFromBorder;
+      mouseY =
+        (event.clientX - canvasRect.left) * scaleX - yOffsetFromBorder;
+    }
+    return true;
+  };
 
-      mouseX = canvasRect.bottom - sidesOfGameOffsetFromBorder - event.clientY;
-      mouseY = event.clientX - canvasRect.left - topOfGameOffsetFromBorder;
+  window.updateFaceCoordsAndRotation = function (
+    blockyHeadCoord,
+    tileWidth,
+    bodyArray
+  ) {
+    // Prefer tile-center head in board pixels. Ec is pixel-space only after render;
+    // on tick/reset it is often still a tile coord and would break aiming.
+    const tileHead = bodyArray[0];
+    let headPx = {
+      x: tileHead.x * tileWidth + tileWidth / 2,
+      y: tileHead.y * tileWidth + tileWidth / 2,
+    };
+    if (
+      blockyHeadCoord &&
+      typeof blockyHeadCoord.x === "number" &&
+      (Math.abs(blockyHeadCoord.x - tileHead.x) > 2 ||
+        Math.abs(blockyHeadCoord.y - tileHead.y) > 2)
+    ) {
+      // Already in pixel space (post-render Ec).
+      headPx = { x: blockyHeadCoord.x, y: blockyHeadCoord.y };
     }
 
-    return true; //Returns true as convenience for touchstart handling (so we can chain with &&)
-  }
+    let headToMouseOffset = {
+      x: mouseX - headPx.x,
+      y: mouseY - headPx.y,
+    };
 
-  //blockyHeadCoord = `this.${blockyHeadCoord}`
-  //tileWidth = `this.${tileWidth}`/*usually a.wa*/
-  //bodyArray = `this.$1`/*Usually this.Ba*/
-  window.updateFaceCoordsAndRotation = function(blockyHeadCoord, tileWidth, bodyArray) {
-    let headToMouseOffset = {x:mouseX - blockyHeadCoord.x, y:mouseY - blockyHeadCoord.y};
+    let magnitude = Math.sqrt(
+      headToMouseOffset.x ** 2 + headToMouseOffset.y ** 2
+    );
+    if (magnitude < 1e-6) magnitude = 1e-6;
 
-    let magnitude = Math.sqrt(headToMouseOffset.x**2 + headToMouseOffset.y**2);
+    faceAngle = Math.atan2(headToMouseOffset.y, headToMouseOffset.x);
 
-    faceAngle = Math.atan(headToMouseOffset.y/headToMouseOffset.x);
-
-    if(headToMouseOffset.x < 0) {
+    // Poison / Burger control-loss: invert + wobble so mouse aim is unreliable.
+    const snake = window.mouseSnakeRef();
+    let poisoned = !!(snake && snake.Ja > 0);
+    if (poisoned) {
       faceAngle += Math.PI;
+      faceAngle += Math.sin(Date.now() / 70) * 1.35;
     }
 
-    if(!aimTrainer) {
-      var xDelta = headToMouseOffset.x/magnitude;
-      var yDelta = headToMouseOffset.y/magnitude;
-    } else{
-      var xDelta = headToMouseOffset.x/tileWidth;
-      var yDelta = headToMouseOffset.y/tileWidth;
+    // Arrow mode (idea 1): stamp a turn-trail on tiles you leave; lock to that dir on arrows.
+    // BaF/f7 are module-scoped — use window.mouseBaF / mouseF7 from alterSnakeCode.
+    // Rail: once an arrow engages, force that direction until the head has traveled
+    // a full tile from the engage point (survives leaving the painted cell + double
+    // updateFaceCoords calls from tick/render).
+    let arrowLock = null;
+    try {
+      const game = window.__remixGame || window.megaWholeSnakeObject;
+      const snakeForArrow = window.mouseSnakeRef();
+      const settings =
+        (game && game.settings) ||
+        (snakeForArrow && snakeForArrow.settings);
+      const hasMode =
+        typeof window.mouseSettingsHas === "function"
+          ? window.mouseSettingsHas(settings, 16)
+          : typeof window.mouseF7 === "function"
+            ? window.mouseF7(settings, 16)
+            : !!(
+                settings &&
+                (settings.ub === 16 ||
+                  (settings.ZSa && settings.ZSa.has(16)) ||
+                  (settings.Jc && settings.Jc.has(16)))
+              );
+      const arrowBoard =
+        (snakeForArrow && snakeForArrow.Tb) ||
+        (game && game.Ka) ||
+        (game && game.oa && game.oa.Tb);
+      const placeArrow =
+        typeof window.mouseBaF === "function"
+          ? window.mouseBaF
+          : typeof BaF === "function"
+            ? BaF
+            : null;
+      const readArrow =
+        typeof window.mouseEaF === "function"
+          ? window.mouseEaF
+          : typeof eaF === "function"
+            ? eaF
+            : function (board, t) {
+                const cell =
+                  board && board.ka && board.ka[t.y] && board.ka[t.y][t.x];
+                return cell && cell.direction ? cell.direction : "NONE";
+              };
+      if (hasMode && arrowBoard && bodyArray && bodyArray[0]) {
+        const hx = bodyArray[0].x;
+        const hy = bodyArray[0].y;
+        const tile = {
+          x: Math.round(hx),
+          y: Math.round(hy),
+        };
+        const tileKey = tile.x + "," + tile.y;
+        const map = {
+          RIGHT: 0,
+          DOWN: Math.PI / 2,
+          LEFT: Math.PI,
+          UP: -Math.PI / 2,
+        };
+        const unit = {
+          RIGHT: [1, 0],
+          DOWN: [0, 1],
+          LEFT: [-1, 0],
+          UP: [0, -1],
+        };
+
+        const existing = readArrow(arrowBoard, tile);
+        const onArrow =
+          existing && existing !== "NONE" && map[existing] !== undefined;
+
+        if (!window.mouseArrowRail) window.mouseArrowRail = null;
+        let rail = window.mouseArrowRail;
+
+        // Finished the committed tile of travel?
+        if (rail) {
+          const traveled =
+            (hx - rail.startX) * rail.ux + (hy - rail.startY) * rail.uy;
+          if (traveled >= rail.need - 1e-6) {
+            window.mouseArrowRail = null;
+            rail = null;
+          }
+        }
+
+        // Engage / redirect when on an arrow (or chain onto a different dir).
+        if (onArrow && (!rail || rail.dir !== existing)) {
+          const u = unit[existing];
+          // Rest of the current cell + one full tile — long enough to matter
+          // (locking only while round(head) matched the painted cell was ~1 frame).
+          let toEdge = 1;
+          if (existing === "RIGHT") {
+            const f = hx - Math.floor(hx);
+            toEdge = f < 1e-9 ? 1 : 1 - f;
+          } else if (existing === "LEFT") {
+            const f = hx - Math.floor(hx);
+            toEdge = f < 1e-9 ? 1 : f;
+          } else if (existing === "DOWN") {
+            const f = hy - Math.floor(hy);
+            toEdge = f < 1e-9 ? 1 : 1 - f;
+          } else if (existing === "UP") {
+            const f = hy - Math.floor(hy);
+            toEdge = f < 1e-9 ? 1 : f;
+          }
+          rail = {
+            dir: existing,
+            ux: u[0],
+            uy: u[1],
+            startX: hx,
+            startY: hy,
+            need: toEdge + 1,
+          };
+          window.mouseArrowRail = rail;
+        }
+
+        if (rail) {
+          faceAngle = map[rail.dir];
+          // Same top speed as free mouse; may take 2 ticks to finish the rail.
+          const traveled =
+            (hx - rail.startX) * rail.ux + (hy - rail.startY) * rail.uy;
+          const left = Math.max(rail.need - traveled, 0);
+          const step = Math.min(1, left);
+          arrowLock = [rail.ux * step, rail.uy * step];
+        }
+
+        const dir = window.mouseCardinalFromAngle(faceAngle);
+        if (!window.mouseArrowTrail) {
+          window.mouseArrowTrail = {
+            dir: null,
+            tile: null,
+            lastStampTile: null,
+          };
+        }
+        const trail = window.mouseArrowTrail;
+
+        // Turn-trail only: stamp when free aim facing changes, at most once per tile.
+        // Skip while railed (rail redirect isn't a player turn).
+        // (Stamping every tile leave painted the whole path and flooded the board.)
+        if (
+          placeArrow &&
+          !rail &&
+          trail.dir &&
+          trail.dir !== dir &&
+          trail.lastStampTile !== tileKey
+        ) {
+          try {
+            placeArrow(arrowBoard, dir, tile);
+          } catch (_spawnErr) {}
+          trail.lastStampTile = tileKey;
+        }
+
+        trail.dir = dir;
+        trail.tile = tileKey;
+      } else if (!hasMode) {
+        // Left arrow mode — drop trail/rail so nothing leaks into the next run.
+        window.mouseArrowTrail = null;
+        window.mouseArrowRail = null;
+      }
+    } catch (_e) {}
+
+    let xDelta;
+    let yDelta;
+    if (arrowLock) {
+      xDelta = arrowLock[0];
+      yDelta = arrowLock[1];
+    } else if (!aimTrainer) {
+      xDelta = headToMouseOffset.x / magnitude;
+      yDelta = headToMouseOffset.y / magnitude;
+      if (poisoned) {
+        // Repel: move opposite the cursor (already inverted angle; keep unit step).
+        xDelta = Math.cos(faceAngle);
+        yDelta = Math.sin(faceAngle);
+      }
+    } else {
+      xDelta = headToMouseOffset.x / tileWidth;
+      yDelta = headToMouseOffset.y / tileWidth;
     }
 
     nextHeadX = bodyArray[0].x + xDelta;
     nextHeadY = bodyArray[0].y + yDelta;
-  }
+    window.mouseSyncDirectionFromAngle();
+  };
 
-  //Helper function for rounding and clamping with an upper bound of boardSideLength - 1 and a lower bound of 0.
-  window.roundClamp = function(value, boardSideLength) {
+  window.roundClamp = function (value, boardSideLength) {
     let res = Math.round(value);
     res = Math.min(res, boardSideLength - 1);
     res = Math.max(res, 0);
     return res;
-  }
+  };
 
-  window.setupMenuCheckbox = function() {
-    let checkboxHtml = `
+  window.setupMenuCheckbox = function () {
+    try {
+      let host =
+        document.getElementsByClassName("sXu3u")[0] ||
+        document.querySelector(".sXu3u");
+      if (!host || document.getElementById("aim-train")) return;
+
+      let checkboxContainer = document.createElement("div");
+      checkboxContainer.className = "e1XC2b";
+      checkboxContainer.innerHTML = `
       <div id="mouse" style="text-align:center; top: 0px; cursor:default;">
         <label class="form-check-label" for="aim-train" style="height:44px;line-height:44px;opacity:100%;">Aim Trainer?</label>
         <input id="aim-train" type="checkbox">
-      </div>
-    `;
-    let checkboxContainer = document.createElement('div');
-    checkboxContainer.className = 'e1XC2b';
-    checkboxContainer.innerHTML = checkboxHtml;
-    document.getElementsByClassName('sXu3u')[0].appendChild(checkboxContainer);
+      </div>`;
+      host.appendChild(checkboxContainer);
 
-    let snakePopup = document.getElementsByClassName('T7SB3d')[1];
-    let popupHeight = window.getComputedStyle(snakePopup,'null').getPropertyValue('height').assertMatch(/\d+/)[0];
-    popupHeight = (parseInt(popupHeight) + 44) + 'px';
-    snakePopup.style.height = popupHeight;
+      let snakePopup = document.getElementsByClassName("T7SB3d")[1];
+      if (snakePopup) {
+        let popupHeight = window
+          .getComputedStyle(snakePopup, null)
+          .getPropertyValue("height")
+          .match(/\d+/);
+        if (popupHeight) {
+          snakePopup.style.height = parseInt(popupHeight[0], 10) + 44 + "px";
+        }
+      }
 
-    document.getElementById('aim-train').onchange = function() {
-      aimTrainer = this.checked;
+      document.getElementById("aim-train").onchange = function () {
+        aimTrainer = this.checked;
+      };
+    } catch (err) {
+      console.warn("MouseMod: Aim Trainer checkbox setup failed", err);
     }
-  }
-}
+  };
+};
 
 ////////////////////////////////////////////////////////////////////
 //ALTERSNAKECODE
 ////////////////////////////////////////////////////////////////////
 
-window.mouseMode.alterSnakeCode = function(code) {
-  if(window.PuddingMod) {
+window.mouseMode.alterSnakeCode = function (code) {
+  if (window.RemixMod) {
+    code = window.RemixMod.alterSnakeCode(code);
+  } else if (window.MorePudding) {
+    code = window.MorePudding.alterSnakeCode(code);
+  } else if (window.PuddingMod) {
     code = window.PuddingMod.alterSnakeCode(code);
   }
-  //lifted tileWidth from apple-snake
-  window.tileWidth = code.assertMatch(/[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];//wa
 
-  //Head pos, but not properly lerped. k9. Lifted from apple-snake. SnakeDetails contains lots of different properties of the snake.
-  [,window.snakeDetails,window.blockyHeadCoord] = code.assertMatch(/this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})=\n?[$a-zA-Z0-9_]{0,8}\.clone\(\),/);
+  code = code.replaceAll(/\$\$/gm, "doubleD");
 
-  window.coordConstructor = code.assertMatch(/new (_\.[$a-zA-Z0-9_]{0,8})\(1,1\)/)[1];
+  const step = (name, fn, optional = false) => {
+    try {
+      return fn();
+    } catch (e) {
+      console.error(
+        "MouseMod PATCH FAIL:",
+        name,
+        e && e.message,
+        optional ? "(optional)" : ""
+      );
+      if (optional) return null;
+      throw e;
+    }
+  };
 
-  window.bodyArray = code.assertMatch(/[a-z]=\n?this\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\),"LEFT"/)[1];
+  // tileWidth path e.g. "ka.ka" (game.ka.ka / renderer.wb.ka.ka)
+  window.tileWidth = step("tileWidth", () =>
+    code.assertMatch(
+      /[a-z]\.[$a-zA-Z0-9_]{0,8}\.fillRect\([a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}),[a-z]\*[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8},[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/
+    )[1]
+  );
 
-  //Start and end point of snake segment for doing corners with quadraticCurveTo
-  [, window.endPoint, window.startPoint] = code.assertMatch(/continue}var ([$a-zA-Z0-9_]{0,8})=[$a-zA-Z0-9_]{0,8}\.clone\(\),([$a-zA-Z0-9_]{0,8})=[$a-zA-Z0-9_]{0,8}\.clone\(\);/);
+  // snakeDetails e.g. "wb" ; blockyHeadCoord e.g. "oa.Ec"
+  step("blockyHead", () => {
+    [, window.snakeDetails, window.blockyHeadCoord] = code.assertMatch(
+      /this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})=\n?[$a-zA-Z0-9_]{0,8}\.clone\(\),/
+    );
+  });
 
-  //Twiddle the out of bounds hitreg to be slightly friendlier. Note the change to strict inequality to disallow -1. Perhaps it would've been better to make a new bounds checking function instead.
-  let funcWithBoundsHitReg, funcWithBoundsHitRegOrig;
-  //IMPORTANT
-  funcWithBoundsHitReg = funcWithBoundsHitRegOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,6}\.prototype\.[$a-zA-Z0-9_]{0,6}=function\(a\)$|[$a-zA-Z0-9_]{0,8}=function\(a,b\)$/,
-  //IMPORTANT - this regex has two different patterns separated by "|", this depends on whether they have the mute update. Same for the bit above
-  /return 0<=[a-z]\.x&&[a-z]\.x<this\.[$a-zA-Z0-9_]{0,6}\.width&&0<=[a-z]\.y&&[a-z]\.y<this\.[$a-zA-Z0-9_]{0,6}\.height|return 0<=[a-z]\.x&&[a-z]\.x<[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.width&&0<=[a-z]\.y&&[a-z]\.y<[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height/,
-  //IMPORTANT
-  false);
+  window.coordConstructor = step("coordCtor", () =>
+    code.assertMatch(/new (_\.[$a-zA-Z0-9_]{0,8})\(1,1\)/)[1]
+  );
 
-  funcWithBoundsHitReg = assertReplaceAll(funcWithBoundsHitReg, '0<=', '-1<');
+  // bodyArray e.g. "oa.ka"
+  window.bodyArray = step("bodyArray", () =>
+    code.assertMatch(
+      /this\.[$a-zA-Z0-9_]{0,8}\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\)/
+    )[1]
+  );
 
-  code = code.replace(funcWithBoundsHitRegOrig, funcWithBoundsHitReg);
+  // Soft fractional OOB (do NOT round here — rounding near edges false-kills Borderless).
+  // Grid indexers below round separately.
+  code = step("n7bounds", () =>
+    code.assertReplace(
+      /n7=function\([a-z],[a-z]\)\{return [a-z]\.x>=0&&[a-z]\.x<[a-z]\.[$a-zA-Z0-9_]{0,8}\.width&&[a-z]\.y>=0&&[a-z]\.y<[a-z]\.[$a-zA-Z0-9_]{0,8}\.height\}/,
+      "n7=function(a,b){return b.x>-0.5&&b.x<a.oa.width-0.5&&b.y>-0.5&&b.y<a.oa.height-0.5}"
+    )
+  );
 
-  //Lifted update function from delete stuff mod
-  let funcWithEat, funcWithEatOrig;
-  funcWithEat = funcWithEatOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.tick=function\(\)$/,
-  /if\([$a-zA-Z0-9_]{0,8}\|\|\n?[$a-zA-Z0-9_]{0,8}\){var [$a-zA-Z0-9_]{0,8}=\n?[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8};\n?[$a-zA-Z0-9_]{0,8}\|\|\n?\([$a-zA-Z0-9_]{0,8}=\n?!0,[$a-zA-Z0-9_]{0,8}\?[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.play\(\)/,
-  false);
+  // Borderless: never die to OOB (wrap handles it). Tc(a){n7(...)||this.Na()}
+  {
+    const next = step(
+      "oobTc",
+      () =>
+        code.assertReplace(
+          /Tc\(a\)\{n7\(this\.ka,a\)\|\|this\.Na\(\)/,
+          "Tc(a){o7(this.settings)||n7(this.ka,a)||this.Na()"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
 
-  //Set the candidate coord for the next head here so that it gets used in the collision checks and then added to the head of the snake
-  funcWithEat = assertReplace(funcWithEat,/case "DOWN":([$a-zA-Z0-9_]{0,8})\.y\+=\n?1,[$a-zA-Z0-9_]{0,8}&&[$a-zA-Z0-9_]{0,8}\.y>=\n?[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.height&&\n?\([$a-zA-Z0-9_]{0,8}\.y=\n?0\)}/,
-  `$&
-  updateFaceCoordsAndRotation(this.${blockyHeadCoord}, this.${tileWidth}, this.${bodyArray});
-  let nextHead = new ${coordConstructor}(nextHeadX, nextHeadY);
-  $1 = nextHead;
+  // Tile Map keys must be integers (walls / statue / mines / gates).
+  code = step("Z6", () =>
+    code.assertReplace(
+      /Z6=function\(a\)\{return a\.x<<16\|a\.y\}/,
+      "Z6=function(a){return Math.round(a.x)<<16|Math.round(a.y)}"
+    )
+  );
+
+  // Statue flood-fill board indexing.
+  code = step("jdF", () =>
+    code.assertReplace(
+      /jdF=function\(a,b,c\)\{if\(n7\(a\.ka,c\)&&!a\.oa\.get\(Z6\(c\)\)\)\{var d=b\[c\.y\]\[c\.x\];/,
+      "jdF=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(n7(a.ka,c)&&!a.oa.get(Z6(c))){var d=b[c.y][c.x];"
+    )
+  );
+
+  // Arrow / gate / sokoban / bridge: round before 2D board indexing.
+  code = step("eaF", () =>
+    code.assertReplace(
+      /eaF=function\(a,b\)\{return n7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.direction:"NONE"\}/,
+      'eaF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return n7(a.oa,b)?a.ka[b.y][b.x].direction:"NONE"}'
+    )
+  );
+  code = step("daF", () =>
+    code.assertReplace(
+      /daF=function\(a,b\)\{return n7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.Gh:!1\}/,
+      'daF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return n7(a.oa,b)?a.ka[b.y][b.x].Gh:!1}'
+    )
+  );
+  code = step("BaF", () =>
+    code.assertReplace(
+      /BaF=function\(a,b,c\)\{var d=a\.ka\[c\.y\]\[c\.x\];/,
+      "BaF=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(!a.ka[c.y]||a.ka[c.y][c.x]==null)return;var d=a.ka[c.y][c.x];"
+    )
+  );
+  // Expose arrow helpers to window (module-scoped BaF/f7 are invisible to runCodeBefore).
+  code = step("exposeArrowApi", () =>
+    code.assertReplace(
+      /c\.color=a\)\},CaF=class\{constructor\(a,b,c\)\{this\.settings=a;this\.oa=b;this\.wa=c;this\.ka=\[\]\}/,
+      "c.color=a)};window.mouseBaF=BaF;window.mouseEaF=eaF;window.mouseF7=f7;window.mouseSettingsHas=f7;var CaF=class{constructor(a,b,c){this.settings=a;this.oa=b;this.wa=c;this.ka=[]}"
+    )
+  );
+  code = step("i7", () =>
+    code.assertReplace(
+      /i7=function\(a,b,c\)\{var d=a\.ka\[b\.y\]\[b\.x\];/,
+      "i7=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};if(!n7(a.oa,b))return;var d=a.ka[b.y][b.x];"
+    )
+  );
+  code = step("cbF", () =>
+    code.assertReplace(
+      /cbF=function\(a,b,c\)\{b=a\.ka\[b\.y\]\[b\.x\];/,
+      // Only enter gates when nearly on-tile — fractional heads were snapping/teleporting early.
+      "cbF=function(a,b,c){if(Math.abs(b.x-Math.round(b.x))>0.35||Math.abs(b.y-Math.round(b.y))>0.35)return;b={x:Math.round(b.x),y:Math.round(b.y)};if(!a.ka[b.y]||a.ka[b.y][b.x]==null)return;b=a.ka[b.y][b.x];"
+    )
+  );
+
+  // Gate setActive: round tile before Yfa grid lookup (float head crashed here).
+  {
+    const next = step(
+      "gateSetActive",
+      () =>
+        code.assertReplace(
+          /setActive\(a,b,c\)\{var d=this\.ka\[a\.y\]\[a\.x\]\.Yfa\.get\(b\);/,
+          "setActive(a,b,c){a={x:Math.round(a.x),y:Math.round(a.y)};var d=this.ka[a.y]&&this.ka[a.y][a.x];if(!d)return;d=d.Yfa.get(b);"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Bridge render/activate: round segment coords before oa[y][x].
+  {
+    const next = step(
+      "bridgeOa",
+      () =>
+        code.assertReplace(
+          /\(\(ce=this\.wb\.Fa\.oa\[yc\.y\]\)==null\?0:ce\[yc\.x\]\)/,
+          "((ce=this.wb.Fa.oa[Math.round(yc.y)])==null?0:ce[Math.round(yc.x)])"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "HaF",
+      () =>
+        code.assertReplace(
+          /HaF=function\(a,b\)\{return GaF\(a,b\.x,b\.y,!1\)\}/,
+          "HaF=function(a,b){return GaF(a,Math.round(b.x),Math.round(b.y),!1)}"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "GaF",
+      () =>
+        code.assertReplace(
+          /GaF=function\(a,b,c,d=!1\)\{a=a\.wa\[c\]\[b\];/,
+          "GaF=function(a,b,c,d=!1){b=Math.round(b);c=Math.round(c);if(!a.wa[c])return!1;a=a.wa[c][b];"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "dbF",
+      () =>
+        code.assertReplace(
+          /dbF=function\(a,b,c\)\{b=b\.clone\(\);/,
+          "dbF=function(a,b,c){b=b.clone();b.x=Math.round(b.x);b.y=Math.round(b.y);"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "rbF",
+      () =>
+        code.assertReplace(
+          /rbF=function\(a,b,c\)\{for\(var d;n7\(a\.ka,b\)&&\(\(d=a\.oa\[b\.y\]\[b\.x\]\)==null\?0:d\.Gh\);\)/,
+          "rbF=function(a,b,c){b.x=Math.round(b.x);b.y=Math.round(b.y);for(var d;n7(a.ka,b)&&((d=a.oa[b.y]&&a.oa[b.y][b.x])==null?0:d.Gh);)"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "scF",
+      () =>
+        code.assertReplace(
+          /scF=function\(a,b,c\)\{a\.Aa\.set\(Z6\(b\),c\);a\.wa\[b\.y\]\[b\.x\]\+\+\}/,
+          "scF=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.set(Z6(b),c);a.wa[b.y][b.x]++}"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "pcF",
+      () =>
+        code.assertReplace(
+          /pcF=function\(a,b\)\{a\.Aa\.delete\(Z6\(b\)\);a\.wa\[b\.y\]\[b\.x\]--\}/,
+          "pcF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.delete(Z6(b));a.wa[b.y][b.x]--}"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Sokoban occupancy: mark rounded body tiles (don't skip fractional segments).
+  {
+    const next = step(
+      "mdFbody",
+      () =>
+        code.assertReplace(
+          /d=b\.ka\[c\],f7\(b\.settings,3\)&&\(d\.x\+d\.y\)%2===0\|\|f7\(b\.settings,11\)&&!b\.wa\[c\]\|\|d\.x%1!==0\|\|d\.y%1!==0\|\|/,
+          "d=b.ka[c],d={x:Math.round(d.x),y:Math.round(d.y)},f7(b.settings,3)&&(d.x+d.y)%2===0||f7(b.settings,11)&&!b.wa[c]||"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Sokoban: generous snoot push; snap to tiles; unlock apples when box hits a goal.
+  // (Vanilla unlock lives at the end of gbF — mouse never calls gbF because head.equals fails.)
+  {
+    const next = step(
+      "jbF",
+      () =>
+        code.assertReplace(
+          /jbF=function\(a,b,c,d\)\{b=c\?k7\(a\.ka,b\):b;c=c\?\$6\(a\.Aa\.direction\):a\.Aa\.direction;for\(let h of a\.oa\)if\(h\.Gh&&h\.pos\.equals\(b\)\)\{if\(n\$E\(a\.settings\.ka,h\.sequenceNumber,a\.wa\.wa\)\)\{d\(\);break\}var e=h\.pos\.clone\(\),f=!1;if\(bbF\(a\.settings\)\)\{let k;var g=\(k=cbF\(a\.Fa,h\.pos,c\)\)!=null\?k:f7\(a\.settings,20\)\?dbF\(a\.Ja,\s*h\.pos,c\):void 0;g&&\(e\.x=g\.x,e\.y=g\.y,f=!0\)\}if\(!f\)switch\(c\)\{case "RIGHT":e\.x\+=1;break;case "LEFT":--e\.x;break;case "DOWN":e\.y\+=1;break;case "UP":--e\.y\}f7\(a\.settings,4\)&&j7\(a\.ka,e\);g=n7\(a\.ka,e\)&&a\.ka\.wa\[e\.y\]\[e\.x\]!==10&&HaF\(a\.ka,e\);f=!n7\(a\.ka,e\)&&!f7\(a\.settings,4\)&&f;if\(g\|\|f\)\{f=f7\(a\.settings,7\)&&PaF\(a\.ka\)&&h\.pos\.x===Math\.floor\(a\.ka\.oa\.width\/2\)&&h\.pos\.y===Math\.floor\(a\.ka\.oa\.height\/2\);if\(a\.ka\.wa\[e\.y\]\[e\.x\]!==5&&a\.ka\.wa\[e\.y\]\[e\.x\]!==11&&a\.ka\.wa\[e\.y\]\[e\.x\]!==7&&!f\)switch\(h\.prev=h\.pos\.clone\(\),e=1\/3,a\.Aa\.direction\)\{case "RIGHT":h\.pos\.x\+=\s*e;break;case "LEFT":h\.pos\.x-=e;break;case "DOWN":h\.pos\.y\+=e;break;case "UP":h\.pos\.y-=e\}d\(\)\}else f7\(a\.settings,16\)&&eaF\(a\.Ba,e\)===\$6\(c\)&&daF\(a\.Ba,e\)&&d\(\)\}\}/,
+          `jbF=function(a,b,c,d){b=c?k7(a.ka,b):b;b={x:Math.round(b.x),y:Math.round(b.y)};c=(typeof faceAngle==="number"?window.mouseCardinalFromAngle(faceAngle):a.Aa.direction);var __sokoGoal=function(box){for(let g of a.B_){if(Math.round(box.pos.x)===Math.round(g.x)&&Math.round(box.pos.y)===Math.round(g.y)){fbF(a,box);a.B_.delete(g);if(f7(a.settings,7)){var m=k7(a.ka,g);for(let t of a.B_)if(Math.round(t.x)===Math.round(m.x)&&Math.round(t.y)===Math.round(m.y)){a.B_.delete(t);break}}return!0}}return!1};for(let h of a.oa){if(!h.Gh)continue;h.pos.x=Math.round(h.pos.x);h.pos.y=Math.round(h.pos.y);if(__sokoGoal(h))continue;if(Math.hypot(h.pos.x-b.x,h.pos.y-b.y)>=1.75)continue;if(n$E(a.settings.ka,h.sequenceNumber,a.wa.wa))continue;var e=h.pos.clone();switch(c){case "RIGHT":e.x+=1;break;case "LEFT":--e.x;break;case "DOWN":e.y+=1;break;case "UP":--e.y;break;default:continue}f7(a.settings,4)&&j7(a.ka,e);e.x=Math.round(e.x);e.y=Math.round(e.y);var other=false;for(let o of a.oa)if(o!==h&&o.Gh&&Math.round(o.pos.x)===e.x&&Math.round(o.pos.y)===e.y){other=true;break}var cell=a.ka.wa[e.y]&&a.ka.wa[e.y][e.x],destOk=n7(a.ka,e)&&!other&&cell!==10&&!HaF(a.ka,e);if(destOk){h.prev=h.pos.clone();h.pos.x=e.x;h.pos.y=e.y;__sokoGoal(h);}}}`
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Also make vanilla gbF goal check tolerant of any residual float coords.
+  {
+    const next = step(
+      "gbFgoal",
+      () =>
+        code.assertReplace(
+          /for\(let g of a\.B_\)if\(b\.pos\.equals\(g\)\)\{fbF\(a,b\);a\.B_\.delete\(g\);/,
+          "for(let g of a.B_)if(Math.round(b.pos.x)===Math.round(g.x)&&Math.round(b.pos.y)===Math.round(g.y)){fbF(a,b);a.B_.delete(g);"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Sokoban: overlapping a box tile must not kill (push handles it).
+  {
+    const next = step(
+      "sokoNoKill",
+      () =>
+        code.assertReplace(
+          /n7\(this\.wb\.ka,ce\)&&\s*this\.wb\.ka\.wa\[ae\.y\]\[ae\.x\]===7&&HaF\(this\.wb\.ka,ce\)&&\(Xc=!0\)/,
+          "false&&(Xc=!0)"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Borderless: always use fixed camera (same as Borderless+Tally via bcF).
+  code = step("bcF", () =>
+    code.assertReplace(
+      /bcF=function\(a\)\{return f7\(a,4\)&&\(f7\(a,2\)\|\|f7\(a,5\)\|\|f7\(a,\s*19\)\|\|f7\(a,20\)\|\|a\.ka===6\)\}/,
+      "bcF=function(a){return f7(a,4)}"
+    )
+  );
+
+  // Minesweeper: keep vanilla fuse (F2a countdown). Do NOT widen the detonation
+  // AcF check — that skipped the timer and exploded as soon as you got near.
+  // Arming still uses AcF(...,1) in EcF (works with fractional heads).
+  // When the mine explodes with the head in blast radius, die (vanilla d()/e()).
+
+  // Hotdog: spawn 2 fewer front-side neighbor walls (drop forward diagonals).
+  {
+    const next = step(
+      "hotdogFront",
+      () =>
+        code.assertReplace(
+          /IcF=function\(a,b\)\{scF\(a,b,\{pos:b,Cm:!0,T0:!1,Gh:!f7\(a\.settings,11\)\}\);var c=\[new _\.Sd\(b\.x-1,b\.y-1\),new _\.Sd\(b\.x,b\.y-1\),new _\.Sd\(b\.x\+1,b\.y-1\),new _\.Sd\(b\.x-1,b\.y\),new _\.Sd\(b\.x\+1,b\.y\),new _\.Sd\(b\.x-1,b\.y\+1\),new _\.Sd\(b\.x,b\.y\+1\),new _\.Sd\(b\.x\+1,b\.y\+1\)\];if\(f7\(a\.settings,4\)\)for\(var d of c\)j7\(a\.ka,d\);for\(let e of c\)n7\(a\.ka,\s*e\)&&a\.wa\[e\.y\]\[e\.x\]\+\+;/,
+          `IcF=function(a,b){scF(a,b,{pos:b,Cm:!0,T0:!1,Gh:!f7(a.settings,11)});var c=[new _.Sd(b.x-1,b.y-1),new _.Sd(b.x,b.y-1),new _.Sd(b.x+1,b.y-1),new _.Sd(b.x-1,b.y),new _.Sd(b.x+1,b.y),new _.Sd(b.x-1,b.y+1),new _.Sd(b.x,b.y+1),new _.Sd(b.x+1,b.y+1)];if(f7(a.settings,4))for(var d of c)j7(a.ka,d);{let __s=window.mouseSnakeRef&&window.mouseSnakeRef(),__dir=__s&&__s.direction,fx=__dir==="RIGHT"?1:__dir==="LEFT"?-1:0,fy=__dir==="DOWN"?1:__dir==="UP"?-1:0;if(fx||fy)c=c.filter(p=>{const dx=p.x-b.x,dy=p.y-b.y;return !(dx&&dy&&dx*fx+dy*fy>0);});}for(let e of c)n7(a.ka,e)&&a.wa[e.y][e.x]++;`
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Shield / chess Oba: on-tile (rounded), never OaF<1.
+  // Chess reuses shield Oba and locks EVERY apple while carrying — fractional
+  // heads with hypot death make carrying unplayable under mouse.
+  {
+    const next = step(
+      "shieldTick",
+      () =>
+        code.assertReplace(
+          /\(e7\(this\.settings\)\?OaF\(this\.ka,a,f\.pos\)<1:f\.pos\.equals\(a\)\)&&\(\(g=f\.Oba\)==null\?0:g\.has\(d\)\)&&this\.Na\(\)/,
+          "(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y))&&((g=f.Oba)==null?0:g.has(d))&&this.Na()"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "shieldRender",
+      () =>
+        code.assertReplace(
+          /ae\.equals\(Qd\.pos\)&&\(\(ge=Qd\.Oba\)==null\?0:ge\.has\(xc\)\)&&\(Xc=!0\)/,
+          "Math.round(ae.x)===Math.round(Qd.pos.x)&&Math.round(ae.y)===Math.round(Qd.pos.y)&&((ge=Qd.Oba)==null?0:ge.has(xc))&&(Xc=!0)"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Disable cardinal head steps (More Menu may respace operators)
+  code = step("switchFalse", () => {
+    const patterns = [
+      /switch\(([a-z])\.direction\)\{case "LEFT":--([a-z])\.x;/,
+      /switch\(([a-z])\.direction\)\{case "LEFT":--\s*([a-z])\.x;/,
+      /switch\(([a-zA-Z0-9_$]+)\.direction\)\s*\{\s*case "LEFT":\s*--\s*([a-zA-Z0-9_$]+)\.x\s*;/,
+      /switch\(([a-zA-Z0-9_$]+)\.direction\)\{case "LEFT":([a-zA-Z0-9_$]+)\.x--/,
+    ];
+    for (const p of patterns) {
+      if (p.test(code)) {
+        return code.assertReplace(
+          p,
+          'switch(false){case "LEFT":--$2.x;'
+        );
+      }
+    }
+    const idx = code.search(/case "LEFT":/);
+    const hits = [];
+    let i = 0,
+      from = 0;
+    while (i < 5) {
+      const j = code.indexOf("switch(", from);
+      if (j < 0) break;
+      const snip = code.slice(j, j + 80);
+      if (snip.includes("direction")) hits.push(snip);
+      from = j + 6;
+      i++;
+    }
+    console.error("MouseMod switch debug LEFT@", idx, code.slice(Math.max(0, idx - 60), idx + 100));
+    console.error("MouseMod switch(direction) hits", hits);
+    throw new Error("no switch(direction) LEFT pattern");
+  });
+
+  // After the (disabled) direction switch, inject mouse next-head.
+  code = step("injectHead", () => {
+    const patterns = [
+      /(switch\(false\)\{case "LEFT":[^]*?case "DOWN":([a-z])\.y\+=\n?1,[^]*?\})/,
+      /(switch\(false\)\{case "LEFT":[^]*?case "DOWN":([a-zA-Z0-9_$]+)\.y\s*\+=\s*1[^]*?\})/,
+    ];
+    for (const p of patterns) {
+      if (p.test(code)) {
+        return code.assertReplace(
+          p,
+          `$1
+  updateFaceCoordsAndRotation(this.${window.blockyHeadCoord}, this.${window.tileWidth}, this.${window.bodyArray});
+  $2 = new ${window.coordConstructor}(nextHeadX, nextHeadY);
   `
+        );
+      }
+    }
+    const idx = code.indexOf("switch(false)");
+    console.error(
+      "MouseMod injectHead debug",
+      idx,
+      code.slice(idx, idx + 350)
+    );
+    throw new Error("injectHead pattern miss");
+  });
+
+  // Force winged-style fruit proximity
+  code = step("wingedFruit", () =>
+    code.assertReplace(
+      /if\(e7\(this\.settings\)\)\{let ([$a-zA-Z0-9_]{0,8})=this\.oa\.ka\[0\]!==void 0/,
+      "if(true){let $1=this.oa.ka[0]!==void 0"
+    )
   );
 
-  //Check for apple collisions the same way that winged mode does.
-  funcWithEat = assertReplace(funcWithEat,/[$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},6\)\){if\([$a-zA-Z0-9_]{0,8}=1>/,
-  'true || $&');
+  // Tally: non-current (higher index) apples act as walls for fractional heads.
+  // Vanilla uses .equals which never hits under mouse.
+  {
+    const next = step(
+      "tallyWallTick",
+      () =>
+        code.assertReplace(
+          /\(e7\(this\.settings\)\?OaF\(this\.ka,a,d\.pos\)<1:d\.pos\.equals\(a\)\)&&n\$E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Na\(\)/,
+          "Math.hypot(a.x-d.pos.x,a.y-d.pos.y)<1&&n$E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Na()"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "tallyWallYY",
+      () =>
+        code.assertReplace(
+          /\(f7\(this\.settings,6\)\?OaF\(this\.ka,b,d\.pos\)<1:d\.pos\.equals\(b\)\)&&n\$E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Na\(\)/,
+          "Math.hypot(b.x-d.pos.x,b.y-d.pos.y)<1&&n$E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Na()"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "tallyWallRender",
+      () =>
+        code.assertReplace(
+          /Qd\.Gh&&Qd\.pos\.equals\(ae\)&&n\$E\(this\.settings\.ka,Qd\.sequenceNumber,this\.wb\.wa\.wa\)/,
+          "Qd.Gh&&Math.hypot(Qd.pos.x-ae.x,Qd.pos.y-ae.y)<1&&n$E(this.settings.ka,Qd.sequenceNumber,this.wb.wa.wa)"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
 
-  //Disable the code that affects the head position based on whether left/right etc is pressed
-  funcWithEat = assertReplace(funcWithEat,/switch\([$a-zA-Z0-9_]{0,8}\.direction\){/,
-  `switch(false){`);
+  // Key pickup: distance instead of tile equals
+  {
+    const next = step(
+      "keys",
+      () =>
+        code.assertReplace(
+          /\(([a-z]\.Aa\.ka\[0\])\.equals\(([a-z]\.pos)\)\|\|([$a-zA-Z0-9_]{0,8}\([a-z]\.settings,7\))&&([$a-zA-Z0-9_]{0,8}\([a-z]\.Aa,0\))\.equals\([a-z]\.pos\)\)/,
+          "(Math.hypot($1.x-$2.x,$1.y-$2.y)<1||$3&&Math.hypot($4.x-$2.x,$4.y-$2.y)<1)"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
 
-  //check for key collisions the same way winged does. WingedCheck has a signature like wingedCheck(this, headCoord, targetCoord)
-  let wingedCheck = funcWithEat.assertMatch(/[$a-zA-Z0-9_]{0,8}=1>([$a-zA-Z0-9_]{0,8})\(this\.[$a-zA-Z0-9_]{0,8},this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\],[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/)[1];
+  // Head visual lerp toward mouse next position (renderer: this.wb.*)
+  {
+    const next = step(
+      "headRender",
+      () => {
+        const re =
+          /pb===0\?\(([a-zA-Z0-9_$]+)=this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\),[\s\S]{0,800}?\):\1=this\.\2\.\3\.\4\[/;
+        return code.assertReplace(
+          re,
+          `pb===0?($1=this.$2.$3.$4[0].clone(),(aimTrainer?($1.x+=Math.cos(faceAngle),$1.y+=Math.sin(faceAngle)):(updateFaceCoordsAndRotation(this.$2.${window.blockyHeadCoord},this.$2.${window.tileWidth},this.$2.$3.$4),$1.x=nextHeadX,$1.y=nextHeadY))):$1=this.$2.$3.$4[`
+        );
+      },
+      true
+    );
+    if (next) code = next;
+  }
 
-  code = code.replace(funcWithEatOrig, function() {return funcWithEat});
+  // Offset body curve control points for off-grid segments (full original logic).
+  {
+    const next = step(
+      "curveOffset",
+      () => {
+        // Neighbor segment vars (v12: yc closer-to-head, kc further).
+        let closer = "yc";
+        let further = "kc";
+        const named = code.match(
+          /let ([a-zA-Z0-9_$]+);pb===0\?\(\1=[\s\S]{0,400}?\):[\s\S]{0,80}?let [a-zA-Z0-9_$]+=this\.[\s\S]{0,120}?;([a-zA-Z0-9_$]+);\2=pb===/
+        );
+        if (named) {
+          closer = named[1];
+          further = named[2];
+        }
 
-  let funcWithKeyCheck, funcWithKeyCheckOrig;
-  funcWithKeyCheck = funcWithKeyCheckOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a\)$/,
-  /a\.keys\.sort\(function/,
-  false);
-
-  //Apply wingedCheck $1 is headCoord, $2 is keyCoord, $3 check mode for yin yang, $4 is mirrored snake head coord.
-  funcWithKeyCheck = assertReplace(funcWithKeyCheck,/\(([a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\])\.equals\(([a-z]\.[$a-zA-Z0-9_]{0,8})\)\|\|([$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},7\))&&([$a-zA-Z0-9_]{0,8}\([a-z]\.[$a-zA-Z0-9_]{0,8},0\))\.equals\([a-z]\.[$a-zA-Z0-9_]{0,8}\)\)/,
-  `(1 > ${wingedCheck}(a,$1,$2) || $3 && 1 > ${wingedCheck}(a,$4,$2))`);
-
-  code = code.replace(funcWithKeyCheckOrig, funcWithKeyCheck);
-
-  let funcWithBodyLines, funcWithBodyLinesOrig;
-  funcWithBodyLines = funcWithBodyLinesOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.render=function\(a,b,c\)$/,
-    /quadraticCurveTo/,
-    false);
-
-  let [,segmentCloserToHead,segmentFurtherFromHead] = funcWithBodyLines.assertMatch(/([a-z])=[a-z]\.clone\(\):\n?([$a-zA-Z0-9_]{0,8})=[a-z]\.clone\(\)/);
-
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/(\*=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8};)-1===[$a-zA-Z0-9_]{0,8}\.x-[$a-zA-Z0-9_]{0,8}\.x\|\|[^]*[$a-zA-Z0-9_]{0,8}\.y\+=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\/2\);(if\(0===\n?[a-z]\){)/,
-    `$1
-    //First bit is ok, but needs a.wa/2's added
-    ${startPoint}.x += this.${snakeDetails}.${tileWidth}/2;${startPoint}.y += this.${snakeDetails}.${tileWidth}/2;${endPoint}.x +=this.${snakeDetails}.${tileWidth}/2;${endPoint}.y += this.${snakeDetails}.${tileWidth}/2; //added by me
-    //Turn n and l into coords space
-    let segmentCloserToHead = ${segmentCloserToHead}.clone(); segmentCloserToHead.x = segmentCloserToHead.x * this.${snakeDetails}.${tileWidth} + this.${snakeDetails}.${tileWidth}/2;segmentCloserToHead.y = segmentCloserToHead.y * this.${snakeDetails}.${tileWidth} + this.${snakeDetails}.${tileWidth}/2;
-    let segmentFurtherFromHead = ${segmentFurtherFromHead}.clone();segmentFurtherFromHead.x = segmentFurtherFromHead.x * this.${snakeDetails}.${tileWidth} + this.${snakeDetails}.${tileWidth}/2;segmentFurtherFromHead.y = segmentFurtherFromHead.y * this.${snakeDetails}.${tileWidth} + this.${snakeDetails}.${tileWidth}/2;
-    //t should be halfway between the control point and the point closer to the head
-    ${endPoint}.x = ${endPoint}.x*0.49 + segmentCloserToHead.x*0.51;
-    ${endPoint}.y = ${endPoint}.y*0.49 + segmentCloserToHead.y*0.51;
-    //Similiarly q should be halfway between the control point and the point further from the head
-    ${startPoint}.x = ${startPoint}.x*0.49 + segmentFurtherFromHead.x*0.51;
-    ${startPoint}.y = ${startPoint}.y*0.49 + segmentFurtherFromHead.y*0.51;
-  $2`);
-
-  //Make it so that the head gets lerped in the direction that the snake is travelling in
-  funcWithBodyLines = assertReplace(funcWithBodyLines,
-    /* /(var [a-z]=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\]\.clone\(\);)[^]*&&\([a-z]\.y=0\)\)/, */
-    /([a-z]=\n?this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\[0\]\.clone\(\),)[^]*&&\([a-z]\.y=0\)\)/,
+        // Replace cardinal-only corner math with fluid blends toward neighboring segments.
+        const re =
+          /(let ([$a-zA-Z0-9_]+)=([$a-zA-Z0-9_]+)\.clone\(\),([$a-zA-Z0-9_]+)=\3\.clone\(\);\2\.x\*=(this\.[$a-zA-Z0-9_.]+);\2\.y\*=\5;\4\.x\*=\5;\4\.y\*=\5;)[\s\S]*?(?=if\(pb===0\))/;
+        return code.assertReplace(
+          re,
+          `$1
+    $2.x+=$5/2;$2.y+=$5/2;$4.x+=$5/2;$4.y+=$5/2;
+    {let __near=${closer}.clone();__near.x=${closer}.x*$5+$5/2;__near.y=${closer}.y*$5+$5/2;
+     let __far=${further}.clone();__far.x=${further}.x*$5+$5/2;__far.y=${further}.y*$5+$5/2;
+     $2.x=$2.x*0.49+__near.x*0.51;$2.y=$2.y*0.49+__near.y*0.51;
+     $4.x=$4.x*0.49+__far.x*0.51;$4.y=$4.y*0.49+__far.y*0.51;}
     `
-    $1
-    (aimTrainer ?
-      (${segmentCloserToHead}.x += Math.cos(faceAngle), ${segmentCloserToHead}.y += Math.sin(faceAngle)) : (
-      updateFaceCoordsAndRotation(this.${snakeDetails}.${blockyHeadCoord}, this.${snakeDetails}.${tileWidth}, this.${snakeDetails}.${bodyArray}),
-      ${segmentCloserToHead}.x = nextHeadX,
-      ${segmentCloserToHead}.y = nextHeadY
-    ))
-    `
-    /*`
-    $1
-    if(aimTrainer) {
-      ${segmentCloserToHead}.x += Math.cos(faceAngle);
-      ${segmentCloserToHead}.y += Math.sin(faceAngle);
-    } else{
-      updateFaceCoordsAndRotation(this.${snakeDetails}.${blockyHeadCoord}, this.${snakeDetails}.${tileWidth}, this.${snakeDetails}.${bodyArray});
-      ${segmentCloserToHead}.x = nextHeadX;
-      ${segmentCloserToHead}.y = nextHeadY;
-    }
-    `*/
+        );
+      },
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Prevent wall-mode render from pausing the head animation (crashes / snaps).
+  {
+    const next = step(
+      "wallPause",
+      () => {
+        const patterns = [
+          /if\(![$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},17\)\)/,
+          /if\(![$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},17\)\)\{/,
+          /if\(!o7\(this\.settings\)\)/,
+        ];
+        for (const p of patterns) {
+          if (p.test(code)) return code.assertReplace(p, "if(false)");
+        }
+        return null;
+      },
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Body part facing uses faceAngle
+  {
+    const next = step(
+      "faceAngle",
+      () =>
+        code.assertReplace(
+          /case "NONE":case "RIGHT":([a-z])=\n?0\}Math\.abs\(\1-([a-z])\)/,
+          'case "NONE":case "RIGHT":$1=0}$1=$2=faceAngle;Math.abs($1-$2)'
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Chess: Remix owns score/lock/respawn. Mouse only bridges fractional heads.
+  //
+  // Chess enables shield (e7), so eat uses OaF<1 — on a grid that means "same
+  // tile", but fractional mouse heads can eat from a neighboring tile. Then
+  // findApple misses the piece → Oh++ + chess_fruit_respawn (2 new pieces).
+  // Force same-tile eat while chess is active; keep OaF for real Shield mode.
+  {
+    const next = step(
+      "appleEatChessTile",
+      () =>
+        code.assertReplace(
+          /if\(e7\(this\.settings\)\)\{let dg=this\.oa\.ka\[0\]!==void 0&&this\.oa\.ka\[1\]!==void 0&&Wd\.pos!==void 0;\$d=dg&&\(OaF\(this\.ka,this\.oa\.ka\[0\],Wd\.pos\)<1\|\|OaF\(this\.ka,this\.oa\.ka\[1\],Wd\.pos\)<1\);if\(f7\(this\.settings,7\)&&dg\)\{let Cg=m7\(this\.oa,1\);He=OaF\(this\.ka,m7\(this\.oa,0\),Wd\.pos\)<1\|\|OaF\(this\.ka,Cg,Wd\.pos\)<1\}\}/,
+          "if(e7(this.settings)){let dg=this.oa.ka[0]!==void 0&&this.oa.ka[1]!==void 0&&Wd.pos!==void 0;if(window.isChessActive&&window.isChessActive()){$d=!!dg&&Math.round(this.oa.ka[0].x)===Math.round(Wd.pos.x)&&Math.round(this.oa.ka[0].y)===Math.round(Wd.pos.y);if(f7(this.settings,7)&&dg){He=Math.round(m7(this.oa,0).x)===Math.round(Wd.pos.x)&&Math.round(m7(this.oa,0).y)===Math.round(Wd.pos.y)}}else{$d=dg&&(OaF(this.ka,this.oa.ka[0],Wd.pos)<1||OaF(this.ka,this.oa.ka[1],Wd.pos)<1);if(f7(this.settings,7)&&dg){let Cg=m7(this.oa,1);He=OaF(this.ka,m7(this.oa,0),Wd.pos)<1||OaF(this.ka,Cg,Wd.pos)<1}}}"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  // Non-shield modes: .equals never hits fractional heads.
+  {
+    const next = step(
+      "appleEatProx",
+      () =>
+        code.assertReplace(
+          /else \$d=this\.oa\.ka\[0\]\.equals\(Wd\.pos\),f7\(this\.settings,\s*7\)&&\(He=m7\(this\.oa,0\)\.equals\(Wd\.pos\)\)/,
+          "else $d=(Math.round(this.oa.ka[0].x)===Math.round(Wd.pos.x)&&Math.round(this.oa.ka[0].y)===Math.round(Wd.pos.y)),f7(this.settings,7)&&(He=(Math.round(m7(this.oa,0).x)===Math.round(Wd.pos.x)&&Math.round(m7(this.oa,0).y)===Math.round(Wd.pos.y)))"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Tag eaten apple; if it's a chess piece, apply Remix pickup immediately
+  // (don't wait for findApple — fractional heads make that miss → fruit path).
+  {
+    const next = step(
+      "chessEatPickup",
+      () =>
+        code.assertReplace(
+          /if\(\$d\|\|He\)\{let dg=Wd\.nla/,
+          "if($d||He){window.__chessEatenApple=Wd;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(window.isChessActive&&window.isChessActive()&&Wd.isPiece){window.just_ate='piece';window.head_state=Wd.ChessPiece;window.head_color=Wd.ChessColor;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(Wd.type);if(typeof window.shield_all==='function')window.shield_all();}let dg=Wd.nla"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Score hook: honor pickup tag / just_ate='piece'; never Oh++ or fruit-respawn a piece.
+  {
+    const next = step(
+      "chessScoreHarden",
+      () =>
+        code.assertReplace(
+          /if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';this\.Oh\+\+;/,
+          "if(window.just_ate!=='piece'&&!(window.__chessEatenApple&&window.__chessEatenApple.isPiece)&&_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "chessScoreHonorPickup",
+      () =>
+        code.assertReplace(
+          /else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';this\.Oh\+\+;/,
+          "else if((_ae&&_ae.isPiece)||(window.__chessEatenApple&&window.__chessEatenApple.isPiece)||window.just_ate==='piece'){window.just_ate='piece';{let _src=(_ae&&_ae.isPiece)?_ae:window.__chessEatenApple;if(_src&&_src.isPiece){window.head_state=_src.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(_src.type);window.head_color=_src.ChessColor;}if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(typeof window.shield_all==='function')window.shield_all();window.__chessEatenApple=null;}}else{window.just_ate='fruit';this.Oh++;"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  // Touch aim
+  let touchEventProperty = step(
+    "touchProp",
+    () =>
+      code.assertMatch(
+        /[a-z]\.preventDefault\(\);[a-z]=[a-z]\.([$a-zA-Z0-9_]{0,8})\.touches\[0\];/
+      )[1],
+    true
   );
 
-  //Prevent wall mode crashing - disable check where animation pauses before bumping a wall.
-  funcWithBodyLines = assertReplace(funcWithBodyLines,/if\(![$a-zA-Z0-9_]{0,8}\(this.[$a-zA-Z0-9_]{0,8},17\)\)/,'if(false)');
+  if (touchEventProperty) {
+    const tm = step(
+      "touchmove",
+      () =>
+        code.assertReplace(
+          /([a-z])\.preventDefault\(\);[a-z]=[a-z]\.[$a-zA-Z0-9_]{0,8}\.touches\[0\];/,
+          "$& window.updateMousePos($1); return;"
+        ),
+      true
+    );
+    if (tm) code = tm;
 
-  code = code.replace(funcWithBodyLinesOrig, funcWithBodyLines);
+    const ts = step(
+      "touchstart",
+      () =>
+        code.assertReplace(
+          /([a-z])(\.target===\n?[a-zA-Z0-9_$.]+\(\))&&([a-z]\.preventDefault\(\))/,
+          `$1$2 && window.updateMousePos($1.${touchEventProperty}.touches[0]) && $3`
+        ),
+      true
+    );
+    if (ts) code = ts;
+  }
 
-  //Function for body parts
-  let funcWithBodyParts, funcWithBodyPartsOrig;
-  funcWithBodyParts = funcWithBodyPartsOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(a,b,c,d,e\)$/,
-    /case "NONE":case "RIGHT":[a-z]=\n?0}Math\.abs\([a-z]-[a-z]\)/,
-    false);
+  // Expose game object for startGame / poison / arrows; clear arrow trail between runs.
+  code = step("resetState", () =>
+    code.assertReplace(
+      /\}resetState\(a=!0\)\{/,
+      "}resetState(a=!0){window.mouseArrowTrail=null;window.mouseArrowRail=null;globalThis.megaWholeSnakeObject=this;window.__remixGame=this;"
+    )
+  );
 
-  //Find m,k
-
-  funcWithBodyParts = assertReplace(funcWithBodyParts, /case "NONE":case "RIGHT":[a-z]=\n?0}Math\.abs\(([a-z])-([a-z])\)/,
-  `case "NONE":case "RIGHT":$1=0}$1=$2=faceAngle;Math.abs($1-$2)`);
-
-  code = code.replace(funcWithBodyPartsOrig, funcWithBodyParts);
-
-  //Add warning if the game is started with a mode that is broken
-  let funcWithNewGame, funcWithNewGameOrig;
-  funcWithNewGame = funcWithNewGameOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}=function\(\)$/,
-  /this\.reset\(\)\}\}/,
-  false);
-
-  let [,modeCheck, settingsProperty] = code.assertMatch(/([$a-zA-Z0-9_]{0,8})\(this\.([$a-zA-Z0-9_]{0,8}),6\)/);
-
-  let chosenMode = code.assertMatch(/return [a-z]\.[$a-zA-Z0-9_]{0,8}\?[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\):18===[a-z]\.([$a-zA-Z0-9_]{0,8})&&[a-z]\.[$a-zA-Z0-9_]{0,8}\.has\([a-z]\)\?!0/)[1];
-
-  funcWithNewGame = assertReplace(funcWithNewGame, /[$a-zA-Z0-9_]{0,8}\([a-z],18\)&&[$a-zA-Z0-9_]{0,8}\([a-z]\);/,
-  `$&if(${modeCheck}(a, 10) || ${modeCheck}(a, 13) || ${modeCheck}(a, 16)){
-    let proceed = confirm('This mode will break snake and you will have to refresh the page. Press ok to continue (Not recommended). Press cancel to go back (recommended). Poison mode and statue mode and arrow mode can break snake. Infinity and sokoban are buggy.');
-    if(!proceed){
-      /*Also set mode back to classic to be safe*/
-      a.${chosenMode} = 0;
-      return;
-    }
-  }`);
-
-  code = code.replace(funcWithNewGameOrig, funcWithNewGame);
-
-  //Make it work on mobile
-  /* (Commented out as misses first touch)
-  code = code.assertReplace(/break ([a-z]);var [a-z]=([a-z])\.clientX-[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x,[a-z]=[a-z]\.clientY-[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y;/,
-    `$& window.updateMousePos($2); break $1;`);
-  */
-
-  let touchEventProperty = code.assertMatch(/[a-z]\.preventDefault\(\);[a-z]=[a-z]\.([$a-zA-Z0-9_]{0,8})\.touches\[0\];/)[1];
-
-  //Update "mouse" position on touchmove
-  code = code.assertReplace(/([a-z])\.preventDefault\(\);[a-z]=[a-z]\.[$a-zA-Z0-9_]{0,8}\.touches\[0\];/,
-  `$& window.updateMousePos($1); return;`);
-
-  //Update mouse position on touchstart, also try to start the game?
-  code = code.assertReplace(/([a-z])(\.target===\n?[a-z]\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\(\))&&([a-z]\.preventDefault\(\))/,
-  `$1$2 && window.updateMousePos($1.${touchEventProperty}.touches[0]) && $3`);
-
-  //Set up megaWholeSnake
-  let funcWithResetState, funcWithResetStateOrig;
-  funcWithResetState = funcWithResetStateOrig = findFunctionInCode(code, /[$a-zA-Z0-9_]{0,8}\.prototype\.resetState=function\(a\)$/,
-  /void 0===[a-z]\?!0:[a-z];this\.[$a-zA-Z0-9_]{0,8}\.reset\(a\);/);
-
-  funcWithResetState = assertReplace(funcWithResetState, '{', '{globalThis.megaWholeSnakeObject = this;');
-
-  code = code.replace(funcWithResetStateOrig, funcWithResetState);
-
-  //Function to start game. Slightly hacky. See varied.js line 112
-  let startGameFunc = code.match(/([$a-zA-Z0-9_]{0,8})\(this,"UP"\);/)[1];
-
-  //Function to start game. Slightly hacky. See varied.js line 522
-  code = appendCodeWithinSnakeModule(code, `
+  // Start via turn (v12) — also assign directly so it works even if append marker misses
+  code = step("startGameAppend", () =>
+    appendCodeWithinSnakeModule(
+      code,
+      `
     globalThis.startGame = function() {
-      ${startGameFunc}(megaWholeSnakeObject, 'START');
-    }
-  `);
+      const root = globalThis.megaWholeSnakeObject;
+      if (!root) return;
+      if (typeof root.turn === "function") root.turn("RIGHT");
+      else if (root.wb && typeof root.wb.turn === "function") root.wb.turn("RIGHT");
+    };
+  `,
+      true
+    )
+  );
+  // Ensure startGame exists even if module append no-ops
+  if (!code.includes("globalThis.startGame")) {
+    code += `
+;globalThis.startGame=function(){const root=globalThis.megaWholeSnakeObject;if(!root)return;if(typeof root.turn==="function")root.turn("RIGHT");else if(root.wb&&typeof root.wb.turn==="function")root.wb.turn("RIGHT");};
+`;
+  }
 
-  //Fix collisions with walls being slightly offset
-  code = code.assertReplace(/([a-z]=this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.get\([$a-zA-Z0-9_]{0,8}\()([a-z])(\)\))/,
-  `$1{x: $2.x + 0.5, y: $2.y + 0.5}$3`);
+  // Wall / statue / hotdog hitreg: probe rounded tile (not +0.5 float).
+  {
+    const next = step(
+      "wallOffset",
+      () =>
+        code.assertReplace(
+          /([a-z]=this\.Ca\.Ca\()([a-z])(\))/,
+          "$1{x:Math.round($2.x),y:Math.round($2.y)}$3"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
 
-  //Prevent self-collisions
-  code = code.assertReplaceAll(/(\.equals\([a-z]\)&&![a-z])(&&\(this\.[$a-zA-Z0-9_]{0,8}\(\),)/g,
-  `$1 && false $2`);
+  // Sokoban / occupancy / keys: round ALL .wa[obj.y][obj.x] including nested .pos.
+  {
+    const next = step(
+      "sokoWa",
+      () =>
+        code.assertReplaceAll(
+          /\.wa\[((?:[$a-zA-Z0-9_]+\.)+[$a-zA-Z0-9_]+)\.y\]\[((?:[$a-zA-Z0-9_]+\.)+[$a-zA-Z0-9_]+)\.x\]/g,
+          ".wa[Math.round($1.y)][Math.round($2.x)]"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+  {
+    const next = step(
+      "sokoWaSimple",
+      () =>
+        code.assertReplaceAll(
+          /\.wa\[([$a-zA-Z0-9_]+)\.y\]\[([$a-zA-Z0-9_]+)\.x\]/g,
+          ".wa[Math.round($1.y)][Math.round($2.x)]"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
 
-  //Offset stuff below is copied from level editor mod
-  //Find out how offset the board is from top left (used for calculating mouse positions)
-  code = code.assertReplace(
-    /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\)\/2\),([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.context\.canvas\.height-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\)\/\n?2\);/,
-    "$&globalThis.leftBorderWidth = $1; globalThis.topBorderWidth = $2;"
+  // Gate/bridge tile grids: a.oa[y][x] / Fa.oa[y][x] with float y.
+  {
+    const next = step(
+      "oaIndex",
+      () =>
+        code.assertReplaceAll(
+          /\.oa\[([a-zA-Z0-9_$]+)\.y\]\[([a-zA-Z0-9_$]+)\.x\]/g,
+          ".oa[Math.round($1.y)][Math.round($2.x)]"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
+
+  // Disable self-collisions
+  code = step("selfCol", () =>
+    code.assertReplaceAll(
+      /(\.equals\([a-z]\)&&![a-z])(&&\(this\.[$a-zA-Z0-9_]{0,8}\(\),)/g,
+      "$1&&false$2"
+    )
   );
 
-  //Also figure out offset if it's borderless
-  /*code = code.assertReplace(/var ([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\),([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/,
-  '$&;globalThis.leftBorderWidth = $1, globalThis.topBorderWidth = $2');*/
-  let [, infiniOffsetX, infiniOffsetY] = code.match(
-    /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\),([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/
-  );
+  // Board letterbox onto the visible canvas (standard mode).
+  // Use \s* so CRLF minified builds still match.
+  {
+    const next = step(
+      "border",
+      () =>
+        code.assertReplace(
+          /let ([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.context\.canvas\.width-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\)\/2\),([$a-zA-Z0-9_]{0,8})=Math\.round\(\(this\.context\.canvas\.height-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\)\/\s*2\);/,
+          "$&globalThis.leftBorderWidth=$1;globalThis.topBorderWidth=$2;"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
 
-  code = code.assertReplace(
-    /var ([$a-zA-Z0-9_]{0,8})=\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\)\/2,([$a-zA-Z0-9_]{0,8})=\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height-this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\)\/2;/,
-    `$&;globalThis.leftBorderWidth = ${infiniOffsetX} - $1; globalThis.topBorderWidth = ${infiniOffsetY} - $2;`
-  );
+  // Source of truth: final blit of the composed board (Ca) onto the context.
+  // Do NOT match other context.drawImage calls (wa/Na/etc) — those corrupt borders.
+  {
+    const next = step(
+      "borderDraw",
+      () =>
+        code.assertReplace(
+          /(this\.context\.drawImage\(this\.Ca\.canvas,)([$a-zA-Z0-9_]+),([$a-zA-Z0-9_]+)(\))/,
+          "$1$2,$3$4;globalThis.leftBorderWidth=$2;globalThis.topBorderWidth=$3"
+        ),
+      true
+    );
+    if (next) code = next;
+  }
 
+  // Borderless / infinity: letterbox is inverted; mirror v5 (infini center − inset).
+  {
+    const next = step(
+      "borderless",
+      () => {
+        const m = code.match(
+          /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\),([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/
+        );
+        if (!m) return null;
+        const infiniOffsetX = m[1];
+        const infiniOffsetY = m[2];
+        return code.assertReplace(
+          /let ([$a-zA-Z0-9_]{0,8})=\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width-this\.context\.canvas\.width\)\/2,([$a-zA-Z0-9_]{0,8})=\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height-this\.context\.canvas\.height\)\/2;/,
+          `$&globalThis.leftBorderWidth=${infiniOffsetX}-$1;globalThis.topBorderWidth=${infiniOffsetY}-$2;`
+        );
+      },
+      true
+    );
+    if (next) code = next;
+  }
+
+  console.log(
+    "MouseMod patches OK",
+    window.snakeDetails,
+    window.blockyHeadCoord,
+    window.tileWidth,
+    window.bodyArray
+  );
   return code;
-}
+};
 
 ////////////////////////////////////////////////////////////////////
 //RUNCODEAFTER
 ////////////////////////////////////////////////////////////////////
 
-window.mouseMode.runCodeAfter = function() {
-  window.gameCanvasEl = document.getElementsByClassName('cer0Bd')[0];
-  document.body.addEventListener('mousemove',updateMousePos);
-  gameCanvasEl.addEventListener('click', startGame);
-  gameCanvasEl.addEventListener('touchstart', startGame);
+window.mouseMode.runCodeAfter = function () {
+  if (window.RemixMod && typeof window.RemixMod.runCodeAfter === "function") {
+    window.RemixMod.runCodeAfter();
+  }
 
-  //Hide keys/swipe "instructions" image as it gets in the way of clicking/touching the game
+  if (typeof globalThis.startGame !== "function") {
+    globalThis.startGame = function () {
+      const root = globalThis.megaWholeSnakeObject || window.__remixGame;
+      if (!root) return;
+      if (typeof root.turn === "function") root.turn("RIGHT");
+      else if (root.wb && typeof root.wb.turn === "function") root.wb.turn("RIGHT");
+    };
+  }
+
+  window.gameCanvasEl =
+    document.getElementsByClassName("cer0Bd")[0] ||
+    document.querySelector("canvas");
+  document.body.addEventListener("mousemove", updateMousePos);
+  if (gameCanvasEl) {
+    gameCanvasEl.addEventListener("click", startGame);
+    gameCanvasEl.addEventListener("touchstart", startGame);
+  }
+
   let keySwipeContainer = document.querySelector('[jsname="IoE5Ec"]');
-  keySwipeContainer.style.visibility = 'hidden';
-  keySwipeContainer.style.opacity = '0';
+  if (keySwipeContainer) {
+    keySwipeContainer.style.visibility = "hidden";
+    keySwipeContainer.style.opacity = "0";
+  }
 
   setupMenuCheckbox();
 
-  if (localStorage.getItem('snakeChosenMod') === "mouseMode") {
-    let modIndicator = document.createElement('div');
-    modIndicator.style='position:absolute;font-family:roboto;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;';
-    modIndicator.textContent = 'Mouse Mod';
-    let canvasNode = document.getElementsByClassName('jNB0Ic')[0];
-    document.getElementsByClassName('EjCLSb')[0].insertBefore(modIndicator, canvasNode);
+  // After Remix.runCodeAfter: install mouse findApple + unlock rounding.
+  if (typeof window.mouseInstallFindApple === "function") {
+    window.mouseInstallFindApple();
+  }
+  if (typeof window.mousePatchChessForMouse === "function") {
+    window.mousePatchChessForMouse();
+  } else if (typeof window.mousePatchChessGenerous === "function") {
+    window.mousePatchChessGenerous();
   }
 
+  try {
+    let parent = document.getElementsByClassName("EjCLSb")[0];
+    let canvasNode = document.getElementsByClassName("jNB0Ic")[0];
+    if (parent) {
+      for (const el of [...parent.querySelectorAll("div")]) {
+        if ((el.textContent || "").trim() === "Remix Mod") el.remove();
+      }
+      let modIndicator = document.createElement("div");
+      modIndicator.style =
+        "position:absolute;font-family:Arial,sans-serif;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;";
+      modIndicator.textContent = "Mouse Mod";
+      if (canvasNode) parent.insertBefore(modIndicator, canvasNode);
+      else parent.appendChild(modIndicator);
+    }
+  } catch (_e) {}
 };
+

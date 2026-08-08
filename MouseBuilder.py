@@ -1,16 +1,27 @@
+import os
 import urllib.request
 
-url = "https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakePudding/main/PuddingMod.js"  # Replace with the actual URL of the file you want to download
-destination_file = "PuddingMod.js"  # Replace with the desired local file name
+BASE = os.path.dirname(os.path.abspath(__file__))
 
-urllib.request.urlretrieve(url, destination_file)
+REMIX_URL = "https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeRemix/main/RemixMod.js"
+REMIX_PATH = os.path.join(BASE, "RemixMod.js")
+OUT_PATH = os.path.join(BASE, "MouseMod.js")
+MOUSE_PATH = os.path.join(BASE, "modloadercode.js")
 
-mouse_file = open("MouseMod.js", "w", encoding='utf-8')
-mouse_init = open("modloadercode.js", "r", encoding='utf-8')
-pudding = open("PuddingMod.js", "r", encoding='utf-8')
 
-mouse_file.write(pudding.read())
-mouse_file.write(mouse_init.read())
-pudding.close()
-mouse_init.close()
-mouse_file.close()
+def main():
+    print(f"Downloading {REMIX_URL}")
+    urllib.request.urlretrieve(REMIX_URL, REMIX_PATH)
+
+    with open(OUT_PATH, "w", encoding="utf-8") as out:
+        for path in (REMIX_PATH, MOUSE_PATH):
+            print(f"Appending {os.path.basename(path)}")
+            with open(path, "r", encoding="utf-8") as f:
+                out.write(f.read())
+                out.write("\n")
+
+    print(f"Wrote {OUT_PATH}")
+
+
+if __name__ == "__main__":
+    main()
