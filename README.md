@@ -1,7 +1,7 @@
 # Mouse Mode For Google Snake
 
 Control the snake with your mouse. Move with full freedom without being confined to the grid.
-Check **Aim Trainer?** in the menu to make the snake jump straight to the cursor.
+Toggle **Aim Trainer** in Pudding Settings to make the snake jump straight to the cursor.
 
 Built on **Remix Mod** (More Pudding + Candy / Chess / Burger) for game **v12**.
 

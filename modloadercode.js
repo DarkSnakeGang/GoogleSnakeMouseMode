@@ -118,6 +118,16 @@ window.mouseMode.runCodeBefore = function () {
       window.chess_tick_logic = function () {
         // Eat tag is only for the score/length hooks in the previous tick.
         window.__chessEatenApple = null;
+        try {
+          const g = window.__remixGame || window.megaWholeSnakeObject;
+          if (g && g.wa && g.wa.ka) window.appleArray = g.wa.ka;
+        } catch (_e) {}
+        // Sticky carry: restore piece type if something reset head_state to OPEN.
+        if (window.__chessCarrying && window.__chessCarryPiece) {
+          if (!window.head_state || window.head_state === "OPEN") {
+            window.head_state = window.__chessCarryPiece;
+          }
+        }
         if (typeof window.faceAngle === "number") {
           window.head_dir = window.mouseCardinalFromAngle(window.faceAngle);
         }
@@ -140,7 +150,7 @@ window.mouseMode.runCodeBefore = function () {
       window.chess_tick_logic.__mouse = true;
     }
 
-    // capture_attempt: Remix logic with rounded coords (pawn/king/knight).
+    // capture_attempt: Remix logic with rounded coords; clears sticky carry.
     if (typeof window.capture_attempt === "function" && !window.capture_attempt.__mouse) {
       window.capture_attempt = function capture_attempt(x, y) {
         if (window.head_state === "OPEN") return false;
@@ -157,6 +167,8 @@ window.mouseMode.runCodeBefore = function () {
             window.head_color != apple.ChessColor
           ) {
             window.head_state = "OPEN";
+            window.__chessCarrying = false;
+            window.__chessCarryPiece = null;
             if (window.selectedFruit == 22) {
               let randomNumber = Math.floor(Math.random() * 51 + 1) % 52;
               apple.type =
@@ -525,38 +537,55 @@ window.mouseMode.runCodeBefore = function () {
   };
 
   window.setupMenuCheckbox = function () {
-    try {
-      let host =
-        document.getElementsByClassName("sXu3u")[0] ||
-        document.querySelector(".sXu3u");
-      if (!host || document.getElementById("aim-train")) return;
+    const inject = function () {
+      try {
+        if (document.getElementById("AimTrainer")) return true;
+        const panel = document.getElementById("settings-popup-pudding");
+        if (!panel) return false;
 
-      let checkboxContainer = document.createElement("div");
-      checkboxContainer.className = "e1XC2b";
-      checkboxContainer.innerHTML = `
-      <div id="mouse" style="text-align:center; top: 0px; cursor:default;">
-        <label class="form-check-label" for="aim-train" style="height:44px;line-height:44px;opacity:100%;">Aim Trainer?</label>
-        <input id="aim-train" type="checkbox">
-      </div>`;
-      host.appendChild(checkboxContainer);
-
-      let snakePopup = document.getElementsByClassName("T7SB3d")[1];
-      if (snakePopup) {
-        let popupHeight = window
-          .getComputedStyle(snakePopup, null)
-          .getPropertyValue("height")
-          .match(/\d+/);
-        if (popupHeight) {
-          snakePopup.style.height = parseInt(popupHeight[0], 10) + 44 + "px";
+        if (window.pudding_settings && typeof window.pudding_settings.AimTrainer === "boolean") {
+          window.aimTrainer = !!window.pudding_settings.AimTrainer;
         }
-      }
 
-      document.getElementById("aim-train").onchange = function () {
-        aimTrainer = this.checked;
-      };
-    } catch (err) {
-      console.warn("MouseMod: Aim Trainer checkbox setup failed", err);
-    }
+        const row = document.createElement("div");
+        row.className = "form-check form-check-inline";
+        row.id = "mouse-aim-trainer-settings";
+        row.innerHTML = `
+          <input class="form-check-input" type="checkbox" role="switch" id="AimTrainer">
+          <label class="form-check-label" for="AimTrainer" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Aim Trainer</label>`;
+
+        const anchor =
+          document.getElementById("RemoveScrollbar") ||
+          document.getElementById("TimerSettings") ||
+          document.getElementById("CustomBowlFruits");
+        if (anchor && anchor.parentElement) {
+          anchor.parentElement.insertBefore(row, anchor.nextSibling);
+        } else {
+          panel.appendChild(row);
+        }
+
+        const el = document.getElementById("AimTrainer");
+        el.checked = !!window.aimTrainer;
+        el.addEventListener("change", function () {
+          window.aimTrainer = this.checked;
+          try {
+            if (window.pudding_settings) {
+              window.pudding_settings.AimTrainer = this.checked;
+              if (typeof window.saveSettings === "function") window.saveSettings();
+            }
+          } catch (_e) {}
+        });
+        return true;
+      } catch (err) {
+        console.warn("MouseMod: Aim Trainer pudding settings setup failed", err);
+        return true;
+      }
+    };
+
+    if (inject()) return;
+    setTimeout(function () {
+      if (!inject()) setTimeout(inject, 50);
+    }, 0);
   };
 };
 
@@ -879,14 +908,15 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
 
   // Shield / chess Oba death: same hitreg as Shield mode under mouse.
-  // e7 (shield/chess) → OaF<1; otherwise rounded tile (grid equals for floats).
+  // e7 (shield/chess) → OaF<1; otherwise rounded tile.
+  // Chess locks set all 4 dirs — also kill when direction is NONE/missing.
   {
     const next = step(
       "shieldTick",
       () =>
         code.assertReplace(
           /\(e7\(this\.settings\)\?OaF\(this\.ka,a,f\.pos\)<1:f\.pos\.equals\(a\)\)&&\(\(g=f\.Oba\)==null\?0:g\.has\(d\)\)&&this\.Na\(\)/,
-          "(e7(this.settings)?OaF(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.Oba)==null?0:g.has(d))&&this.Na()"
+          "(e7(this.settings)?OaF(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.Oba)==null?0:(g.has(d)||(window.__chessCarrying&&g.size>=4)))&&this.Na()"
         ),
       true
     );
@@ -1156,21 +1186,21 @@ window.mouseMode.alterSnakeCode = function (code) {
       () =>
         code.assertReplace(
           /if\(\$d\|\|He\)\{let dg=Wd\.nla/,
-          "if($d||He){window.__chessEatenApple=Wd;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(window.isChessActive&&window.isChessActive()&&Wd.isPiece){window.just_ate='piece';window.head_state=Wd.ChessPiece;window.head_color=Wd.ChessColor;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(Wd.type);if(typeof window.shield_all==='function')window.shield_all();}let dg=Wd.nla"
+          "if($d||He){window.__chessEatenApple=Wd;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(window.isChessActive&&window.isChessActive()&&Wd.isPiece){window.just_ate='piece';window.head_state=Wd.ChessPiece;window.head_color=Wd.ChessColor;window.__chessCarrying=true;window.__chessCarryPiece=Wd.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(Wd.type);if(typeof window.shield_all==='function')window.shield_all();}let dg=Wd.nla"
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Score hook: honor pickup tag / just_ate='piece'; never Oh++ or fruit-respawn a piece.
+  // Score hook: honor pickup tag / just_ate / sticky carry; never Oh++ a piece.
   {
     const next = step(
       "chessScoreHarden",
       () =>
         code.assertReplace(
           /if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';this\.Oh\+\+;/,
-          "if(window.just_ate!=='piece'&&!(window.__chessEatenApple&&window.__chessEatenApple.isPiece)&&_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;"
+          "if(window.just_ate!=='piece'&&!window.__chessCarrying&&!(window.__chessEatenApple&&window.__chessEatenApple.isPiece)&&_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;"
         ),
       true
     );
@@ -1182,7 +1212,7 @@ window.mouseMode.alterSnakeCode = function (code) {
       () =>
         code.assertReplace(
           /else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';this\.Oh\+\+;/,
-          "else if((_ae&&_ae.isPiece)||(window.__chessEatenApple&&window.__chessEatenApple.isPiece)||window.just_ate==='piece'){window.just_ate='piece';{let _src=(_ae&&_ae.isPiece)?_ae:window.__chessEatenApple;if(_src&&_src.isPiece){window.head_state=_src.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(_src.type);window.head_color=_src.ChessColor;}if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(typeof window.shield_all==='function')window.shield_all();window.__chessEatenApple=null;}}else{window.just_ate='fruit';this.Oh++;"
+          "else if((_ae&&_ae.isPiece)||(window.__chessEatenApple&&window.__chessEatenApple.isPiece)||window.just_ate==='piece'||window.__chessCarrying){window.just_ate='piece';{let _src=(_ae&&_ae.isPiece)?_ae:(window.__chessEatenApple&&window.__chessEatenApple.isPiece?window.__chessEatenApple:null);if(_src&&_src.isPiece){window.head_state=_src.ChessPiece;window.__chessCarryPiece=_src.ChessPiece;window.head_color=_src.ChessColor;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(_src.type);}window.__chessCarrying=true;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(typeof window.shield_all==='function')window.shield_all();window.__chessEatenApple=null;}}else{window.just_ate='fruit';this.Oh++;"
         ),
       true
     );
@@ -1226,7 +1256,7 @@ window.mouseMode.alterSnakeCode = function (code) {
   code = step("resetState", () =>
     code.assertReplace(
       /\}resetState\(a=!0\)\{/,
-      "}resetState(a=!0){window.mouseArrowTrail=null;window.mouseArrowRail=null;globalThis.megaWholeSnakeObject=this;window.__remixGame=this;"
+      "}resetState(a=!0){window.mouseArrowTrail=null;window.mouseArrowRail=null;window.__chessCarrying=false;window.__chessCarryPiece=null;window.__chessEatenApple=null;globalThis.megaWholeSnakeObject=this;window.__remixGame=this;"
     )
   );
 
