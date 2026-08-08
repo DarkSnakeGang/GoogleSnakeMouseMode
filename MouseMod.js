@@ -10696,6 +10696,93 @@ window.mouseMode.runCodeBefore = function () {
       };
       window.capture_attempt.__mouse = true;
     }
+
+    // Rook/bishop: only real pieces (fruits have no ChessColor and would
+    // short-circuit open), and round coords so float heads still line up.
+    const pieceList = function () {
+      const arr = window.appleArray || [];
+      return arr.filter(function (a) {
+        return a && a.isPiece && a.pos;
+      });
+    };
+
+    if (typeof window.rook_open === "function" && !window.rook_open.__mouse) {
+      window.rook_open = function rook_open(headPos) {
+        if (!headPos) return false;
+        const hx = Math.round(headPos.x);
+        const hy = Math.round(headPos.y);
+        const closest = {
+          up: { piece: null, distance: Infinity },
+          down: { piece: null, distance: Infinity },
+          left: { piece: null, distance: Infinity },
+          right: { piece: null, distance: Infinity },
+        };
+        pieceList().forEach(function (piece) {
+          const px = Math.round(piece.pos.x);
+          const py = Math.round(piece.pos.y);
+          const distance = Math.abs(px - hx) + Math.abs(py - hy);
+          if (px === hx && py < hy && distance < closest.up.distance) {
+            closest.up = { piece: piece, distance: distance };
+          } else if (px === hx && py > hy && distance < closest.down.distance) {
+            closest.down = { piece: piece, distance: distance };
+          } else if (py === hy && px < hx && distance < closest.left.distance) {
+            closest.left = { piece: piece, distance: distance };
+          } else if (py === hy && px > hx && distance < closest.right.distance) {
+            closest.right = { piece: piece, distance: distance };
+          }
+        });
+        const list = Object.values(closest)
+          .map(function (o) {
+            return o.piece;
+          })
+          .filter(Boolean);
+        for (let i = 0; i < list.length; i++) {
+          const el = list[i];
+          if (el.ChessColor != window.head_color) {
+            return window.capture_attempt(el.pos.x, el.pos.y);
+          }
+        }
+        return false;
+      };
+      window.rook_open.__mouse = true;
+    }
+
+    if (typeof window.bishop_open === "function" && !window.bishop_open.__mouse) {
+      window.bishop_open = function bishop_open(headPos) {
+        if (!headPos) return false;
+        const hx = Math.round(headPos.x);
+        const hy = Math.round(headPos.y);
+        const closest = {};
+        pieceList().forEach(function (piece) {
+          const px = Math.round(piece.pos.x);
+          const py = Math.round(piece.pos.y);
+          const dx = px - hx;
+          const dy = py - hy;
+          if (Math.abs(dx) !== Math.abs(dy) || dx === 0) return;
+          const direction =
+            (dx < 0 ? "left-" : "right-") + (dy < 0 ? "up" : "down");
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (!closest[direction] || dist < closest[direction].dist) {
+            closest[direction] = { piece: piece, dist: dist };
+          }
+        });
+        const list = Object.values(closest)
+          .sort(function (a, b) {
+            return a.dist - b.dist;
+          })
+          .map(function (o) {
+            return o.piece;
+          });
+        for (let i = 0; i < list.length; i++) {
+          const el = list[i];
+          if (el.ChessColor != window.head_color) {
+            return window.capture_attempt(el.pos.x, el.pos.y);
+          }
+        }
+        return false;
+      };
+      window.bishop_open.__mouse = true;
+    }
   };
   // Back-compat name used by runCodeAfter
   window.mousePatchChessGenerous = window.mousePatchChessForMouse;
@@ -11311,16 +11398,15 @@ window.mouseMode.alterSnakeCode = function (code) {
     if (next) code = next;
   }
 
-  // Shield / chess Oba: on-tile (rounded), never OaF<1.
-  // Chess reuses shield Oba and locks EVERY apple while carrying — fractional
-  // heads with hypot death make carrying unplayable under mouse.
+  // Shield / chess Oba death: same hitreg as Shield mode under mouse.
+  // e7 (shield/chess) → OaF<1; otherwise rounded tile (grid equals for floats).
   {
     const next = step(
       "shieldTick",
       () =>
         code.assertReplace(
           /\(e7\(this\.settings\)\?OaF\(this\.ka,a,f\.pos\)<1:f\.pos\.equals\(a\)\)&&\(\(g=f\.Oba\)==null\?0:g\.has\(d\)\)&&this\.Na\(\)/,
-          "(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y))&&((g=f.Oba)==null?0:g.has(d))&&this.Na()"
+          "(e7(this.settings)?OaF(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.Oba)==null?0:g.has(d))&&this.Na()"
         ),
       true
     );
@@ -11547,18 +11633,23 @@ window.mouseMode.alterSnakeCode = function (code) {
 
   // Chess: Remix owns score/lock/respawn. Mouse only bridges fractional heads.
   //
-  // Chess enables shield (e7), so eat uses OaF<1 — on a grid that means "same
-  // tile", but fractional mouse heads can eat from a neighboring tile. Then
-  // findApple misses the piece → Oh++ + chess_fruit_respawn (2 new pieces).
-  // Force same-tile eat while chess is active; keep OaF for real Shield mode.
+  // wingedFruit already rewrote if(e7) → if(true) for mouse eat proximity.
+  // Chess still needs same-tile eat (OaF near-miss → findApple fruit path).
   {
     const next = step(
       "appleEatChessTile",
-      () =>
-        code.assertReplace(
+      () => {
+        const patterns = [
+          /if\(true\)\{let dg=this\.oa\.ka\[0\]!==void 0&&this\.oa\.ka\[1\]!==void 0&&Wd\.pos!==void 0;\$d=dg&&\(OaF\(this\.ka,this\.oa\.ka\[0\],Wd\.pos\)<1\|\|OaF\(this\.ka,this\.oa\.ka\[1\],Wd\.pos\)<1\);if\(f7\(this\.settings,7\)&&dg\)\{let Cg=m7\(this\.oa,1\);He=OaF\(this\.ka,m7\(this\.oa,0\),Wd\.pos\)<1\|\|OaF\(this\.ka,Cg,Wd\.pos\)<1\}\}/,
           /if\(e7\(this\.settings\)\)\{let dg=this\.oa\.ka\[0\]!==void 0&&this\.oa\.ka\[1\]!==void 0&&Wd\.pos!==void 0;\$d=dg&&\(OaF\(this\.ka,this\.oa\.ka\[0\],Wd\.pos\)<1\|\|OaF\(this\.ka,this\.oa\.ka\[1\],Wd\.pos\)<1\);if\(f7\(this\.settings,7\)&&dg\)\{let Cg=m7\(this\.oa,1\);He=OaF\(this\.ka,m7\(this\.oa,0\),Wd\.pos\)<1\|\|OaF\(this\.ka,Cg,Wd\.pos\)<1\}\}/,
-          "if(e7(this.settings)){let dg=this.oa.ka[0]!==void 0&&this.oa.ka[1]!==void 0&&Wd.pos!==void 0;if(window.isChessActive&&window.isChessActive()){$d=!!dg&&Math.round(this.oa.ka[0].x)===Math.round(Wd.pos.x)&&Math.round(this.oa.ka[0].y)===Math.round(Wd.pos.y);if(f7(this.settings,7)&&dg){He=Math.round(m7(this.oa,0).x)===Math.round(Wd.pos.x)&&Math.round(m7(this.oa,0).y)===Math.round(Wd.pos.y)}}else{$d=dg&&(OaF(this.ka,this.oa.ka[0],Wd.pos)<1||OaF(this.ka,this.oa.ka[1],Wd.pos)<1);if(f7(this.settings,7)&&dg){let Cg=m7(this.oa,1);He=OaF(this.ka,m7(this.oa,0),Wd.pos)<1||OaF(this.ka,Cg,Wd.pos)<1}}}"
-        ),
+        ];
+        const rep =
+          "if(true){let dg=this.oa.ka[0]!==void 0&&this.oa.ka[1]!==void 0&&Wd.pos!==void 0;if(window.isChessActive&&window.isChessActive()){$d=!!dg&&Math.round(this.oa.ka[0].x)===Math.round(Wd.pos.x)&&Math.round(this.oa.ka[0].y)===Math.round(Wd.pos.y);if(f7(this.settings,7)&&dg){He=Math.round(m7(this.oa,0).x)===Math.round(Wd.pos.x)&&Math.round(m7(this.oa,0).y)===Math.round(Wd.pos.y)}}else{$d=dg&&(OaF(this.ka,this.oa.ka[0],Wd.pos)<1||OaF(this.ka,this.oa.ka[1],Wd.pos)<1);if(f7(this.settings,7)&&dg){let Cg=m7(this.oa,1);He=OaF(this.ka,m7(this.oa,0),Wd.pos)<1||OaF(this.ka,Cg,Wd.pos)<1}}}";
+        for (const p of patterns) {
+          if (p.test(code)) return code.assertReplace(p, rep);
+        }
+        return null;
+      },
       true
     );
     if (next) code = next;
