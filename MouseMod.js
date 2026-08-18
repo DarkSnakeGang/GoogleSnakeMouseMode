@@ -11521,7 +11521,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
 
   // Pick a legal free cell for a new fresh fruit. Returns null if none.
   window.burger_find_spawn_pos = function burger_find_spawn_pos(game) {
-    if (!game || typeof game.Tb !== "function") return null;
+    if (!game) return null;
     const board = game.ka;
     const box = board && board.oa;
     if (!box) return null;
@@ -11531,17 +11531,21 @@ window.BurgerMod.alterSnakeCode = function (code) {
       return (p.x << 16) | (p.y & 65535);
     };
     // Prefer native free-cell picker (spawn radius / occupancy), then filter.
-    for (let attempt = 0; attempt < 24; attempt++) {
-      const p = game.Tb(null, 2);
-      if (!p) break;
-      if (
-        p.x >= 0 &&
-        p.y >= 0 &&
-        p.x < box.width &&
-        p.y < box.height &&
-        (!banned || !banned.has(keyOf(p)))
-      ) {
-        return p;
+    // v13: game.Rb; v12: game.Tb.
+    const free = game.Rb || game.Tb;
+    if (typeof free === "function") {
+      for (let attempt = 0; attempt < 24; attempt++) {
+        const p = free.call(game, null, 2);
+        if (!p) break;
+        if (
+          p.x >= 0 &&
+          p.y >= 0 &&
+          p.x < box.width &&
+          p.y < box.height &&
+          (!banned || !banned.has(keyOf(p)))
+        ) {
+          return p;
+        }
       }
     }
     // Exhaustive scan fallback (still respect late-game ban).
@@ -11577,15 +11581,23 @@ window.BurgerMod.alterSnakeCode = function (code) {
     return candidates[Math.floor(Math.random() * candidates.length)];
   };
 
+  window.burger_ended = function burger_ended(game) {
+    return !!(game && (game.nj || game.lj));
+  };
+
   window.burger_trigger_win = function burger_trigger_win(game) {
-    if (!game || game.lj) return;
+    if (!game || window.burger_ended(game)) return;
     try {
-      if (typeof ybF !== "undefined" && ybF.WIN) ybF.WIN.play();
+      if (typeof Q4E !== "undefined" && Q4E.rWd && Q4E.rWd.play) Q4E.rWd.play();
+      else if (typeof ybF !== "undefined" && ybF.WIN) ybF.WIN.play();
     } catch (_e) {}
-    game.ub = true;
+    // v13 ended flag is nj; lj is the v12 name. Never set game.ub — that is the mode id.
+    game.nj = true;
     game.lj = true;
     try {
-      if (typeof vdF === "function") vdF(game.menu, 1400, game.Oh);
+      const score = game.Sh != null ? game.Sh : game.Oh;
+      if (typeof A7E === "function") A7E(game.menu, 1400, score);
+      else if (typeof vdF === "function") vdF(game.menu, 1400, score);
     } catch (_e2) {}
   };
 
@@ -11656,6 +11668,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
         apple.pos.x = pos.x;
         apple.pos.y = pos.y;
       }
+      apple.wm = true;
       apple.Cm = true;
       apple.Oka = false;
       apple.Gh = true;
@@ -11706,7 +11719,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
   window.burger_tick_logic = function burger_tick_logic() {
     if (!window.isBurgerActive || !window.isBurgerActive()) return;
     const game = window.__remixGame;
-    if (!game || !game.wa || !game.wa.ka || game.lj) return;
+    if (!game || !game.wa || !game.wa.ka || window.burger_ended(game)) return;
     const apples = game.wa.ka;
     const toExpire = [];
     for (let i = 0; i < apples.length; i++) {
@@ -11738,7 +11751,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
       }
     }
     for (let i = 0; i < toExpire.length; i++) {
-      if (game.lj) break;
+      if (window.burger_ended(game)) break;
       const a = toExpire[i];
       if (apples.indexOf(a) < 0) continue;
       if (a.Oka) window.burger_despawn_poison(game, a);
@@ -11877,7 +11890,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
   if (code.match(poisonTopUp)) {
     code = code.assertReplace(
       poisonTopUp,
-      `$1!(window.isBurgerActive&&window.isBurgerActive())&&e4E(hd)`
+      `$1!(window.isBurgerActive&&window.isBurgerActive())&&e4E(a)`
     );
   } else {
     console.error("BurgerMod: failed to patch poison top-up e4E");
@@ -11994,7 +12007,9 @@ window.BurgerMod.alterSnakeCode = function (code) {
     console.error("BurgerMod: failed to find score hook");
   }
 
-  // After chess fruit respawn path, re-assign timers on new apples.
+  // After chess fruit respawn AND native Vm, re-assign timers on new apples.
+  const afterRespawn =
+    `if(window.isBurgerActive&&window.isBurgerActive()&&window.just_ate==='fruit'){window.burger_after_respawn(a);}`;
   if (
     code.match(
       /window\.chess_fruit_respawn\(a\.wa,g7,d4E,Q3E\);/
@@ -12002,8 +12017,20 @@ window.BurgerMod.alterSnakeCode = function (code) {
   ) {
     code = code.assertReplace(
       /window\.chess_fruit_respawn\(a\.wa,g7,d4E,Q3E\);/,
-      `window.chess_fruit_respawn(a.wa,g7,d4E,Q3E);if(window.isBurgerActive&&window.isBurgerActive()&&window.just_ate==='fruit'){window.burger_after_respawn(a);}`
+      `window.chess_fruit_respawn(a.wa,g7,d4E,Q3E);${afterRespawn}`
     );
+  }
+  // Burger-only eats go through native Vm, not chess_fruit_respawn.
+  // The call sits in a comma-group: `e=a.Vm(k,!e,null));` — the extra ) is
+  // required; matching through `null);` would miss and leave reused slots
+  // without a timer (snake-length roll happens in burger_after_respawn).
+  if (code.match(/e=a\.Vm\(k,\s*!e,null\)\);/)) {
+    code = code.assertReplace(
+      /e=a\.Vm\(k,\s*!e,null\)\);/,
+      `e=a.Vm(k,!e,null));${afterRespawn}`
+    );
+  } else {
+    console.error("BurgerMod: failed to find native Vm respawn for after_respawn");
   }
 
   // Aging overlay on fruit drawImage.
@@ -12075,7 +12102,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
   if (code.match(/g7=function\(a,b,c\)\{b=new _\.Od/)) {
     code = code.assertReplace(
       /g7=function\(a,b,c\)\{b=new _\.Od/,
-      `g7=function(a,b,c){window.__h7=g7;window.__aaF=d4E;window.__qaF=f4E;b=new _.Od`
+      `g7=function(a,b,c){window.__h7=g7;window.__aaF=Q3E;window.__qaF=f4E;b=new _.Od`
     );
   } else {
     console.error("BurgerMod: failed to expose g7/f4E");
