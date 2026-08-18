@@ -41,7 +41,7 @@ window.mouseMode.runCodeBefore = function () {
         return true;
       }
       const game = window.__remixGame || window.megaWholeSnakeObject;
-      if (game && typeof f7 === "function" && f7(game.settings, 24)) {
+      if (game && typeof e7 === "function" && e7(game.settings, 24)) {
         return true;
       }
     } catch (_e) {}
@@ -103,6 +103,8 @@ window.mouseMode.runCodeBefore = function () {
           const s = g && g.settings;
           if (!s || window.CHESS_MODE == null) return false;
           if (s.ub === window.CHESS_MODE) return true;
+          if (s.rSa && s.rSa.has(window.CHESS_MODE)) return true;
+          if (s.Lc && s.Lc.has(window.CHESS_MODE)) return true;
           if (s.ZSa && s.ZSa.has(window.CHESS_MODE)) return true;
           if (s.Jc && s.Jc.has(window.CHESS_MODE)) return true;
         } catch (_e) {}
@@ -351,7 +353,7 @@ window.mouseMode.runCodeBefore = function () {
     }
 
     // Arrow mode (idea 1): stamp a turn-trail on tiles you leave; lock to that dir on arrows.
-    // BaF/f7 are module-scoped — use window.mouseBaF / mouseF7 from alterSnakeCode.
+    // s4E/e7 are module-scoped — use window.mouseBaF / mouseSettingsHas from alterSnakeCode.
     // Rail: once an arrow engages, force that direction until the head has traveled
     // a full tile from the engage point (survives leaving the painted cell + double
     // updateFaceCoords calls from tick/render).
@@ -370,12 +372,16 @@ window.mouseMode.runCodeBefore = function () {
             : !!(
                 settings &&
                 (settings.ub === 16 ||
+                  (settings.rSa && settings.rSa.has(16)) ||
+                  (settings.Lc && settings.Lc.has(16)) ||
                   (settings.ZSa && settings.ZSa.has(16)) ||
                   (settings.Jc && settings.Jc.has(16)))
               );
       const arrowBoard =
-        (snakeForArrow && snakeForArrow.Tb) ||
         (game && game.Ka) ||
+        (game && game.wb && game.wb.Ka) ||
+        (snakeForArrow && snakeForArrow.Ka) ||
+        (snakeForArrow && snakeForArrow.Tb) ||
         (game && game.oa && game.oa.Tb);
       const placeArrow =
         typeof window.mouseBaF === "function"
@@ -644,7 +650,7 @@ window.mouseMode.alterSnakeCode = function (code) {
     )[1]
   );
 
-  // snakeDetails e.g. "wb" ; blockyHeadCoord e.g. "oa.Ec"
+  // snakeDetails e.g. "wb" ; blockyHeadCoord e.g. "oa.Dc"
   step("blockyHead", () => {
     [, window.snakeDetails, window.blockyHeadCoord] = code.assertMatch(
       /this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})=\n?[$a-zA-Z0-9_]{0,8}\.clone\(\),/
@@ -664,21 +670,21 @@ window.mouseMode.alterSnakeCode = function (code) {
 
   // Soft fractional OOB (do NOT round here — rounding near edges false-kills Borderless).
   // Grid indexers below round separately.
-  code = step("n7bounds", () =>
+  code = step("m7bounds", () =>
     code.assertReplace(
-      /n7=function\([a-z],[a-z]\)\{return [a-z]\.x>=0&&[a-z]\.x<[a-z]\.[$a-zA-Z0-9_]{0,8}\.width&&[a-z]\.y>=0&&[a-z]\.y<[a-z]\.[$a-zA-Z0-9_]{0,8}\.height\}/,
-      "n7=function(a,b){return b.x>-0.5&&b.x<a.oa.width-0.5&&b.y>-0.5&&b.y<a.oa.height-0.5}"
+      /m7=function\([a-z],[a-z]\)\{return [a-z]\.x>=0&&[a-z]\.x<[a-z]\.[$a-zA-Z0-9_]{0,8}\.width&&[a-z]\.y>=0&&[a-z]\.y<[a-z]\.[$a-zA-Z0-9_]{0,8}\.height\}/,
+      "m7=function(a,b){return b.x>-0.5&&b.x<a.oa.width-0.5&&b.y>-0.5&&b.y<a.oa.height-0.5}"
     )
   );
 
-  // Borderless: never die to OOB (wrap handles it). Tc(a){n7(...)||this.Na()}
+  // Borderless: never die to OOB (wrap handles it). Sc(a){m7(...)||this.Oa()}
   {
     const next = step(
-      "oobTc",
+      "oobSc",
       () =>
         code.assertReplace(
-          /Tc\(a\)\{n7\(this\.ka,a\)\|\|this\.Na\(\)/,
-          "Tc(a){o7(this.settings)||n7(this.ka,a)||this.Na()"
+          /Sc\(a\)\{m7\(this\.ka,a\)\|\|this\.Oa\(\)/,
+          "Sc(a){n7(this.settings)||m7(this.ka,a)||this.Oa()"
         ),
       true
     );
@@ -686,69 +692,69 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
 
   // Tile Map keys must be integers (walls / statue / mines / gates).
-  code = step("Z6", () =>
+  code = step("Y6", () =>
     code.assertReplace(
-      /Z6=function\(a\)\{return a\.x<<16\|a\.y\}/,
-      "Z6=function(a){return Math.round(a.x)<<16|Math.round(a.y)}"
+      /Y6=function\(a\)\{return a\.x<<16\|a\.y\}/,
+      "Y6=function(a){return Math.round(a.x)<<16|Math.round(a.y)}"
     )
   );
 
   // Statue flood-fill board indexing.
-  code = step("jdF", () =>
+  code = step("j7E", () =>
     code.assertReplace(
-      /jdF=function\(a,b,c\)\{if\(n7\(a\.ka,c\)&&!a\.oa\.get\(Z6\(c\)\)\)\{var d=b\[c\.y\]\[c\.x\];/,
-      "jdF=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(n7(a.ka,c)&&!a.oa.get(Z6(c))){var d=b[c.y][c.x];"
+      /j7E=function\(a,b,c\)\{if\(m7\(a\.ka,c\)&&!a\.oa\.get\(Y6\(c\)\)\)\{var d=b\[c\.y\]\[c\.x\];/,
+      "j7E=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(m7(a.ka,c)&&!a.oa.get(Y6(c))){var d=b[c.y][c.x];"
     )
   );
 
   // Arrow / gate / sokoban / bridge: round before 2D board indexing.
-  code = step("eaF", () =>
+  code = step("U3E", () =>
     code.assertReplace(
-      /eaF=function\(a,b\)\{return n7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.direction:"NONE"\}/,
-      'eaF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return n7(a.oa,b)?a.ka[b.y][b.x].direction:"NONE"}'
+      /U3E=function\(a,b\)\{return m7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.direction:"NONE"\}/,
+      'U3E=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return m7(a.oa,b)?a.ka[b.y][b.x].direction:"NONE"}'
     )
   );
-  code = step("daF", () =>
+  code = step("T3E", () =>
     code.assertReplace(
-      /daF=function\(a,b\)\{return n7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.Gh:!1\}/,
-      'daF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return n7(a.oa,b)?a.ka[b.y][b.x].Gh:!1}'
+      /T3E=function\(a,b\)\{return m7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.Lh:!1\}/,
+      'T3E=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return m7(a.oa,b)?a.ka[b.y][b.x].Lh:!1}'
     )
   );
-  code = step("BaF", () =>
+  code = step("s4E", () =>
     code.assertReplace(
-      /BaF=function\(a,b,c\)\{var d=a\.ka\[c\.y\]\[c\.x\];/,
-      "BaF=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(!a.ka[c.y]||a.ka[c.y][c.x]==null)return;var d=a.ka[c.y][c.x];"
+      /s4E=function\(a,b,c\)\{var d=a\.ka\[c\.y\]\[c\.x\];/,
+      "s4E=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(!a.ka[c.y]||a.ka[c.y][c.x]==null)return;var d=a.ka[c.y][c.x];"
     )
   );
-  // Expose arrow helpers to window (module-scoped BaF/f7 are invisible to runCodeBefore).
+  // Expose arrow helpers to window (module-scoped s4E/e7 are invisible to runCodeBefore).
   code = step("exposeArrowApi", () =>
     code.assertReplace(
-      /c\.color=a\)\},CaF=class\{constructor\(a,b,c\)\{this\.settings=a;this\.oa=b;this\.wa=c;this\.ka=\[\]\}/,
-      "c.color=a)};window.mouseBaF=BaF;window.mouseEaF=eaF;window.mouseF7=f7;window.mouseSettingsHas=f7;var CaF=class{constructor(a,b,c){this.settings=a;this.oa=b;this.wa=c;this.ka=[]}"
+      /c\.color=a\)\},t4E=class\{constructor\(a,b,c\)\{this\.settings=a;this\.oa=b;this\.wa=c;this\.ka=\[\]\}/,
+      "c.color=a)};window.mouseBaF=s4E;window.mouseEaF=U3E;window.mouseF7=e7;window.mouseSettingsHas=e7;var t4E=class{constructor(a,b,c){this.settings=a;this.oa=b;this.wa=c;this.ka=[]}"
     )
   );
-  code = step("i7", () =>
+  code = step("h7", () =>
     code.assertReplace(
-      /i7=function\(a,b,c\)\{var d=a\.ka\[b\.y\]\[b\.x\];/,
-      "i7=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};if(!n7(a.oa,b))return;var d=a.ka[b.y][b.x];"
+      /h7=function\(a,b,c\)\{var d=a\.ka\[b\.y\]\[b\.x\];/,
+      "h7=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};if(!m7(a.oa,b))return;var d=a.ka[b.y][b.x];"
     )
   );
-  code = step("cbF", () =>
+  code = step("U4E", () =>
     code.assertReplace(
-      /cbF=function\(a,b,c\)\{b=a\.ka\[b\.y\]\[b\.x\];/,
+      /U4E=function\(a,b,c\)\{b=a\.ka\[b\.y\]\[b\.x\];/,
       // Only enter gates when nearly on-tile — fractional heads were snapping/teleporting early.
-      "cbF=function(a,b,c){if(Math.abs(b.x-Math.round(b.x))>0.35||Math.abs(b.y-Math.round(b.y))>0.35)return;b={x:Math.round(b.x),y:Math.round(b.y)};if(!a.ka[b.y]||a.ka[b.y][b.x]==null)return;b=a.ka[b.y][b.x];"
+      "U4E=function(a,b,c){if(Math.abs(b.x-Math.round(b.x))>0.35||Math.abs(b.y-Math.round(b.y))>0.35)return;b={x:Math.round(b.x),y:Math.round(b.y)};if(!a.ka[b.y]||a.ka[b.y][b.x]==null)return;b=a.ka[b.y][b.x];"
     )
   );
 
-  // Gate setActive: round tile before Yfa grid lookup (float head crashed here).
+  // Gate setActive: round tile before pfa grid lookup (float head crashed here).
   {
     const next = step(
       "gateSetActive",
       () =>
         code.assertReplace(
-          /setActive\(a,b,c\)\{var d=this\.ka\[a\.y\]\[a\.x\]\.Yfa\.get\(b\);/,
-          "setActive(a,b,c){a={x:Math.round(a.x),y:Math.round(a.y)};var d=this.ka[a.y]&&this.ka[a.y][a.x];if(!d)return;d=d.Yfa.get(b);"
+          /setActive\(a,b,c\)\{var d=this\.ka\[a\.y\]\[a\.x\]\.pfa\.get\(b\);/,
+          "setActive(a,b,c){a={x:Math.round(a.x),y:Math.round(a.y)};var d=this.ka[a.y]&&this.ka[a.y][a.x];if(!d)return;d=d.pfa.get(b);"
         ),
       true
     );
@@ -761,8 +767,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "bridgeOa",
       () =>
         code.assertReplace(
-          /\(\(ce=this\.wb\.Fa\.oa\[yc\.y\]\)==null\?0:ce\[yc\.x\]\)/,
-          "((ce=this.wb.Fa.oa[Math.round(yc.y)])==null?0:ce[Math.round(yc.x)])"
+          /\(\(be=this\.wb\.Ga\.oa\[yc\.y\]\)==null\?0:be\[yc\.x\]\)/,
+          "((be=this.wb.Ga.oa[Math.round(yc.y)])==null?0:be[Math.round(yc.x)])"
         ),
       true
     );
@@ -770,11 +776,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "HaF",
+      "y4E",
       () =>
         code.assertReplace(
-          /HaF=function\(a,b\)\{return GaF\(a,b\.x,b\.y,!1\)\}/,
-          "HaF=function(a,b){return GaF(a,Math.round(b.x),Math.round(b.y),!1)}"
+          /y4E=function\(a,b\)\{return x4E\(a,b\.x,b\.y,!1\)\}/,
+          "y4E=function(a,b){return x4E(a,Math.round(b.x),Math.round(b.y),!1)}"
         ),
       true
     );
@@ -782,11 +788,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "GaF",
+      "x4E",
       () =>
         code.assertReplace(
-          /GaF=function\(a,b,c,d=!1\)\{a=a\.wa\[c\]\[b\];/,
-          "GaF=function(a,b,c,d=!1){b=Math.round(b);c=Math.round(c);if(!a.wa[c])return!1;a=a.wa[c][b];"
+          /x4E=function\(a,b,c,d=!1\)\{a=a\.wa\[c\]\[b\];/,
+          "x4E=function(a,b,c,d=!1){b=Math.round(b);c=Math.round(c);if(!a.wa[c])return!1;a=a.wa[c][b];"
         ),
       true
     );
@@ -794,11 +800,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "dbF",
+      "V4E",
       () =>
         code.assertReplace(
-          /dbF=function\(a,b,c\)\{b=b\.clone\(\);/,
-          "dbF=function(a,b,c){b=b.clone();b.x=Math.round(b.x);b.y=Math.round(b.y);"
+          /V4E=function\(a,b,c\)\{b=b\.clone\(\);/,
+          "V4E=function(a,b,c){b=b.clone();b.x=Math.round(b.x);b.y=Math.round(b.y);"
         ),
       true
     );
@@ -806,11 +812,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "rbF",
+      "k5E",
       () =>
         code.assertReplace(
-          /rbF=function\(a,b,c\)\{for\(var d;n7\(a\.ka,b\)&&\(\(d=a\.oa\[b\.y\]\[b\.x\]\)==null\?0:d\.Gh\);\)/,
-          "rbF=function(a,b,c){b.x=Math.round(b.x);b.y=Math.round(b.y);for(var d;n7(a.ka,b)&&((d=a.oa[b.y]&&a.oa[b.y][b.x])==null?0:d.Gh);)"
+          /k5E=function\(a,b,c\)\{for\(var d;m7\(a\.ka,b\)&&\(\(d=a\.oa\[b\.y\]\[b\.x\]\)==null\?0:d\.Lh\);\)/,
+          "k5E=function(a,b,c){b.x=Math.round(b.x);b.y=Math.round(b.y);for(var d;m7(a.ka,b)&&((d=a.oa[b.y]&&a.oa[b.y][b.x])==null?0:d.Lh);)"
         ),
       true
     );
@@ -818,11 +824,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "scF",
+      "n6E",
       () =>
         code.assertReplace(
-          /scF=function\(a,b,c\)\{a\.Aa\.set\(Z6\(b\),c\);a\.wa\[b\.y\]\[b\.x\]\+\+\}/,
-          "scF=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.set(Z6(b),c);a.wa[b.y][b.x]++}"
+          /n6E=function\(a,b,c\)\{a\.Aa\.set\(Y6\(b\),c\);a\.wa\[b\.y\]\[b\.x\]\+\+\}/,
+          "n6E=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.set(Y6(b),c);a.wa[b.y][b.x]++}"
         ),
       true
     );
@@ -830,11 +836,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "pcF",
+      "k6E",
       () =>
         code.assertReplace(
-          /pcF=function\(a,b\)\{a\.Aa\.delete\(Z6\(b\)\);a\.wa\[b\.y\]\[b\.x\]--\}/,
-          "pcF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.delete(Z6(b));a.wa[b.y][b.x]--}"
+          /k6E=function\(a,b\)\{a\.Aa\.delete\(Y6\(b\)\);a\.wa\[b\.y\]\[b\.x\]--\}/,
+          "k6E=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.delete(Y6(b));a.wa[b.y][b.x]--}"
         ),
       true
     );
@@ -847,8 +853,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "mdFbody",
       () =>
         code.assertReplace(
-          /d=b\.ka\[c\],f7\(b\.settings,3\)&&\(d\.x\+d\.y\)%2===0\|\|f7\(b\.settings,11\)&&!b\.wa\[c\]\|\|d\.x%1!==0\|\|d\.y%1!==0\|\|/,
-          "d=b.ka[c],d={x:Math.round(d.x),y:Math.round(d.y)},f7(b.settings,3)&&(d.x+d.y)%2===0||f7(b.settings,11)&&!b.wa[c]||"
+          /d=b\.ka\[c\],e7\(b\.settings,3\)&&\(d\.x\+d\.y\)%2===0\|\|e7\(b\.settings,11\)&&!b\.wa\[c\]\|\|d\.x%1!==0\|\|d\.y%1!==0\|\|/,
+          "d=b.ka[c],d={x:Math.round(d.x),y:Math.round(d.y)},e7(b.settings,3)&&(d.x+d.y)%2===0||e7(b.settings,11)&&!b.wa[c]||"
         ),
       true
     );
@@ -859,11 +865,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   // (Vanilla unlock lives at the end of gbF — mouse never calls gbF because head.equals fails.)
   {
     const next = step(
-      "jbF",
+      "b5E",
       () =>
         code.assertReplace(
-          /jbF=function\(a,b,c,d\)\{b=c\?k7\(a\.ka,b\):b;c=c\?\$6\(a\.Aa\.direction\):a\.Aa\.direction;for\(let h of a\.oa\)if\(h\.Gh&&h\.pos\.equals\(b\)\)\{if\(n\$E\(a\.settings\.ka,h\.sequenceNumber,a\.wa\.wa\)\)\{d\(\);break\}var e=h\.pos\.clone\(\),f=!1;if\(bbF\(a\.settings\)\)\{let k;var g=\(k=cbF\(a\.Fa,h\.pos,c\)\)!=null\?k:f7\(a\.settings,20\)\?dbF\(a\.Ja,\s*h\.pos,c\):void 0;g&&\(e\.x=g\.x,e\.y=g\.y,f=!0\)\}if\(!f\)switch\(c\)\{case "RIGHT":e\.x\+=1;break;case "LEFT":--e\.x;break;case "DOWN":e\.y\+=1;break;case "UP":--e\.y\}f7\(a\.settings,4\)&&j7\(a\.ka,e\);g=n7\(a\.ka,e\)&&a\.ka\.wa\[e\.y\]\[e\.x\]!==10&&HaF\(a\.ka,e\);f=!n7\(a\.ka,e\)&&!f7\(a\.settings,4\)&&f;if\(g\|\|f\)\{f=f7\(a\.settings,7\)&&PaF\(a\.ka\)&&h\.pos\.x===Math\.floor\(a\.ka\.oa\.width\/2\)&&h\.pos\.y===Math\.floor\(a\.ka\.oa\.height\/2\);if\(a\.ka\.wa\[e\.y\]\[e\.x\]!==5&&a\.ka\.wa\[e\.y\]\[e\.x\]!==11&&a\.ka\.wa\[e\.y\]\[e\.x\]!==7&&!f\)switch\(h\.prev=h\.pos\.clone\(\),e=1\/3,a\.Aa\.direction\)\{case "RIGHT":h\.pos\.x\+=\s*e;break;case "LEFT":h\.pos\.x-=e;break;case "DOWN":h\.pos\.y\+=e;break;case "UP":h\.pos\.y-=e\}d\(\)\}else f7\(a\.settings,16\)&&eaF\(a\.Ba,e\)===\$6\(c\)&&daF\(a\.Ba,e\)&&d\(\)\}\}/,
-          `jbF=function(a,b,c,d){b=c?k7(a.ka,b):b;b={x:Math.round(b.x),y:Math.round(b.y)};c=(typeof faceAngle==="number"?window.mouseCardinalFromAngle(faceAngle):a.Aa.direction);var __sokoGoal=function(box){for(let g of a.B_){if(Math.round(box.pos.x)===Math.round(g.x)&&Math.round(box.pos.y)===Math.round(g.y)){fbF(a,box);a.B_.delete(g);if(f7(a.settings,7)){var m=k7(a.ka,g);for(let t of a.B_)if(Math.round(t.x)===Math.round(m.x)&&Math.round(t.y)===Math.round(m.y)){a.B_.delete(t);break}}return!0}}return!1};for(let h of a.oa){if(!h.Gh)continue;h.pos.x=Math.round(h.pos.x);h.pos.y=Math.round(h.pos.y);if(__sokoGoal(h))continue;if(Math.hypot(h.pos.x-b.x,h.pos.y-b.y)>=1.75)continue;if(n$E(a.settings.ka,h.sequenceNumber,a.wa.wa))continue;var e=h.pos.clone();switch(c){case "RIGHT":e.x+=1;break;case "LEFT":--e.x;break;case "DOWN":e.y+=1;break;case "UP":--e.y;break;default:continue}f7(a.settings,4)&&j7(a.ka,e);e.x=Math.round(e.x);e.y=Math.round(e.y);var other=false;for(let o of a.oa)if(o!==h&&o.Gh&&Math.round(o.pos.x)===e.x&&Math.round(o.pos.y)===e.y){other=true;break}var cell=a.ka.wa[e.y]&&a.ka.wa[e.y][e.x],destOk=n7(a.ka,e)&&!other&&cell!==10&&!HaF(a.ka,e);if(destOk){h.prev=h.pos.clone();h.pos.x=e.x;h.pos.y=e.y;__sokoGoal(h);}}}`
+          /b5E=function\(a,b,c,d\)\{b=c\?j7\(a\.ka,b\):b;c=c\?Z6\(a\.Aa\.direction\):a\.Aa\.direction;for\(let h of a\.oa\)if\(h\.Lh&&h\.pos\.equals\(b\)\)\{if\(c3E\(a\.settings\.ka,h\.sequenceNumber,a\.wa\.wa\)\)\{d\(\);break\}var e=h\.pos\.clone\(\),f=!1;if\(T4E\(a\.settings\)\)\{let k;var g=\(k=U4E\(a\.Ga,h\.pos,c\)\)!=null\?k:e7\(a\.settings,20\)\?V4E\(a\.Ja,h\.pos,c\):void 0;g&&\(e\.x=g\.x,e\.y=g\.y,f=!0\)\}if\(!f\)switch\(c\)\{case "RIGHT":e\.x\+=1;break;case "LEFT":--e\.x;break;case "DOWN":e\.y\+=1;break;case "UP":--e\.y\}e7\(a\.settings,4\)&&i7\(a\.ka,e\);g=m7\(a\.ka,e\)&&a\.ka\.wa\[e\.y\]\[e\.x\]!==10&&y4E\(a\.ka,e\);f=!m7\(a\.ka,e\)&&!e7\(a\.settings,4\)&&f;if\(g\|\|f\)\{f=e7\(a\.settings,7\)&&G4E\(a\.ka\)&&h\.pos\.x===Math\.floor\(a\.ka\.oa\.width\/2\)&&h\.pos\.y===Math\.floor\(a\.ka\.oa\.height\/2\);if\(!a5E\(a\.ka\.wa\[e\.y\]\[e\.x\]\)&&!f\)switch\(h\.prev=h\.pos\.clone\(\),e=1\/3,a\.Aa\.direction\)\{case "RIGHT":h\.pos\.x\+=e;break;case "LEFT":h\.pos\.x-=e;break;case "DOWN":h\.pos\.y\+=e;break;case "UP":h\.pos\.y-=e\}d\(\)\}else e7\(a\.settings,16\)&&U3E\(a\.Ba,e\)===Z6\(c\)&&T3E\(a\.Ba,e\)&&d\(\)\}\}/,
+          `b5E=function(a,b,c,d){b=c?j7(a.ka,b):b;b={x:Math.round(b.x),y:Math.round(b.y)};c=(typeof faceAngle==="number"?window.mouseCardinalFromAngle(faceAngle):a.Aa.direction);var __sokoGoal=function(box){for(let g of a.d_){if(Math.round(box.pos.x)===Math.round(g.x)&&Math.round(box.pos.y)===Math.round(g.y)){X4E(a,box);a.d_.delete(g);if(e7(a.settings,7)){var m=j7(a.ka,g);for(let t of a.d_)if(Math.round(t.x)===Math.round(m.x)&&Math.round(t.y)===Math.round(m.y)){a.d_.delete(t);break}}return!0}}return!1};for(let h of a.oa){if(!h.Lh)continue;h.pos.x=Math.round(h.pos.x);h.pos.y=Math.round(h.pos.y);if(__sokoGoal(h))continue;if(Math.hypot(h.pos.x-b.x,h.pos.y-b.y)>=1.75)continue;if(c3E(a.settings.ka,h.sequenceNumber,a.wa.wa))continue;var e=h.pos.clone();switch(c){case "RIGHT":e.x+=1;break;case "LEFT":--e.x;break;case "DOWN":e.y+=1;break;case "UP":--e.y;break;default:continue}e7(a.settings,4)&&i7(a.ka,e);e.x=Math.round(e.x);e.y=Math.round(e.y);var other=false;for(let o of a.oa)if(o!==h&&o.Lh&&Math.round(o.pos.x)===e.x&&Math.round(o.pos.y)===e.y){other=true;break}var cell=a.ka.wa[e.y]&&a.ka.wa[e.y][e.x],destOk=m7(a.ka,e)&&!other&&cell!==10&&!y4E(a.ka,e);if(destOk){h.prev=h.pos.clone();h.pos.x=e.x;h.pos.y=e.y;__sokoGoal(h);}}}`
         ),
       true
     );
@@ -876,8 +882,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "gbFgoal",
       () =>
         code.assertReplace(
-          /for\(let g of a\.B_\)if\(b\.pos\.equals\(g\)\)\{fbF\(a,b\);a\.B_\.delete\(g\);/,
-          "for(let g of a.B_)if(Math.round(b.pos.x)===Math.round(g.x)&&Math.round(b.pos.y)===Math.round(g.y)){fbF(a,b);a.B_.delete(g);"
+          /for\(let g of a\.d_\)if\(b\.pos\.equals\(g\)\)\{X4E\(a,b\);a\.d_\.delete\(g\);/,
+          "for(let g of a.d_)if(Math.round(b.pos.x)===Math.round(g.x)&&Math.round(b.pos.y)===Math.round(g.y)){X4E(a,b);a.d_.delete(g);"
         ),
       true
     );
@@ -890,19 +896,19 @@ window.mouseMode.alterSnakeCode = function (code) {
       "sokoNoKill",
       () =>
         code.assertReplace(
-          /n7\(this\.wb\.ka,ce\)&&\s*this\.wb\.ka\.wa\[ae\.y\]\[ae\.x\]===7&&HaF\(this\.wb\.ka,ce\)&&\(Xc=!0\)/,
-          "false&&(Xc=!0)"
+          /m7\(this\.wb\.ka,be\)&&\s*this\.wb\.ka\.wa\[ge\.y\]\[ge\.x\]===7&&y4E\(this\.wb\.ka,be\)&&\(dd=!0\)/,
+          "false&&(dd=!0)"
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Borderless: always use fixed camera (same as Borderless+Tally via bcF).
-  code = step("bcF", () =>
+  // Borderless: always use fixed camera (same as Borderless+Tally via W5E).
+  code = step("W5E", () =>
     code.assertReplace(
-      /bcF=function\(a\)\{return f7\(a,4\)&&\(f7\(a,2\)\|\|f7\(a,5\)\|\|f7\(a,\s*19\)\|\|f7\(a,20\)\|\|a\.ka===6\)\}/,
-      "bcF=function(a){return f7(a,4)}"
+      /W5E=function\(a\)\{return e7\(a,4\)&&\(e7\(a,2\)\|\|e7\(a,5\)\|\|e7\(a,\s*19\)\|\|e7\(a,20\)\|\|a\.ka===6\)\}/,
+      "W5E=function(a){return e7(a,4)}"
     )
   );
 
@@ -917,23 +923,23 @@ window.mouseMode.alterSnakeCode = function (code) {
       "hotdogFront",
       () =>
         code.assertReplace(
-          /IcF=function\(a,b\)\{scF\(a,b,\{pos:b,Cm:!0,T0:!1,Gh:!f7\(a\.settings,11\)\}\);var c=\[new _\.Sd\(b\.x-1,b\.y-1\),new _\.Sd\(b\.x,b\.y-1\),new _\.Sd\(b\.x\+1,b\.y-1\),new _\.Sd\(b\.x-1,b\.y\),new _\.Sd\(b\.x\+1,b\.y\),new _\.Sd\(b\.x-1,b\.y\+1\),new _\.Sd\(b\.x,b\.y\+1\),new _\.Sd\(b\.x\+1,b\.y\+1\)\];if\(f7\(a\.settings,4\)\)for\(var d of c\)j7\(a\.ka,d\);for\(let e of c\)n7\(a\.ka,\s*e\)&&a\.wa\[e\.y\]\[e\.x\]\+\+;/,
-          `IcF=function(a,b){scF(a,b,{pos:b,Cm:!0,T0:!1,Gh:!f7(a.settings,11)});var c=[new _.Sd(b.x-1,b.y-1),new _.Sd(b.x,b.y-1),new _.Sd(b.x+1,b.y-1),new _.Sd(b.x-1,b.y),new _.Sd(b.x+1,b.y),new _.Sd(b.x-1,b.y+1),new _.Sd(b.x,b.y+1),new _.Sd(b.x+1,b.y+1)];if(f7(a.settings,4))for(var d of c)j7(a.ka,d);{let __s=window.mouseSnakeRef&&window.mouseSnakeRef(),__dir=__s&&__s.direction,fx=__dir==="RIGHT"?1:__dir==="LEFT"?-1:0,fy=__dir==="DOWN"?1:__dir==="UP"?-1:0;if(fx||fy)c=c.filter(p=>{const dx=p.x-b.x,dy=p.y-b.y;return !(dx&&dy&&dx*fx+dy*fy>0);});}for(let e of c)n7(a.ka,e)&&a.wa[e.y][e.x]++;`
+          /E6E=function\(a,b\)\{n6E\(a,b,\{pos:b,wm:!0,m0:!1,Lh:!e7\(a\.settings,11\)\}\);var c=\[new _\.Od\(b\.x-1,b\.y-1\),new _\.Od\(b\.x,b\.y-1\),new _\.Od\(b\.x\+1,b\.y-1\),new _\.Od\(b\.x-1,b\.y\),new _\.Od\(b\.x\+1,b\.y\),new _\.Od\(b\.x-1,b\.y\+1\),new _\.Od\(b\.x,b\.y\+1\),new _\.Od\(b\.x\+1,b\.y\+1\)\];if\(e7\(a\.settings,4\)\)for\(var d of c\)i7\(a\.ka,d\);for\(let e of c\)m7\(a\.ka,/,
+          `E6E=function(a,b){n6E(a,b,{pos:b,wm:!0,m0:!1,Lh:!e7(a.settings,11)});var c=[new _.Od(b.x-1,b.y-1),new _.Od(b.x,b.y-1),new _.Od(b.x+1,b.y-1),new _.Od(b.x-1,b.y),new _.Od(b.x+1,b.y),new _.Od(b.x-1,b.y+1),new _.Od(b.x,b.y+1),new _.Od(b.x+1,b.y+1)];if(e7(a.settings,4))for(var d of c)i7(a.ka,d);{let __s=window.mouseSnakeRef&&window.mouseSnakeRef(),__dir=__s&&__s.direction,fx=__dir==="RIGHT"?1:__dir==="LEFT"?-1:0,fy=__dir==="DOWN"?1:__dir==="UP"?-1:0;if(fx||fy)c=c.filter(p=>{const dx=p.x-b.x,dy=p.y-b.y;return !(dx&&dy&&dx*fx+dy*fy>0);});}for(let e of c)m7(a.ka,`
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Shield mode Oba death: e7 → OaF (same as Shield under mouse); else rounded tile.
-  // Chess lethality while carrying is the eat-path Na() above — not Oba.has(direction).
+  // Shield death: d7 → F4E (same as Shield under mouse); else rounded tile.
+  // Chess lethality while carrying is the eat-path Oa() above — not nba.has(direction).
   {
     const next = step(
       "shieldTick",
       () =>
         code.assertReplace(
-          /\(e7\(this\.settings\)\?OaF\(this\.ka,a,f\.pos\)<1:f\.pos\.equals\(a\)\)&&\(\(g=f\.Oba\)==null\?0:g\.has\(d\)\)&&this\.Na\(\)/,
-          "(e7(this.settings)?OaF(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.Oba)==null?0:g.has(d))&&this.Na()"
+          /\(d7\(this\.settings\)\?F4E\(this\.ka,a,f\.pos\)<1:f\.pos\.equals\(a\)\)&&\(\(g=f\.nba\)==null\?0:g\.has\(d\)\)&&this\.Oa\(\)/,
+          "(d7(this.settings)?F4E(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.nba)==null?0:g.has(d))&&this.Oa()"
         ),
       true
     );
@@ -944,8 +950,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "shieldRender",
       () =>
         code.assertReplace(
-          /ae\.equals\(Qd\.pos\)&&\(\(ge=Qd\.Oba\)==null\?0:ge\.has\(xc\)\)&&\(Xc=!0\)/,
-          "Math.round(ae.x)===Math.round(Qd.pos.x)&&Math.round(ae.y)===Math.round(Qd.pos.y)&&((ge=Qd.Oba)==null?0:ge.has(xc))&&(Xc=!0)"
+          /ge\.equals\(Sd\.pos\)&&\(\(ne=Sd\.nba\)==null\?0:ne\.has\(Ec\)\)&&\(dd=!0\)/,
+          "Math.round(ge.x)===Math.round(Sd.pos.x)&&Math.round(ge.y)===Math.round(Sd.pos.y)&&((ne=Sd.nba)==null?0:ne.has(Ec))&&(dd=!0)"
         ),
       true
     );
@@ -1014,8 +1020,8 @@ window.mouseMode.alterSnakeCode = function (code) {
   // Force winged-style fruit proximity
   code = step("wingedFruit", () =>
     code.assertReplace(
-      /if\(e7\(this\.settings\)\)\{let ([$a-zA-Z0-9_]{0,8})=this\.oa\.ka\[0\]!==void 0/,
-      "if(true){let $1=this.oa.ka[0]!==void 0"
+      /if\(d7\(a\.settings\)\)\{var ([$a-zA-Z0-9_]{0,8})=a\.oa\.ka\[0\]!==void 0/,
+      "if(true){var $1=a.oa.ka[0]!==void 0"
     )
   );
 
@@ -1026,8 +1032,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "tallyWallTick",
       () =>
         code.assertReplace(
-          /\(e7\(this\.settings\)\?OaF\(this\.ka,a,d\.pos\)<1:d\.pos\.equals\(a\)\)&&n\$E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Na\(\)/,
-          "Math.hypot(a.x-d.pos.x,a.y-d.pos.y)<1&&n$E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Na()"
+          /\(d7\(this\.settings\)\?F4E\(this\.ka,a,d\.pos\)<1:d\.pos\.equals\(a\)\)&&c3E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Oa\(\)/,
+          "Math.hypot(a.x-d.pos.x,a.y-d.pos.y)<1&&c3E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Oa()"
         ),
       true
     );
@@ -1038,8 +1044,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "tallyWallYY",
       () =>
         code.assertReplace(
-          /\(f7\(this\.settings,6\)\?OaF\(this\.ka,b,d\.pos\)<1:d\.pos\.equals\(b\)\)&&n\$E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Na\(\)/,
-          "Math.hypot(b.x-d.pos.x,b.y-d.pos.y)<1&&n$E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Na()"
+          /\(e7\(this\.settings,6\)\?F4E\(this\.ka,b,d\.pos\)<1:d\.pos\.equals\(b\)\)&&c3E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Oa\(\)/,
+          "Math.hypot(b.x-d.pos.x,b.y-d.pos.y)<1&&c3E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Oa()"
         ),
       true
     );
@@ -1050,8 +1056,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "tallyWallRender",
       () =>
         code.assertReplace(
-          /Qd\.Gh&&Qd\.pos\.equals\(ae\)&&n\$E\(this\.settings\.ka,Qd\.sequenceNumber,this\.wb\.wa\.wa\)/,
-          "Qd.Gh&&Math.hypot(Qd.pos.x-ae.x,Qd.pos.y-ae.y)<1&&n$E(this.settings.ka,Qd.sequenceNumber,this.wb.wa.wa)"
+          /Sd\.Lh&&Sd\.pos\.equals\(ge\)&&c3E\(this\.settings\.ka,Sd\.sequenceNumber,this\.wb\.wa\.wa\)/,
+          "Sd.Lh&&Math.hypot(Sd.pos.x-ge.x,Sd.pos.y-ge.y)<1&&c3E(this.settings.ka,Sd.sequenceNumber,this.wb.wa.wa)"
         ),
       true
     );
@@ -1078,10 +1084,10 @@ window.mouseMode.alterSnakeCode = function (code) {
       "headRender",
       () => {
         const re =
-          /pb===0\?\(([a-zA-Z0-9_$]+)=this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\),[\s\S]{0,800}?\):\1=this\.\2\.\3\.\4\[/;
+          /rb===0\?\(([a-zA-Z0-9_$]+)=this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\),[\s\S]{0,2000}?\):\1=this\.\2\.\3\.\4\[/;
         return code.assertReplace(
           re,
-          `pb===0?($1=this.$2.$3.$4[0].clone(),(aimTrainer?($1.x+=Math.cos(faceAngle),$1.y+=Math.sin(faceAngle)):(updateFaceCoordsAndRotation(this.$2.${window.blockyHeadCoord},this.$2.${window.tileWidth},this.$2.$3.$4),$1.x=nextHeadX,$1.y=nextHeadY))):$1=this.$2.$3.$4[`
+          `rb===0?($1=this.$2.$3.$4[0].clone(),(aimTrainer?($1.x+=Math.cos(faceAngle),$1.y+=Math.sin(faceAngle)):(updateFaceCoordsAndRotation(this.$2.${window.blockyHeadCoord},this.$2.${window.tileWidth},this.$2.$3.$4),$1.x=nextHeadX,$1.y=nextHeadY))):$1=this.$2.$3.$4[`
         );
       },
       true
@@ -1094,11 +1100,11 @@ window.mouseMode.alterSnakeCode = function (code) {
     const next = step(
       "curveOffset",
       () => {
-        // Neighbor segment vars (v12: yc closer-to-head, kc further).
+        // Neighbor segment vars (v13: yc closer-to-head, sc further).
         let closer = "yc";
-        let further = "kc";
+        let further = "sc";
         const named = code.match(
-          /let ([a-zA-Z0-9_$]+);pb===0\?\(\1=[\s\S]{0,400}?\):[\s\S]{0,80}?let [a-zA-Z0-9_$]+=this\.[\s\S]{0,120}?;([a-zA-Z0-9_$]+);\2=pb===/
+          /let ([a-zA-Z0-9_$]+);rb===0\?\(\1=[\s\S]{0,800}?\):[\s\S]{0,80}?let [a-zA-Z0-9_$]+=this\.[\s\S]{0,120}?,([a-zA-Z0-9_$]+);\2=rb===/
         );
         if (named) {
           closer = named[1];
@@ -1107,7 +1113,7 @@ window.mouseMode.alterSnakeCode = function (code) {
 
         // Replace cardinal-only corner math with fluid blends toward neighboring segments.
         const re =
-          /(let ([$a-zA-Z0-9_]+)=([$a-zA-Z0-9_]+)\.clone\(\),([$a-zA-Z0-9_]+)=\3\.clone\(\);\2\.x\*=(this\.[$a-zA-Z0-9_.]+);\2\.y\*=\5;\4\.x\*=\5;\4\.y\*=\5;)[\s\S]*?(?=if\(pb===0\))/;
+          /(let ([$a-zA-Z0-9_]+)=([$a-zA-Z0-9_]+)\.clone\(\),([$a-zA-Z0-9_]+)=\3\.clone\(\);\2\.x\*=(this\.[$a-zA-Z0-9_.]+);\2\.y\*=\5;\4\.x\*=\5;\4\.y\*=\5;)[\s\S]*?(?=if\(rb===0\))/;
         return code.assertReplace(
           re,
           `$1
@@ -1130,9 +1136,10 @@ window.mouseMode.alterSnakeCode = function (code) {
       "wallPause",
       () => {
         const patterns = [
+          /if\(!e7\(this\.settings,21\)\)/,
           /if\(![$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},17\)\)/,
           /if\(![$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},17\)\)\{/,
-          /if\(!o7\(this\.settings\)\)/,
+          /if\(!n7\(this\.settings\)\)/,
         ];
         for (const p of patterns) {
           if (p.test(code)) return code.assertReplace(p, "if(false)");
@@ -1160,18 +1167,18 @@ window.mouseMode.alterSnakeCode = function (code) {
 
   // Chess: Remix owns score/lock/respawn. Mouse only bridges fractional heads.
   //
-  // wingedFruit already rewrote if(e7) → if(true) for mouse eat proximity.
-  // Chess still needs same-tile eat (OaF near-miss → findApple fruit path).
+  // wingedFruit already rewrote if(d7) → if(true) for mouse eat proximity.
+  // Chess still needs same-tile eat (F4E near-miss → findApple fruit path).
   {
     const next = step(
       "appleEatChessTile",
       () => {
         const patterns = [
-          /if\(true\)\{let dg=this\.oa\.ka\[0\]!==void 0&&this\.oa\.ka\[1\]!==void 0&&Wd\.pos!==void 0;\$d=dg&&\(OaF\(this\.ka,this\.oa\.ka\[0\],Wd\.pos\)<1\|\|OaF\(this\.ka,this\.oa\.ka\[1\],Wd\.pos\)<1\);if\(f7\(this\.settings,7\)&&dg\)\{let Cg=m7\(this\.oa,1\);He=OaF\(this\.ka,m7\(this\.oa,0\),Wd\.pos\)<1\|\|OaF\(this\.ka,Cg,Wd\.pos\)<1\}\}/,
-          /if\(e7\(this\.settings\)\)\{let dg=this\.oa\.ka\[0\]!==void 0&&this\.oa\.ka\[1\]!==void 0&&Wd\.pos!==void 0;\$d=dg&&\(OaF\(this\.ka,this\.oa\.ka\[0\],Wd\.pos\)<1\|\|OaF\(this\.ka,this\.oa\.ka\[1\],Wd\.pos\)<1\);if\(f7\(this\.settings,7\)&&dg\)\{let Cg=m7\(this\.oa,1\);He=OaF\(this\.ka,m7\(this\.oa,0\),Wd\.pos\)<1\|\|OaF\(this\.ka,Cg,Wd\.pos\)<1\}\}/,
+          /if\(true\)\{var g=a\.oa\.ka\[0\]!==void 0&&a\.oa\.ka\[1\]!==void 0&&d\.pos!==void 0;e=g&&\(F4E\(a\.ka,a\.oa\.ka\[0\],d\.pos\)<1\|\|F4E\(a\.ka,a\.oa\.ka\[1\],d\.pos\)<1\);e7\(a\.settings,7\)&&g&&\(g=l7\(a\.oa,1\),f=F4E\(a\.ka,l7\(a\.oa,0\),d\.pos\)<1\|\|F4E\(a\.ka,g,d\.pos\)<1\)\}/,
+          /if\(d7\(a\.settings\)\)\{var g=a\.oa\.ka\[0\]!==void 0&&a\.oa\.ka\[1\]!==void 0&&d\.pos!==void 0;e=g&&\(F4E\(a\.ka,a\.oa\.ka\[0\],d\.pos\)<1\|\|F4E\(a\.ka,a\.oa\.ka\[1\],d\.pos\)<1\);e7\(a\.settings,7\)&&g&&\(g=l7\(a\.oa,1\),f=F4E\(a\.ka,l7\(a\.oa,0\),d\.pos\)<1\|\|F4E\(a\.ka,g,d\.pos\)<1\)\}/,
         ];
         const rep =
-          "if(true){let dg=this.oa.ka[0]!==void 0&&this.oa.ka[1]!==void 0&&Wd.pos!==void 0;if(window.isChessActive&&window.isChessActive()){$d=!!dg&&Math.round(this.oa.ka[0].x)===Math.round(Wd.pos.x)&&Math.round(this.oa.ka[0].y)===Math.round(Wd.pos.y);if(f7(this.settings,7)&&dg){He=Math.round(m7(this.oa,0).x)===Math.round(Wd.pos.x)&&Math.round(m7(this.oa,0).y)===Math.round(Wd.pos.y)}}else{$d=dg&&(OaF(this.ka,this.oa.ka[0],Wd.pos)<1||OaF(this.ka,this.oa.ka[1],Wd.pos)<1);if(f7(this.settings,7)&&dg){let Cg=m7(this.oa,1);He=OaF(this.ka,m7(this.oa,0),Wd.pos)<1||OaF(this.ka,Cg,Wd.pos)<1}}}";
+          "if(true){var g=a.oa.ka[0]!==void 0&&a.oa.ka[1]!==void 0&&d.pos!==void 0;if(window.isChessActive&&window.isChessActive()){e=!!g&&Math.round(a.oa.ka[0].x)===Math.round(d.pos.x)&&Math.round(a.oa.ka[0].y)===Math.round(d.pos.y);if(e7(a.settings,7)&&g){f=Math.round(l7(a.oa,0).x)===Math.round(d.pos.x)&&Math.round(l7(a.oa,0).y)===Math.round(d.pos.y)}}else{e=g&&(F4E(a.ka,a.oa.ka[0],d.pos)<1||F4E(a.ka,a.oa.ka[1],d.pos)<1);e7(a.settings,7)&&g&&(g=l7(a.oa,1),f=F4E(a.ka,l7(a.oa,0),d.pos)<1||F4E(a.ka,g,d.pos)<1)}}";
         for (const p of patterns) {
           if (p.test(code)) return code.assertReplace(p, rep);
         }
@@ -1187,37 +1194,37 @@ window.mouseMode.alterSnakeCode = function (code) {
       "appleEatProx",
       () =>
         code.assertReplace(
-          /else \$d=this\.oa\.ka\[0\]\.equals\(Wd\.pos\),f7\(this\.settings,\s*7\)&&\(He=m7\(this\.oa,0\)\.equals\(Wd\.pos\)\)/,
-          "else $d=(Math.round(this.oa.ka[0].x)===Math.round(Wd.pos.x)&&Math.round(this.oa.ka[0].y)===Math.round(Wd.pos.y)),f7(this.settings,7)&&(He=(Math.round(m7(this.oa,0).x)===Math.round(Wd.pos.x)&&Math.round(m7(this.oa,0).y)===Math.round(Wd.pos.y)))"
+          /else e=a\.oa\.ka\[0\]\.equals\(d\.pos\),e7\(a\.settings,7\)&&\(f=l7\(a\.oa,0\)\.equals\(d\.pos\)\)/,
+          "else e=(Math.round(a.oa.ka[0].x)===Math.round(d.pos.x)&&Math.round(a.oa.ka[0].y)===Math.round(d.pos.y)),e7(a.settings,7)&&(f=(Math.round(l7(a.oa,0).x)===Math.round(d.pos.x)&&Math.round(l7(a.oa,0).y)===Math.round(d.pos.y)))"
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Chess eat: while locked/carrying, any eat attempt kills (generous $d||He hitreg).
-  // While OPEN, tag Wd and apply piece pickup immediately (don't trust findApple alone).
+  // Chess eat: while locked/carrying, any eat attempt kills (generous e||f hitreg).
+  // While OPEN, tag d and apply piece pickup immediately (don't trust findApple alone).
   {
     const next = step(
       "chessEatLockedDeath",
       () =>
         code.assertReplace(
-          /if\(\$d\|\|He\)\{let dg=Wd\.nla/,
-          "if($d||He){if(window.isChessActive&&window.isChessActive()&&(window.__chessCarrying||(window.head_state&&window.head_state!=='OPEN'))){this.Na();break;}window.__chessEatenApple=Wd;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(window.isChessActive&&window.isChessActive()&&Wd.isPiece){window.just_ate='piece';window.head_state=Wd.ChessPiece;window.head_color=Wd.ChessColor;window.__chessCarrying=true;window.__chessCarryPiece=Wd.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(Wd.type);if(typeof window.shield_all==='function')window.shield_all();}let dg=Wd.nla"
+          /if\(e\|\|f\)\{g=d\.Oka/,
+          "if(e||f){if(window.isChessActive&&window.isChessActive()&&(window.__chessCarrying||(window.head_state&&window.head_state!=='OPEN'))){a.Oa();break;}window.__chessEatenApple=d;if(a.wa&&a.wa.ka)window.appleArray=a.wa.ka;if(window.isChessActive&&window.isChessActive()&&d.isPiece){window.just_ate='piece';window.head_state=d.ChessPiece;window.head_color=d.ChessColor;window.__chessCarrying=true;window.__chessCarryPiece=d.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(d.type);if(typeof window.shield_all==='function')window.shield_all();}g=d.Oka"
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Score hook: honor pickup tag / just_ate / sticky carry; never Oh++ a piece.
+  // Score hook: honor pickup tag / just_ate / sticky carry; never Sh++ a piece.
   {
     const next = step(
       "chessScoreHarden",
       () =>
         code.assertReplace(
-          /if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';this\.Oh\+\+;/,
-          "if(window.just_ate!=='piece'&&!window.__chessCarrying&&!(window.__chessEatenApple&&window.__chessEatenApple.isPiece)&&_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;"
+          /if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';a\.Sh\+\+;/,
+          "if(window.just_ate!=='piece'&&!window.__chessCarrying&&!(window.__chessEatenApple&&window.__chessEatenApple.isPiece)&&_ae&&!_ae.isPiece){window.just_ate='fruit';a.Sh++;"
         ),
       true
     );
@@ -1228,8 +1235,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "chessScoreHonorPickup",
       () =>
         code.assertReplace(
-          /else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';this\.Oh\+\+;/,
-          "else if((_ae&&_ae.isPiece)||(window.__chessEatenApple&&window.__chessEatenApple.isPiece)||window.just_ate==='piece'||window.__chessCarrying){window.just_ate='piece';{let _src=(_ae&&_ae.isPiece)?_ae:(window.__chessEatenApple&&window.__chessEatenApple.isPiece?window.__chessEatenApple:null);if(_src&&_src.isPiece){window.head_state=_src.ChessPiece;window.__chessCarryPiece=_src.ChessPiece;window.head_color=_src.ChessColor;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(_src.type);}window.__chessCarrying=true;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(typeof window.shield_all==='function')window.shield_all();window.__chessEatenApple=null;}}else{window.just_ate='fruit';this.Oh++;"
+          /else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';a\.Sh\+\+;/,
+          "else if((_ae&&_ae.isPiece)||(window.__chessEatenApple&&window.__chessEatenApple.isPiece)||window.just_ate==='piece'||window.__chessCarrying){window.just_ate='piece';{let _src=(_ae&&_ae.isPiece)?_ae:(window.__chessEatenApple&&window.__chessEatenApple.isPiece?window.__chessEatenApple:null);if(_src&&_src.isPiece){window.head_state=_src.ChessPiece;window.__chessCarryPiece=_src.ChessPiece;window.head_color=_src.ChessColor;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(_src.type);}window.__chessCarrying=true;if(a.wa&&a.wa.ka)window.appleArray=a.wa.ka;if(typeof window.shield_all==='function')window.shield_all();window.__chessEatenApple=null;}}else{window.just_ate='fruit';a.Sh++;"
         ),
       true
     );
@@ -1277,7 +1284,7 @@ window.mouseMode.alterSnakeCode = function (code) {
     )
   );
 
-  // Start via turn (v12) — also assign directly so it works even if append marker misses
+  // Start via turn (v13) — also assign directly so it works even if append marker misses
   code = step("startGameAppend", () =>
     appendCodeWithinSnakeModule(
       code,
@@ -1305,7 +1312,7 @@ window.mouseMode.alterSnakeCode = function (code) {
       "wallOffset",
       () =>
         code.assertReplace(
-          /([a-z]=this\.Ca\.Ca\()([a-z])(\))/,
+          /([a-zA-Z0-9_$]+=this\.Ca\.Ca\()([a-zA-Z0-9_$]+)(\))/,
           "$1{x:Math.round($2.x),y:Math.round($2.y)}$3"
         ),
       true
@@ -1397,6 +1404,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "borderless",
       () => {
         const m = code.match(
+          /([A-Za-z0-9_$]+)=[$A-Za-z0-9_.]+\?-[^:]+:Math\.round\(this\.[$A-Za-z0-9_.]+\.canvas\.width\/2-this\.[$A-Za-z0-9_.]+\.x-this\.[$A-Za-z0-9_.]+\),([A-Za-z0-9_$]+)=[$A-Za-z0-9_.]+\?-[^:]+:Math\.round\(this\.[$A-Za-z0-9_.]+\.canvas\.height\/2-this\.[$A-Za-z0-9_.]+\.y-this\.[$A-Za-z0-9_.]+\)/
+        ) || code.match(
           /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\),([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/
         );
         if (!m) return null;

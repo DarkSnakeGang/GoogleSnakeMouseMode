@@ -1,3 +1,5 @@
+window.PuddingMod = window.PuddingMod || {};
+
 window.Core = {};
 
 window.Core.make = function () {
@@ -69,7 +71,8 @@ window.Theme = {};
 window.Theme.make = function () {
 
   // style for all pudding sidebar overlays
-  window.puddingSidebarStyle = 'position:absolute;left:100%;z-index:10000;background-color:#4a752c;padding:8px;display:block;border-radius:3px;width:220px;height:584px;top:0px;';
+  window.puddingSidebarStyle = 'position:absolute;left:100%;z-index:10000;background-color:#4a752c;padding:8px;display:block;border-radius:3px;width:220px;height:584px;top:0px;overflow:hidden;';
+  window.puddingSidebarStyleLeft = 'position:absolute;right:100%;left:auto;z-index:10000;background-color:#4a752c;padding:8px;display:block;border-radius:3px;width:220px;height:584px;top:0px;overflow:hidden;';
 
   let advancedSettings = JSON.parse(localStorage.getItem('snakeAdvancedSettings')) ?? {};
 
@@ -439,8 +442,12 @@ window.Theme.alterCode = function (code) {
       }
     }
 
-    document.getElementById('settings-popup-pudding').style.background = real_top_bar;
-    document.getElementById('speedinfo-popup-pudding').style.background = real_top_bar;
+    const settingsBox = document.getElementById('settings-popup-pudding');
+    if (settingsBox) settingsBox.style.background = real_top_bar;
+    const speedinfo = document.getElementById('speedinfo-popup-pudding');
+    if (speedinfo) speedinfo.style.background = real_top_bar;
+    const splitPanel = document.getElementById('split-panel-pudding');
+    if (splitPanel) splitPanel.style.background = real_top_bar;
     const portalPanel = document.getElementById('fruit-bowl-popup-pudding') || document.getElementById('portal-pairs-popup-pudding');
     if (portalPanel) {
       portalPanel.style.background = real_top_bar;
@@ -768,11 +775,10 @@ window.Counter.alterCode = function (code) {
     counter_reset_code = `;stats.inputs.game = 0;
     stats.walls.game = 0;
     window.wallCoords = [];
-    window.timeKeeper.playing = false;
     window.BootstrapHide();
     stats.plays.session++;
     stats.plays.lifetime++;
-    window.timeKeeper.addAttempt(window.timeKeeper.mode, window.timeKeeper.count, window.timeKeeper.speed, window.timeKeeper.size);
+    window.timeKeeper.addAttempt();
     saveStatistics();
     stats.visible = true;
     if((window.CurrentModeNum != 1 && window.CurrentModeNum != 19) && stats.statShown == "walls"){
@@ -787,10 +793,9 @@ window.Counter.alterCode = function (code) {
 
     window.IncrementCounter = function(){
 
-        if(!window.timeKeeper.playing)
+        if(!window.timeKeeper.runStarted)
         {
             window.timeKeeper.start();
-            window.timeKeeper.playing = true;
         }
 
         stats.inputs.game++;
@@ -802,6 +807,8 @@ window.Counter.alterCode = function (code) {
 
 
     document.addEventListener('keydown', (event)=> {
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
         if(!event.repeat)
         {
             if ((event.key === 'ArrowRight') || (event.code === 'KeyD')){
@@ -833,20 +840,35 @@ window.Counter.alterCode = function (code) {
 
     code = code.assertReplace(stop_regex, save_stats_code);
 
-    wall_spawn_regex = new RegExp(/(?:let|const|var) [a-zA-Z0-9_$]{1,8}=\n?[a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},this\.[a-zA-Z0-9_$]{1,8}\(null,5\)\);/gm)
-    catchError(wall_spawn_regex, code)
-    wall_pos = code.match(wall_spawn_regex)[0].split('=')[0].split(' ')[1]
+    // v12: let Ni=ucF(this.Ca,this.Sb(null,5));
+    // v13: (h=p6E(a.Ca,a.Vb(null,5)))&&(...)
+    const wall_spawn_let = /(?:let|const|var) ([a-zA-Z0-9_$]{1,8})=\n?[a-zA-Z0-9_$]{1,8}\(this\.[a-zA-Z0-9_$]{1,8},this\.[a-zA-Z0-9_$]{1,8}\(null,5\)\);/
+    const wall_spawn_assign = /\(([a-zA-Z0-9_$]{1,8})=[a-zA-Z0-9_$]{1,8}\((?:this|a)\.[a-zA-Z0-9_$]{1,8},(?:this|a)\.[a-zA-Z0-9_$]{1,8}\(null,5\)\)\)/
 
-    wall_counter_code = `${code.match(wall_spawn_regex)[0]}
+    const wall_let_match = code.match(wall_spawn_let)
+    if (wall_let_match) {
+        catchError(wall_spawn_let, code)
+        const wall_pos = wall_let_match[1]
+        const wall_counter_code = `${wall_let_match[0]}
     if(${wall_pos}){stats.walls.game++;
     window.wallCoords.push([${wall_pos}.x, ${wall_pos}.y]);
     updateCounterDisplay();}
     `
-    if (window.NepDebug) {
-        console.log("Wall thing: " + wall_pos)
-        console.log("Wall thing 2: " + wall_counter_code)
+        if (window.NepDebug) {
+            console.log("Wall thing: " + wall_pos)
+            console.log("Wall thing 2: " + wall_counter_code)
+        }
+        code = code.assertReplace(wall_spawn_let, wall_counter_code)
+    } else {
+        catchError(wall_spawn_assign, code)
+        const wall_assign_match = code.match(wall_spawn_assign)
+        const wall_pos = wall_assign_match[1]
+        const inner = wall_assign_match[0].slice(1, -1)
+        code = code.assertReplace(
+            wall_spawn_assign,
+            `(${inner},${wall_pos}&&(stats.walls.game++,window.wallCoords.push([${wall_pos}.x,${wall_pos}.y]),updateCounterDisplay()),${wall_pos})`
+        )
     }
-    code = code.assertReplace(wall_spawn_regex, wall_counter_code);
     
 
     window.coordinatesToBoardString = function coordinatesToBoardString(coordinates) {
@@ -879,356 +901,760 @@ window.Counter.alterCode = function (code) {
 
     return code;
 }
+window.ModeRegistry = {};
+
+// Known middle modes (between Classic and Peaceful). Peaceful/Classic/Blender are positional.
+window.ModeRegistry.MIDDLE = [
+    { id: "wall", label: "Wall", trophySrcHints: ["trophy_01"], bitIndexV3: 0 },
+    { id: "portal", label: "Portal", trophySrcHints: ["trophy_02"], bitIndexV3: 1 },
+    { id: "cheese", label: "Cheese", trophySrcHints: ["trophy_03"], bitIndexV3: 2 },
+    { id: "borderless", label: "Borderless", trophySrcHints: ["trophy_04"], bitIndexV3: 3 },
+    { id: "twin", label: "Twin", trophySrcHints: ["trophy_05"], bitIndexV3: 4 },
+    { id: "winged", label: "Winged", trophySrcHints: ["trophy_06"], bitIndexV3: 5 },
+    { id: "yin_yang", label: "Yin Yang", trophySrcHints: ["trophy_07"], bitIndexV3: 6 },
+    { id: "key", label: "Key", trophySrcHints: ["trophy_08"], bitIndexV3: 7 },
+    { id: "sokoban", label: "Sokoban", trophySrcHints: ["trophy_09"], bitIndexV3: 8 },
+    { id: "poison", label: "Poison", trophySrcHints: ["trophy_10"], bitIndexV3: 9 },
+    { id: "dimension", label: "Dimension", trophySrcHints: ["trophy_11"], bitIndexV3: 10 },
+    { id: "minesweeper", label: "Minesweeper", trophySrcHints: ["trophy_12"], bitIndexV3: 11 },
+    { id: "statue", label: "Statue", trophySrcHints: ["trophy_13"], bitIndexV3: 12 },
+    { id: "light", label: "Light", trophySrcHints: ["trophy_14"], bitIndexV3: 13 },
+    { id: "shield", label: "Shield", trophySrcHints: ["/v16/trophy_15"], bitIndexV3: 14 },
+    { id: "arrow", label: "Arrow", trophySrcHints: ["/v17/trophy_15"], bitIndexV3: 15 },
+    { id: "hotdog", label: "Hotdog", trophySrcHints: ["trophy_16"], bitIndexV3: 16 },
+    { id: "magnet", label: "Magnet", trophySrcHints: ["trophy_17"], bitIndexV3: 17 },
+    { id: "gate", label: "Gate", trophySrcHints: ["trophy_18"], bitIndexV3: 18 },
+    { id: "bridge", label: "Bridge", trophySrcHints: ["trophy_19"], bitIndexV3: 19 },
+];
+
+window.ModeRegistry.LABELS = (function () {
+    const map = { classic: "Classic", peaceful: "Peaceful", blender: "Blender" };
+    for (const m of window.ModeRegistry.MIDDLE) map[m.id] = m.label;
+    return map;
+})();
+
+window.ModeRegistry._byBitV3 = (function () {
+    const map = Object.create(null);
+    for (const m of window.ModeRegistry.MIDDLE) map[m.bitIndexV3] = m.id;
+    map[20] = "peaceful"; // v3 bitstring: Peaceful was last bit before Blender
+    return map;
+})();
+
+window.ModeRegistry._matchMiddleId = function (src) {
+    if (!src) return null;
+    const s = String(src);
+    for (const m of window.ModeRegistry.MIDDLE) {
+        for (const hint of m.trophySrcHints) {
+            if (s.includes(hint)) return m.id;
+        }
+    }
+    return null;
+};
+
+window.ModeRegistry._provisionalId = function (src, index) {
+    if (src) {
+        const m = String(src).match(/trophy_(\d+)/i);
+        if (m) return "trophy_" + m[1];
+    }
+    return "unknown_" + index;
+};
+
+window.ModeRegistry._trophySrc = function (child) {
+    const img = child && (child.querySelector && child.querySelector("img"));
+    return img ? img.src : "";
+};
+
+window.ModeRegistry.listActiveModes = function () {
+    const root = document.getElementById("trophy");
+    if (!root || !root.children || root.children.length === 0) {
+        return [{ id: "classic", label: "Classic", index: 0 }];
+    }
+    const children = [...root.children];
+    const last = children.length - 1;
+    const used = new Set();
+    const list = [];
+
+    for (let i = 0; i < children.length; i++) {
+        let id;
+        if (i === 0) {
+            id = "classic";
+        } else if (i === last) {
+            id = "blender";
+        } else if (i === last - 1) {
+            id = "peaceful";
+        } else {
+            const src = window.ModeRegistry._trophySrc(children[i]);
+            id = window.ModeRegistry._matchMiddleId(src);
+            // Fallback: expected slot among middle modes when layout matches catalog length
+            if (!id) {
+                const middleSlot = i - 1; // index into MIDDLE
+                if (middleSlot >= 0 && middleSlot < window.ModeRegistry.MIDDLE.length) {
+                    id = window.ModeRegistry.MIDDLE[middleSlot].id;
+                } else {
+                    id = window.ModeRegistry._provisionalId(src, i);
+                }
+            }
+            if (used.has(id)) id = window.ModeRegistry._provisionalId(src, i);
+        }
+        used.add(id);
+        list.push({
+            id,
+            label: window.ModeRegistry.LABELS[id] || id,
+            index: i,
+        });
+    }
+    return list;
+};
+
+window.ModeRegistry.has = function (id) {
+    return window.ModeRegistry.listActiveModes().some((m) => m.id === id);
+};
+
+window.ModeRegistry.labelModeKey = function (key) {
+    if (!key) return "Classic";
+    if (key === "classic") return "Classic";
+    if (key.indexOf("+") === -1) {
+        return window.ModeRegistry.LABELS[key] || key;
+    }
+    return key.split("+").map((id) => window.ModeRegistry.LABELS[id] || id).join(", ");
+};
+
+window.ModeRegistry.bitstringV3ToModeKey = function (bits) {
+    if (!bits || typeof bits !== "string") return "classic";
+    if (!/^[01]+$/.test(bits)) return "classic";
+    const ids = [];
+    for (let i = 0; i < bits.length; i++) {
+        if (bits[i] === "1") {
+            ids.push(window.ModeRegistry._byBitV3[i] || ("unknown_bit_" + i));
+        }
+    }
+    if (ids.length === 0) return "classic";
+    if (ids.length === 1) return ids[0];
+    return ids.slice().sort().join("+");
+};
+
+window.ModeRegistry._blenderSelectedIds = function (modes) {
+    // Blender UI: find random.png row and read which mode toggles are selected
+    let element = null;
+    for (const i of document.querySelectorAll("img")) {
+        if (i.src && i.src.includes("random.png")) {
+            element = i;
+            break;
+        }
+    }
+    if (!element) return [];
+    try {
+        const row = element.parentElement.parentElement.parentElement;
+        const ids = [];
+        let counter = -1;
+        for (const child of row.children) {
+            counter++;
+            if (counter === 0) continue;
+            const selected =
+                child.firstElementChild &&
+                child.firstElementChild.classList.length > 1 &&
+                child.firstElementChild.children.length > 0;
+            if (!selected) continue;
+            // Map blender toggle order to modes excluding classic/blender: indices 1..n-2 of trophy list
+            const modeIndex = counter; // 1-based into middle+peaceful relative to old scrape
+            // Prefer matching by mode list: blender toggles align with trophies 1..last-1
+            const trophyModes = modes.filter((m) => m.id !== "classic" && m.id !== "blender");
+            const entry = trophyModes[counter - 1];
+            if (entry) ids.push(entry.id);
+        }
+        return ids;
+    } catch (e) {
+        return [];
+    }
+};
+
+window.ModeRegistry.getCurrentModeKey = function () {
+    const modes = window.ModeRegistry.listActiveModes();
+    if (!modes.length) return "classic";
+
+    let selectedIndex = 0;
+    if (window.timeKeeper && typeof window.timeKeeper.getCurrentSetting === "function") {
+        selectedIndex = window.timeKeeper.getCurrentSetting("trophy");
+    } else {
+        // Fallback: odd-class-out on #trophy
+        const root = document.getElementById("trophy");
+        if (root) {
+            const classNames = [];
+            let notUnique = "";
+            for (const el of root.children) {
+                if (classNames.indexOf(el.className) === -1) classNames.push(el.className);
+                else {
+                    notUnique = el.className;
+                    break;
+                }
+            }
+            let n = 0;
+            for (const el of root.children) {
+                if (el.className !== notUnique) {
+                    selectedIndex = n;
+                    break;
+                }
+                n++;
+            }
+        }
+    }
+
+    if (selectedIndex < 0 || selectedIndex >= modes.length) selectedIndex = 0;
+    const selected = modes[selectedIndex];
+
+    if (selected.id === "classic") return "classic";
+    if (selected.id !== "blender") return selected.id;
+
+    const combo = window.ModeRegistry._blenderSelectedIds(modes);
+    if (!combo.length) return "blender";
+    return combo.slice().sort().join("+");
+};
+
+window.ModeRegistry.make = function () {
+    window.isBridge = window.ModeRegistry.has("bridge");
+};
+
+window.ModeRegistry.alterCode = function (code) {
+    return code;
+};
 window.TimeKeeper = {};
 
 window.TimeKeeper.make = function () {
-
     /*
-    storage:
-    att-modeStr-count-speed-size : number of attempts of this mode
-    25-modeStr-count-speed-size: {time: time of 25 score, date: date of 25 score, att: number of attempts that reached 25 score, sum: total time of all attempts that reached 25 score}
-    50, 100 and ALL idem.
-    H-modeStr-count-speed-size: {high: highscore of this mode, time: time of the highscore run, date: date of the highscore run, sum: total score of all attempts}
-*/
+    storage v4:
+    att-modeKey-count-speed-size : number (legacy) OR
+      { total, lastAttempt, session, lastSession }
+      session = attempts since this page load; lastSession = previous page's session count
+    25|50|100|ALL-modeKey-count-speed-size: {time, date, att, sum}
+    H-modeKey-count-speed-size: {high, time, date}
+    modeKey = classic | wall | ... | peaceful | wall+portal (blender)
+    */
     window.timeKeeper = {};
     window.timeKeeper.debug = false;
-    //called on every apple
+    window.timeKeeper.playing = false;
+    window.timeKeeper.runStarted = false;
+    window.timeKeeper.dialogActive = false;
+
+    window.timeKeeper.refreshSpeedInfo = function () {
+        if (typeof window.SpeedInfoUpdate === "function") {
+            window.SpeedInfoUpdate().catch(function (e) {
+                console.error("SpeedInfoUpdate error:", e);
+            });
+        }
+    };
+
+    // Prefer frozen run settings (no #trophy walk) once a run has started.
+    window.timeKeeper.shouldTrack = function (ctx) {
+        if (window.daily_challenge) return false;
+        if (typeof window.aimTrainer !== "undefined" || typeof window.megaWholeSnakeObject !== "undefined") {
+            return false;
+        }
+        const c = ctx || window.timeKeeper.getSaveContext();
+        if (c.count > 6 || c.speed > 2 || c.size > 2) return false;
+        return true;
+    };
+
+    window.timeKeeper.resolveRunContext = function () {
+        return {
+            modeKey: window.ModeRegistry.getCurrentModeKey(),
+            count: window.timeKeeper.getCurrentSetting("count"),
+            speed: window.timeKeeper.getCurrentSetting("speed"),
+            size: window.timeKeeper.getCurrentSetting("size"),
+        };
+    };
+
+    // Prefer the mode/settings frozen at run start so score events after a
+    // trophy switch (reset/death) cannot write PBs into the newly selected mode.
+    window.timeKeeper.getSaveContext = function () {
+        if (
+            (window.timeKeeper.runStarted || window.timeKeeper.playing) &&
+            typeof window.timeKeeper.mode === "string" &&
+            typeof window.timeKeeper.count === "number" &&
+            typeof window.timeKeeper.speed === "number" &&
+            typeof window.timeKeeper.size === "number"
+        ) {
+            return {
+                modeKey: window.timeKeeper.mode,
+                count: window.timeKeeper.count,
+                speed: window.timeKeeper.speed,
+                size: window.timeKeeper.size,
+            };
+        }
+        return window.timeKeeper.resolveRunContext();
+    };
+
+    window.timeKeeper.buildKey = function (prefix, ctx) {
+        const c = ctx || window.timeKeeper.getSaveContext();
+        return prefix + "-" + c.modeKey + "-" + c.count + "-" + c.speed + "-" + c.size;
+    };
+
+    // Normalize legacy number / partial objects into the attempt stats record
+    window.timeKeeper.normalizeAttemptRecord = function (raw) {
+        if (typeof raw === "number" && !isNaN(raw)) {
+            return {
+                total: raw,
+                lastAttempt: null,
+                session: 0,
+                lastSession: 0,
+            };
+        }
+        if (!raw || typeof raw !== "object") {
+            return {
+                total: 0,
+                lastAttempt: null,
+                session: 0,
+                lastSession: 0,
+            };
+        }
+        return {
+            total: typeof raw.total === "number" ? raw.total : 0,
+            lastAttempt: raw.lastAttempt != null ? raw.lastAttempt : null,
+            session: typeof raw.session === "number" ? raw.session : 0,
+            lastSession: typeof raw.lastSession === "number" ? raw.lastSession : 0,
+        };
+    };
+
+    window.timeKeeper.getAttemptTotal = function (raw) {
+        if (typeof raw === "number" && !isNaN(raw)) return raw;
+        if (raw && typeof raw === "object" && typeof raw.total === "number") return raw.total;
+        return 0;
+    };
+
+    // On page load: roll previous page's session into lastSession
+    window.timeKeeper.rollAttemptSession = function (rec) {
+        const r = window.timeKeeper.normalizeAttemptRecord(rec);
+        if (r.session > 0) {
+            r.lastSession = r.session;
+            r.session = 0;
+        }
+        return r;
+    };
+
+    window.timeKeeper.getStorage = function () {
+        if (!window.timeKeeper._storageCache) {
+            try {
+                window.timeKeeper._storageCache = JSON.parse(
+                    localStorage.getItem("snake_timeKeeper_remix") || '{"version":4}'
+                );
+            } catch (e) {
+                window.timeKeeper._storageCache = { version: 4 };
+            }
+        }
+        return window.timeKeeper._storageCache;
+    };
+
+    // Persist immediately (settings edits, attempt count, end-of-run flush helpers)
+    window.timeKeeper.setStorage = function (storage) {
+        window.timeKeeper._storageCache = storage;
+        localStorage.setItem("snake_timeKeeper_remix", JSON.stringify(storage));
+        window.timeKeeper._storageDirty = false;
+    };
+
+    // Mid-run mutations stay in memory until flushStorage (death / All)
+    window.timeKeeper.markStorageDirty = function () {
+        window.timeKeeper._storageDirty = true;
+    };
+
+    window.timeKeeper.flushStorage = function () {
+        if (!window.timeKeeper._storageDirty || !window.timeKeeper._storageCache) return;
+        localStorage.setItem(
+            "snake_timeKeeper_remix",
+            JSON.stringify(window.timeKeeper._storageCache)
+        );
+        window.timeKeeper._storageDirty = false;
+    };
+
+    // Compat: callers expecting mode "string" now get stable modeKey
+    window.timeKeeper.getCurrentMode = function () {
+        return window.ModeRegistry.getCurrentModeKey();
+    };
+
     window.timeKeeper.gotApple = function (time, score) {
-        stats.apples.session++;
-        stats.apples.lifetime++;
-        updateCounterDisplay();
-        if (window.pudding_settings.randomizeThemeApple) {
+        if (!window.SpeedrunMod && typeof stats !== "undefined" && stats.apples) {
+            stats.apples.session++;
+            stats.apples.lifetime++;
+            if (typeof updateCounterDisplay === "function") {
+                updateCounterDisplay();
+            }
+        }
+        if (
+            !window.SpeedrunMod &&
+            window.pudding_settings &&
+            window.pudding_settings.randomizeThemeApple &&
+            typeof window.setTheme === "function" &&
+            typeof window.getRandomThemeName === "function"
+        ) {
             window.setTheme(window.getRandomThemeName());
         }
-        if(window.daily_challenge) {
-            return;
-        }
-        if (window.timeKeeper.debug) {
-            //console.log("got Apple %s, %s", time, score);
-        }
-        if (localStorage.getItem('snakeChosenMod') != "PuddingMod"){
-            return;
-        }
+        if (!window.timeKeeper.shouldTrack(window.timeKeeper.getSaveContext())) return;
+
         window.timeKeeper.lastAppleDate = new Date();
         window.timeKeeper.lastAppleTime = time;
-        //save time
+
         if (score == 25 || score == 50 || score == 100) {
-            if (window.timeKeeper.debug) {
-                //console.log("Saving PB for %s Ticks, %s Apples", time, score);
-            }
-            window.timeKeeper.savePB(time, score, window.timeKeeper.mode, window.timeKeeper.count, window.timeKeeper.speed, window.timeKeeper.size);
+            window.timeKeeper.savePB(time, score);
         }
-    }
+        window.timeKeeper.updateHighscoreLive(time, score);
+    };
 
-    //called when you get all apples
     window.timeKeeper.gotAll = function (time, score) {
-        if(window.daily_challenge) {
-            return;
+        if (!window.timeKeeper.shouldTrack(window.timeKeeper.getSaveContext())) return;
+        if (window.timeKeeper.playing || window.timeKeeper.runStarted) {
+            window.timeKeeper.saveScore(time, score);
         }
-        if (window.timeKeeper.debug) {
-            //console.log("got All %s, %s", time, score);
-        }
-        if (localStorage.getItem('snakeChosenMod') != "PuddingMod"){
-            return;
-        }
-        window.timeKeeper.savePB(time, "ALL", window.timeKeeper.mode, window.timeKeeper.count, window.timeKeeper.speed, window.timeKeeper.size);
-    }
+        window.timeKeeper.savePB(time, "ALL");
+        // End of successful run: persist mid-run PB/HS memory
+        window.timeKeeper.flushStorage();
+        window.timeKeeper.playing = false;
+    };
 
-    //called when you're dead, every time.
     window.timeKeeper.death = function (time, score) {
-        if (window.timeKeeper.debug) {
-            //console.log("death %s, %s", time, score);
-        }
-        if (localStorage.getItem('snakeChosenMod') != "PuddingMod"){
+        if (!window.timeKeeper.shouldTrack(window.timeKeeper.getSaveContext())) {
+            window.timeKeeper.playing = false;
             return;
         }
-        if (window.timeKeeper.playing) {
-            window.timeKeeper.playing = false;
-            window.timeKeeper.saveScore(time, score, window.timeKeeper.mode, window.timeKeeper.count, window.timeKeeper.speed, window.timeKeeper.size);
+        if (window.timeKeeper.playing || window.timeKeeper.runStarted) {
+            window.timeKeeper.saveScore(time, score);
         }
-    }
+        window.timeKeeper.playing = false;
+    };
 
-    //called when you start gamed d
     window.timeKeeper.start = function () {
-        if (window.timeKeeper.debug) {
-            //console.log("start");
-        }
         window.timeKeeper.playing = true;
-        //save current settings
-        window.timeKeeper.mode = window.timeKeeper.getCurrentMode();
-        window.timeKeeper.count = window.timeKeeper.getCurrentSetting("count");
-        window.timeKeeper.speed = window.timeKeeper.getCurrentSetting("speed");
-        window.timeKeeper.size = window.timeKeeper.getCurrentSetting("size");
-    }
+        window.timeKeeper.runStarted = true;
+        const ctx = window.timeKeeper.resolveRunContext();
+        window.timeKeeper.mode = ctx.modeKey;
+        window.timeKeeper.count = ctx.count;
+        window.timeKeeper.speed = ctx.speed;
+        window.timeKeeper.size = ctx.size;
+    };
 
-    window.timeKeeper.getCurrentMode = function () {
-        element = "";
-        for (i of document.querySelectorAll('img')) {
-            if (i.src.includes('random.png')) {
-                element = i;
-            }
-        }
-        counter = -1;
-        modeStr = "";
-        for (child of element.parentElement.parentElement.parentElement.children) {
-            counter++;
-            if (counter == 0) { continue; };
-            if (child.firstElementChild.classList.length > 1 && child.firstElementChild.children.length > 0) {
-                modeStr += "1";
-            }
-            else {
-                modeStr += "0";
-            }
-        }
-
-        let mode = window.timeKeeper.getCurrentSetting("trophy");
-        let trophyCount = document.getElementById("trophy").children.length;
-        if (mode != trophyCount - 1) {	//not on blender mode
-            modeStr = "";
-            // Bits cover every trophy except Classic (0) and Blender (last)
-            for (t = 1; t < trophyCount - 1; t++) {
-                if (t == mode) {
-                    modeStr += "1";
-                }
-                else {
-                    modeStr += "0";
-                }
-            }
-        }
-        return modeStr
-    }
-
-    //get the current setting, name = 'count', 'speed', 'size' or 'trophy'
+    // get the current setting, name = 'count', 'speed', 'size' or 'trophy'
     window.timeKeeper.getCurrentSetting = function (name) {
         let getSelectedIndex = function (name) {
             let elementList = document.getElementById(name);
+            if (!elementList) return 0;
             let number = 0;
             let classNames = [];
             let notUnique = "";
-            for (element of elementList.children) {
+            for (const element of elementList.children) {
                 if (classNames.indexOf(element.className) == -1) {
                     classNames.push(element.className);
-                }
-                else {
+                } else {
                     notUnique = element.className;
                     break;
                 }
             }
-            for (element of elementList.children) {
+            for (const element of elementList.children) {
                 if (element.className != notUnique) {
                     return number;
                 }
                 number++;
             }
             return 0;
-        }
+        };
 
-        if(name != 'trophy'){
-            return eval(window[name + '_var'])
+        if (!window.SpeedrunMod && name != "trophy") {
+            return eval(window[name + "_var"]);
         }
-
         return getSelectedIndex(name);
-    }
+    };
 
-    //save highscore
-    window.timeKeeper.saveScore = function (time, score, mode, count, speed, size) {
-        // count > 6 = beyond Tally (MoreMenu / custom); also skip MouseMode / Level Editor
-        if (count > 6 || speed > 2 || size > 2 || typeof window.aimTrainer !== 'undefined' || typeof window.megaWholeSnakeObject !== 'undefined') {
+    window.timeKeeper.scheduleLiveRefresh = function () {
+        if (window.timeKeeper._liveRefreshQueued) return;
+        window.timeKeeper._liveRefreshQueued = true;
+        queueMicrotask(function () {
+            window.timeKeeper._liveRefreshQueued = false;
+            window.timeKeeper.refreshSpeedInfo();
+        });
+    };
+
+    // Mid-run: update Highscore PB in memory when current apples beat the stored best
+    window.timeKeeper.updateHighscoreLive = function (time, score) {
+        const ctx = window.timeKeeper.getSaveContext();
+        if (!window.timeKeeper.shouldTrack(ctx)) return;
+        if (typeof score !== "number" || isNaN(score)) return;
+
+        const storage = window.timeKeeper.getStorage();
+        const name = window.timeKeeper.buildKey("H", ctx);
+        const appleTime =
+            typeof window.timeKeeper.lastAppleTime !== "undefined"
+                ? window.timeKeeper.lastAppleTime
+                : Math.floor(time);
+
+        if (typeof storage[name] == "undefined") {
+            storage[name] = {
+                high: score,
+                time: appleTime,
+                date:
+                    typeof window.timeKeeper.lastAppleDate !== "undefined"
+                        ? window.timeKeeper.lastAppleDate
+                        : new Date(),
+            };
+            window.timeKeeper.markStorageDirty();
+            window.timeKeeper.scheduleLiveRefresh();
             return;
         }
-        if (typeof (window.timeKeeper.lastAppleDate) == "undefined") {
+
+        const cur = storage[name];
+        if (score < cur.high) return;
+        if (score == cur.high && appleTime >= cur.time) return;
+
+        cur.high = score;
+        cur.time = appleTime;
+        cur.date =
+            typeof window.timeKeeper.lastAppleDate !== "undefined"
+                ? window.timeKeeper.lastAppleDate
+                : new Date();
+        window.timeKeeper.markStorageDirty();
+        window.timeKeeper.scheduleLiveRefresh();
+    };
+
+    window.timeKeeper.saveScore = function (time, score) {
+        const ctx = window.timeKeeper.getSaveContext();
+        if (!window.timeKeeper.shouldTrack(ctx)) return;
+
+        if (typeof window.timeKeeper.lastAppleDate == "undefined") {
             window.timeKeeper.lastAppleDate = new Date();
         }
-        if (typeof (window.timeKeeper.lastAppleTime) == "undefined") {
+        if (typeof window.timeKeeper.lastAppleTime == "undefined") {
             window.timeKeeper.lastAppleTime = time;
         }
 
         time = Math.floor(time);
-        let storage = localStorage.getItem("snake_timeKeeper");
-        storage = JSON.parse(storage);
-        let name = "H" + "-" + mode + "-" + count + "-" + speed + "-" + size;
-        //if undefined, save new high
-        if (typeof (storage[name]) == "undefined") {
-            storage[name] = { "high": score, "time": window.timeKeeper.lastAppleTime, "date": window.timeKeeper.lastAppleDate, "sum": score };
+        const storage = window.timeKeeper.getStorage();
+        const name = window.timeKeeper.buildKey("H", ctx);
+        if (typeof storage[name] == "undefined") {
+            storage[name] = {
+                high: score,
+                time: window.timeKeeper.lastAppleTime,
+                date: window.timeKeeper.lastAppleDate,
+            };
+        } else if (
+            score > storage[name].high ||
+            (score == storage[name].high && time < storage[name].time)
+        ) {
+            storage[name].high = score;
+            storage[name].time = window.timeKeeper.lastAppleTime;
+            storage[name].date = window.timeKeeper.lastAppleDate;
         }
-        else {
-            //increase sum
-            storage[name].sum += score;
-            if (score > storage[name].high || (score == storage[name].high && time < storage[name].time)) {
-                //save new pb
-                storage[name].high = score;
-                storage[name].time = window.timeKeeper.lastAppleTime;
-                storage[name].date = window.timeKeeper.lastAppleDate;
-            }
+        // Drop unused average accumulators if present
+        if (storage[name]) {
+            delete storage[name].sum;
+            delete storage[name].att;
         }
-        localStorage.setItem("snake_timeKeeper", JSON.stringify(storage));
-    }
+        // End of run: persist memory (including any mid-run PB/HS dirty state)
+        window.timeKeeper.setStorage(storage);
+        window.timeKeeper.refreshSpeedInfo();
+    };
 
-    //save 25, 50, 100 or 'ALL' score
-    window.timeKeeper.savePB = function (time, score, mode, count, speed, size) {
-        // count > 6 = beyond Tally (MoreMenu / custom); also skip MouseMode / Level Editor
-        if (count > 6 || speed > 2 || size > 2 || typeof window.aimTrainer !== 'undefined' || typeof window.megaWholeSnakeObject !== 'undefined') {
-            return;
-        }
+    window.timeKeeper.savePB = function (time, score) {
+        const ctx = window.timeKeeper.getSaveContext();
+        if (!window.timeKeeper.shouldTrack(ctx)) return;
 
         time = Math.floor(time);
-        let storage = localStorage.getItem("snake_timeKeeper");
-        storage = JSON.parse(storage);
-        let name = score.toString() + "-" + mode + "-" + count + "-" + speed + "-" + size;
+        const storage = window.timeKeeper.getStorage();
+        const name = window.timeKeeper.buildKey(String(score), ctx);
 
-        //if undefined, save new pb
-        if (typeof (storage[name]) == "undefined") {
-            storage[name] = { "time": time, "date": new Date(), "att": 1, "sum": time };
-        }
-        else {
-            //increase attempt
-            if (typeof (storage[name].att) == "undefined") { storage[name].att = 0 };
+        if (typeof storage[name] == "undefined") {
+            storage[name] = { time: time, date: new Date(), att: 1, sum: time };
+        } else {
+            if (typeof storage[name].att == "undefined") storage[name].att = 0;
             storage[name].att += 1;
-            //increase sum
-            if (typeof (storage[name].sum) == "undefined") { storage[name].sum = 0 };
+            if (typeof storage[name].sum == "undefined") storage[name].sum = 0;
             storage[name].sum += time;
-            if (time < storage[name].time) {		//only pb when lower time then stored
-                storage[name] = { "time": time, "date": new Date(), "att": storage[name].att, "sum": storage[name].sum };
+            if (time < storage[name].time) {
+                storage[name] = {
+                    time: time,
+                    date: new Date(),
+                    att: storage[name].att,
+                    sum: storage[name].sum,
+                };
             }
         }
+        // Mid-run (25/50/100) or pre-flush ALL: keep in memory only
+        window.timeKeeper.markStorageDirty();
+        window.timeKeeper.refreshSpeedInfo();
+    };
 
-        localStorage.setItem("snake_timeKeeper", JSON.stringify(storage));
-    }
+    // Only count if a run had actually started (not play→esc→play)
+    window.timeKeeper.addAttempt = function () {
+        if (!window.timeKeeper.runStarted) {
+            window.timeKeeper.playing = false;
+            return;
+        }
+        const ctx = {
+            modeKey: window.timeKeeper.mode || window.ModeRegistry.getCurrentModeKey(),
+            count:
+                typeof window.timeKeeper.count === "number"
+                    ? window.timeKeeper.count
+                    : window.timeKeeper.getCurrentSetting("count"),
+            speed:
+                typeof window.timeKeeper.speed === "number"
+                    ? window.timeKeeper.speed
+                    : window.timeKeeper.getCurrentSetting("speed"),
+            size:
+                typeof window.timeKeeper.size === "number"
+                    ? window.timeKeeper.size
+                    : window.timeKeeper.getCurrentSetting("size"),
+        };
+        if (!window.timeKeeper.shouldTrack(ctx)) {
+            window.timeKeeper.runStarted = false;
+            window.timeKeeper.playing = false;
+            return;
+        }
 
-    //function to add attempt to localStorage
-    window.timeKeeper.addAttempt = function (mode, count, speed, size) {
-        let storage = localStorage.getItem("snake_timeKeeper");
-        storage = JSON.parse(storage);
-        let name = "att" + "-" + mode + "-" + count + "-" + speed + "-" + size;
-        if (typeof (storage[name]) == "undefined") {
-            storage[name] = 1;
-        }
-        else {
-            storage[name] += 1;
-        }
-        localStorage.setItem("snake_timeKeeper", JSON.stringify(storage));
-    }
+        const storage = window.timeKeeper.getStorage();
+        const name = window.timeKeeper.buildKey("att", ctx);
+        const rec = window.timeKeeper.normalizeAttemptRecord(storage[name]);
+        const now = new Date();
+        rec.total += 1;
+        rec.lastAttempt = now;
+        rec.session += 1;
+        storage[name] = rec;
+        window.timeKeeper.setStorage(storage);
+        window.timeKeeper.runStarted = false;
+        window.timeKeeper.playing = false;
+        window.timeKeeper.refreshSpeedInfo();
+    };
 
     window.timeKeeper.setAttempts = function (attempts) {
-        if (isNaN(attempts)) {
-            //console.log(attempts.toString() + " is not a number!");
-            return;
-        }
-        let storage = localStorage.getItem("snake_timeKeeper");
-        storage = JSON.parse(storage);
-        mode = window.timeKeeper.getCurrentMode()
-        count = window.timeKeeper.getCurrentSetting("count");
-        speed = window.timeKeeper.getCurrentSetting("speed");
-        size = window.timeKeeper.getCurrentSetting("size");
-        let name = "att" + "-" + mode + "-" + count + "-" + speed + "-" + size;
-        storage[name] = {};
-        storage[name] = attempts;
-        localStorage.setItem("snake_timeKeeper", JSON.stringify(storage));
-    }
+        if (isNaN(attempts)) return;
+        const storage = window.timeKeeper.getStorage();
+        const name = window.timeKeeper.buildKey("att");
+        const rec = window.timeKeeper.normalizeAttemptRecord(storage[name]);
+        rec.total = attempts;
+        storage[name] = rec;
+        window.timeKeeper.setStorage(storage);
+        window.timeKeeper.refreshSpeedInfo();
+    };
 
     window.timeKeeper.setPB = function (time, score, attempts, average) {
-        if (isNaN(time)) {
-            //console.log(time.toString() + " is not a number!");
-            return;
-        }
-        if (score != 25 && score != 50 && score != 100 && score != "ALL") {
-            //console.log(score + " has to be 25, 50, 100 or \"ALL\"!");
-            return;
-        }
-        if (isNaN(attempts)) {
-            //console.log(attempts.toString() + " is not a number!");
-            return;
-        }
-        if (isNaN(average)) {
-            //console.log(average.toString() + " is not a number!");
-            return;
-        }
-        let storage = localStorage.getItem("snake_timeKeeper");
-        storage = JSON.parse(storage);
-        mode = window.timeKeeper.getCurrentMode()
-        count = window.timeKeeper.getCurrentSetting("count");
-        speed = window.timeKeeper.getCurrentSetting("speed");
-        size = window.timeKeeper.getCurrentSetting("size");
-        let name = score.toString() + "-" + mode + "-" + count + "-" + speed + "-" + size;
-        storage[name] = {};
-        storage[name].time = time;
-        storage[name].date = new Date();
-        storage[name].att = attempts;
-        storage[name].sum = Math.round(average * attempts);
-        localStorage.setItem("snake_timeKeeper", JSON.stringify(storage));
-    }
+        if (isNaN(time)) return;
+        if (score != 25 && score != 50 && score != 100 && score != "ALL") return;
+        if (isNaN(attempts)) return;
+        if (isNaN(average)) return;
+        const storage = window.timeKeeper.getStorage();
+        const name = window.timeKeeper.buildKey(String(score));
+        storage[name] = {
+            time: time,
+            date: new Date(),
+            att: attempts,
+            sum: Math.round(average * attempts),
+        };
+        window.timeKeeper.setStorage(storage);
+        window.timeKeeper.refreshSpeedInfo();
+    };
 
-    window.timeKeeper.setScore = function (highscore, time, average) {
-        if (isNaN(highscore)) {
-            //console.log(highscore.toString() + " is not a number!");
-            return;
-        }
-        if (isNaN(time)) {
-            //console.log(time.toString() + " is not a number!");
-            return;
-        }
-        if (isNaN(average)) {
-            //console.log(average.toString() + " is not a number!");
-            return;
-        }
-        let storage = localStorage.getItem("snake_timeKeeper");
-        storage = JSON.parse(storage);
-        mode = window.timeKeeper.getCurrentMode()
-        count = window.timeKeeper.getCurrentSetting("count");
-        speed = window.timeKeeper.getCurrentSetting("speed");
-        size = window.timeKeeper.getCurrentSetting("size");
-        let name = "H" + "-" + mode + "-" + count + "-" + speed + "-" + size;
-        storage[name] = {};
-        storage[name].high = highscore;
-        storage[name].time = time;
-        storage[name].date = new Date();
-        storage[name].sum = average * storage["att" + "-" + mode + "-" + count + "-" + speed + "-" + size];
-        localStorage.setItem("snake_timeKeeper", JSON.stringify(storage));
-    }
+    window.timeKeeper.setScore = function (highscore, time) {
+        if (isNaN(highscore)) return;
+        if (isNaN(time)) return;
+        const storage = window.timeKeeper.getStorage();
+        const ctx = window.timeKeeper.resolveRunContext();
+        const name = window.timeKeeper.buildKey("H", ctx);
+        storage[name] = {
+            high: highscore,
+            time: time,
+            date: new Date(),
+        };
+        window.timeKeeper.setStorage(storage);
+        window.timeKeeper.refreshSpeedInfo();
+    };
 
-    //generate storage if it doesn't exist, or import from old file format.
+    window.timeKeeper.formatDuration = function (ms) {
+        ms = Math.floor(ms);
+        const hours = Math.floor(ms / 3600000);
+        const minutes = String(Math.floor((ms - hours * 3600000) / 60000)).padStart(2, "0");
+        const seconds = String(
+            Math.floor((ms - minutes * 60000 - hours * 3600000) / 1000)
+        ).padStart(2, "0");
+        const mseconds = String(
+            ms - minutes * 60000 - seconds * 1000 - hours * 3600000
+        ).padStart(3, "0");
+        if (hours == 0) return minutes + ":" + seconds + ":" + mseconds;
+        return hours + ":" + minutes + ":" + seconds + ":" + mseconds;
+    };
+
+    // Local calendar date as YYYY-MM-DD
+    window.timeKeeper.formatAchievedOn = function (raw) {
+        const date = new Date(raw);
+        if (isNaN(date.getTime())) return "—";
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + d;
+    };
+
+    // Local calendar date + time as YYYY-MM-DD HH:MM:SS
+    window.timeKeeper.formatAchievedOnWithTime = function (raw) {
+        const date = new Date(raw);
+        if (isNaN(date.getTime())) return "—";
+        const y = date.getFullYear();
+        const mo = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        const h = String(date.getHours()).padStart(2, "0");
+        const mi = String(date.getMinutes()).padStart(2, "0");
+        const s = String(date.getSeconds()).padStart(2, "0");
+        return y + "-" + mo + "-" + d + " " + h + ":" + mi + ":" + s;
+    };
+
+    // ms → SRC-like 1m2s345ms (shared with SpeedInfo personal rows)
+    window.timeKeeper.formatTimeSrcStyle = function (ms) {
+        ms = Math.floor(Number(ms) || 0);
+        const hours = Math.floor(ms / 3600000);
+        const minutes = Math.floor((ms % 3600000) / 60000);
+        const seconds = Math.floor((ms % 60000) / 1000);
+        const milliseconds = ms % 1000;
+        let out = "";
+        if (hours > 0) out += hours + "h";
+        if (minutes > 0 || hours > 0) out += minutes + "m";
+        out += seconds + "s";
+        if (hours === 0) out += String(milliseconds).padStart(3, "0") + "ms";
+        if (hours > 0) out = out.split("s")[0] + "s";
+        return out;
+    };
+
     window.timeKeeper.makeStorage = function () {
-        let storage = localStorage.getItem("snake_timeKeeper");
+        let storage = localStorage.getItem("snake_timeKeeper_remix");
         if (storage == null) {
-            storage = {};
-            storage["version"] = 2;
-
-            //try to read version 1 to new storage type
-            old_pbs = localStorage.getItem("snake_pbs");
+            storage = { version: 2 };
+            const old_pbs = localStorage.getItem("snake_pbs");
             if (old_pbs != null) {
-                old_pbs = JSON.parse(old_pbs);
-                //console.log("Converting local storage to new storage type");
-                for (mode = 0; mode < 20; mode++) {
-                    modeStr = "00000000000000000000".split("");
-                    if (mode != 0) {
-                        modeStr[mode - 1] = '1';
-                    }
-                    modeStr = modeStr.join('');
-
-                    for (count = 0; count < 5; count++) {
-                        for (speed = 0; speed < 3; speed++) {
-                            for (size = 0; size < 3; size++) {
-                                for (let score of ["25", "50", "100", "ALL", "att"]) {
-                                    let name = score + "-" + mode + "-" + count + "-" + speed + "-" + size;
-                                    if (typeof (old_pbs[name]) != "undefined") {
-                                        //console.log(name, old_pbs[name]);
-                                        newName = score + "-" + modeStr + "-" + count + "-" + speed + "-" + size;
-                                        storage[newName] = old_pbs[name];
+                const old = JSON.parse(old_pbs);
+                for (let mode = 0; mode < 20; mode++) {
+                    let modeStr = "00000000000000000000".split("");
+                    if (mode != 0) modeStr[mode - 1] = "1";
+                    modeStr = modeStr.join("");
+                    for (let count = 0; count < 5; count++) {
+                        for (let speed = 0; speed < 3; speed++) {
+                            for (let size = 0; size < 3; size++) {
+                                for (const score of ["25", "50", "100", "ALL", "att", "H"]) {
+                                    const name =
+                                        score + "-" + mode + "-" + count + "-" + speed + "-" + size;
+                                    if (typeof old[name] != "undefined") {
+                                        storage[
+                                            score +
+                                                "-" +
+                                                modeStr +
+                                                "-" +
+                                                count +
+                                                "-" +
+                                                speed +
+                                                "-" +
+                                                size
+                                        ] = old[name];
                                     }
-
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-        else {
+        } else {
             storage = JSON.parse(storage);
         }
 
-        // v2 (20-bit modeStr) -> v3 (21-bit): insert Bridge bit before Peaceful
-        if (storage["version"] == 2) {
+        if (storage.version == 2) {
             const migrated = { version: 3 };
             for (const key of Object.keys(storage)) {
                 if (key === "version") continue;
@@ -1236,7 +1662,8 @@ window.TimeKeeper.make = function () {
                 if (parts.length >= 5 && /^[01]{20}$/.test(parts[1])) {
                     const modeStr = parts[1];
                     const newModeStr = modeStr.slice(0, 19) + "0" + modeStr.slice(19);
-                    migrated[parts[0] + "-" + newModeStr + "-" + parts.slice(2).join("-")] = storage[key];
+                    migrated[parts[0] + "-" + newModeStr + "-" + parts.slice(2).join("-")] =
+                        storage[key];
                 } else {
                     migrated[key] = storage[key];
                 }
@@ -1244,107 +1671,84 @@ window.TimeKeeper.make = function () {
             storage = migrated;
         }
 
-        if (storage["version"] != 3) {
-            alert("Something went wrong with you localStorage!");
+        if (storage.version == 3) {
+            const migrated = { version: 4 };
+            for (const key of Object.keys(storage)) {
+                if (key === "version") continue;
+                const parts = key.split("-");
+                if (parts.length >= 5 && /^[01]{21}$/.test(parts[1])) {
+                    const modeKey = window.ModeRegistry.bitstringV3ToModeKey(parts[1]);
+                    migrated[parts[0] + "-" + modeKey + "-" + parts.slice(2).join("-")] =
+                        storage[key];
+                } else {
+                    migrated[key] = storage[key];
+                }
+            }
+            storage = migrated;
         }
-        localStorage.setItem("snake_timeKeeper", JSON.stringify(storage));
-    }
 
-    window.timeKeeper.dialogActive = false;
+        if (storage.version != 4) {
+            console.error("TimeKeeper storage version unexpected:", storage.version);
+            storage.version = 4;
+        }
 
-    //generate and show the dialog
+        // Strip unused highscore average fields (sum/att) from H-* rows
+        for (const key of Object.keys(storage)) {
+            if (key === "version" || key.slice(0, 2) !== "H-") continue;
+            const rec = storage[key];
+            if (!rec || typeof rec !== "object") continue;
+            delete rec.sum;
+            delete rec.att;
+        }
+
+        // Migrate att-* numbers → objects; roll previous page session into last/best
+        for (const key of Object.keys(storage)) {
+            if (key === "version" || key.slice(0, 4) !== "att-") continue;
+            storage[key] = window.timeKeeper.rollAttemptSession(storage[key]);
+        }
+
+        localStorage.setItem("snake_timeKeeper_remix", JSON.stringify(storage));
+        window.timeKeeper._storageCache = storage;
+        window.timeKeeper._storageDirty = false;
+    };
+
     window.timeKeeper.showDialog = function () {
-
-        //make dialog
         window.timeKeeper.dialogActive = true;
-        document.getElementById('time-keeper').innerHTML = 'Hide Details';
+        const btn = document.getElementById("time-keeper");
+        if (btn) btn.innerHTML = "Hide";
 
-        //dialog = document.createElement("dialog");
-        dialog = document.createElement("div");
+        const body = document.querySelector("body");
+        const oldBd = document.getElementById("timeKeeperBackdrop");
+        if (oldBd) oldBd.remove();
+        const oldDialog = document.getElementById("timeKeeperDialog");
+        if (oldDialog) oldDialog.remove();
 
+        const backdrop = document.createElement("div");
+        backdrop.id = "timeKeeperBackdrop";
+        backdrop.style.cssText =
+            "position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:10099;" +
+            "background:rgba(0,0,0,0.45);";
+        backdrop.addEventListener("click", function () {
+            window.timeKeeper.hideDialog();
+        });
+        body.insertBefore(backdrop, body.firstChild);
+
+        const dialog = document.createElement("div");
         dialog.setAttribute("open", "");
         dialog.setAttribute("id", "timeKeeperDialog");
 
-        let count = window.timeKeeper.getCurrentSetting("count");
-        let speed = window.timeKeeper.getCurrentSetting("speed");
-        let size = window.timeKeeper.getCurrentSetting("size");
-        let modeStr = window.timeKeeper.getCurrentMode("size");
-        //change modeStr to gamemode
-        counter = 0
-        var gamemode = "";
-        for (t of modeStr) {
-            if (t == 1) {
-                if(window.isBridge){
-                    switch (counter) {
-                        case 0: gamemode += "Wall, "; break;
-                        case 1: gamemode += "Portal, "; break;
-                        case 2: gamemode += "Cheese, "; break;
-                        case 3: gamemode += "Borderless, "; break;
-                        case 4: gamemode += "Twin, "; break;
-                        case 5: gamemode += "Winged, "; break;
-                        case 6: gamemode += "YinYang, "; break;
-                        case 7: gamemode += "Key, "; break;
-                        case 8: gamemode += "Sokoban, "; break;
-                        case 9: gamemode += "Poison, "; break;
-                        case 10: gamemode += "Dimension, "; break;
-                        case 11: gamemode += "Minesweeper, "; break;
-                        case 12: gamemode += "Statue, "; break;
-                        case 13: gamemode += "Light, "; break;
-                        case 14: gamemode += "Shield, "; break;
-                        case 15: gamemode += "Arrow, "; break;
-                        case 16: gamemode += "Hotdog, "; break;
-                        case 17: gamemode += "Magnet, "; break;
-                        case 18: gamemode += "Gate, "; break;
-                        case 19: gamemode += "Bridge, "; break;
-                        case 20: gamemode += "Peaceful, "; break;
-                        default: gamemode += "Unknown, "; break;
-                    }
-                }else{
-                    switch (counter) {
-                        case 0: gamemode += "Wall, "; break;
-                        case 1: gamemode += "Portal, "; break;
-                        case 2: gamemode += "Cheese, "; break;
-                        case 3: gamemode += "Borderless, "; break;
-                        case 4: gamemode += "Twin, "; break;
-                        case 5: gamemode += "Winged, "; break;
-                        case 6: gamemode += "YinYang, "; break;
-                        case 7: gamemode += "Key, "; break;
-                        case 8: gamemode += "Sokoban, "; break;
-                        case 9: gamemode += "Poison, "; break;
-                        case 10: gamemode += "Dimension, "; break;
-                        case 11: gamemode += "Minesweeper, "; break;
-                        case 12: gamemode += "Statue, "; break;
-                        case 13: gamemode += "Light, "; break;
-                        case 14: gamemode += "Shield, "; break;
-                        case 15: gamemode += "Arrow, "; break;
-                        case 16: gamemode += "Hotdog, "; break;
-                        case 17: gamemode += "Magnet, "; break;
-                        case 18: gamemode += "Gate, "; break;
-                        case 19: gamemode += "Skip, "; break;
-                        case 20: gamemode += "Peaceful, "; break;
-                        default: gamemode += "Unknown, "; break;
-                    }
-                }
-            }
-            counter++;
-        }
-        if (gamemode == "") {
-            gamemode = "Classic, ";
-        }
-        gamemode = gamemode.substring(0, gamemode.lastIndexOf(","));
+        const ctx = window.timeKeeper.resolveRunContext();
+        const gamemode = window.ModeRegistry.labelModeKey(ctx.modeKey);
 
-        //add level information
-        bold = document.createElement('u');
-        textnode = document.createTextNode("Speed Info Details");
-        bold.style = 'color:white;font-family:Roboto,Arial;'
-        //textnode.style = 'color:white;font-family:Arial;'
-        bold.appendChild(textnode);
-        //buttonClose.style = 'color:white;background:black'; font-family:roboto;
+        const bold = document.createElement("div");
+        bold.appendChild(document.createTextNode("TimeKeeper Details"));
+        bold.style = "color:white;font-family:Roboto,Arial;font-weight:bold;text-align:center;";
         dialog.appendChild(bold);
         dialog.appendChild(document.createElement("br"));
         dialog.appendChild(document.createTextNode("Mode: " + gamemode));
         dialog.appendChild(document.createElement("br"));
-        switch (count) {
+
+        switch (ctx.count) {
             case 0: dialog.appendChild(document.createTextNode("1 Apple, ")); break;
             case 1: dialog.appendChild(document.createTextNode("3 Apples, ")); break;
             case 2: dialog.appendChild(document.createTextNode("5 Apples, ")); break;
@@ -1354,272 +1758,242 @@ window.TimeKeeper.make = function () {
             case 6: dialog.appendChild(document.createTextNode("Tally count, ")); break;
             default: dialog.appendChild(document.createTextNode("MoreMenu Apples, ")); break;
         }
-        switch (speed) {
+        switch (ctx.speed) {
             case 0: dialog.appendChild(document.createTextNode("Normal speed, ")); break;
             case 1: dialog.appendChild(document.createTextNode("Fast speed, ")); break;
             case 2: dialog.appendChild(document.createTextNode("Slow speed, ")); break;
             default: dialog.appendChild(document.createTextNode("MoreMenu speed, ")); break;
-
         }
-        switch (size) {
+        switch (ctx.size) {
             case 0: dialog.appendChild(document.createTextNode("Normal size")); break;
             case 1: dialog.appendChild(document.createTextNode("Small size")); break;
             case 2: dialog.appendChild(document.createTextNode("Large size")); break;
             default: dialog.appendChild(document.createTextNode("MoreMenu size")); break;
         }
-        //dialog.style = 'border-radius: 10px;'
 
-        //add stats
         dialog.appendChild(document.createElement("br"));
         dialog.appendChild(document.createElement("br"));
-        storage = JSON.parse(localStorage["snake_timeKeeper"]);
-        let totalAttempts = 0;
 
-        for (let score of ["att", "25", "50", "100", "ALL", "H"]) {
-            let name = score + "-" + modeStr + "-" + count + "-" + speed + "-" + size;
-            if (typeof (storage[name]) != "undefined") {
+        const storage = window.timeKeeper.getStorage();
+        const attKey = window.timeKeeper.buildKey("att", ctx);
+        const attemptRec = window.timeKeeper.normalizeAttemptRecord(storage[attKey]);
 
-                bold = document.createElement('span');
-                switch (score) {
-                    case "25": bold.appendChild(document.createTextNode("25 Apples:")); break;
-                    case "50": bold.appendChild(document.createTextNode("50 Apples:")); break;
-                    case "100": bold.appendChild(document.createTextNode("100 Apples:")); break;
-                    case "ALL": bold.appendChild(document.createTextNode("All Apples:")); break;
-                    case "att": bold.appendChild(document.createTextNode("Total Attempts: ")); break;
-                    case "H": bold.appendChild(document.createTextNode("Highscore: ")); break;
-                    default: break;
-                }
-                dialog.appendChild(bold);
+        const cellStyle =
+            "box-sizing:border-box;padding:6px 8px;border:1px solid rgba(255,255,255,0.22);border-radius:6px;min-width:0;";
 
-                if (score == "att") {
-                    totalAttempts = storage[name];
-                    dialog.appendChild(document.createTextNode(totalAttempts));
-                    dialog.appendChild(document.createElement("br"));
-                }
-                else if (score == "H") {
-                    dialog.appendChild(document.createTextNode(storage[name].high));
-                }
+        function line(parent, text) {
+            parent.appendChild(document.createTextNode(text));
+            parent.appendChild(document.createElement("br"));
+        }
 
-                dialog.appendChild(document.createElement("br"));
+        function titleLine(parent, text) {
+            const span = document.createElement("span");
+            span.style = "font-weight:bold;";
+            span.appendChild(document.createTextNode(text));
+            parent.appendChild(span);
+            parent.appendChild(document.createElement("br"));
+        }
 
-                if (score == "att")
-                    continue;
+        function buildTimedCell(score) {
+            const cell = document.createElement("div");
+            cell.style = cellStyle;
+            const name = window.timeKeeper.buildKey(score, ctx);
+            const titles = {
+                "25": "25 Apples",
+                "50": "50 Apples",
+                "100": "100 Apples",
+                ALL: "All Apples",
+            };
+            titleLine(cell, titles[score] + ":");
+            const data = storage[name];
+            if (typeof data == "undefined") {
+                line(cell, "None");
+                return cell;
+            }
+            line(cell, "Best Time: " + window.timeKeeper.formatDuration(data.time));
+            line(cell, "Achieved on: " + window.timeKeeper.formatAchievedOnWithTime(data.date));
+            if (data.att != undefined && data.sum != undefined && data.att > 0) {
+                const avg = Math.floor(data.sum / data.att);
+                line(cell, "Attempts to this point: " + data.att);
+                line(cell, "Average: " + window.timeKeeper.formatDuration(avg));
+            }
+            return cell;
+        }
 
-                hours = Math.floor(storage[name].time / 3600000);
-                minutes = String(Math.floor((storage[name].time-hours*3600000) / 60000)).padStart(2, "0");
-                seconds = String(Math.floor((storage[name].time - minutes * 60000-hours*3600000) / 1000)).padStart(2, "0");
-                mseconds = String(storage[name].time - minutes * 60000 - seconds * 1000-hours*3600000).padStart(3, "0");
-                if(hours==0){
-                    if (score != "H") {
-                        dialog.appendChild(document.createTextNode("Best Time: " + minutes + ":" + seconds + ":" + mseconds));
-                        dialog.appendChild(document.createElement("br"));
-                        dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
-                        dialog.appendChild(document.createElement("br"));
-                    }
-                    else {
-                        dialog.appendChild(document.createTextNode("Duration: " + minutes + ":" + seconds + ":" + mseconds));
-                        dialog.appendChild(document.createElement("br"));
-                        dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
-                        dialog.appendChild(document.createElement("br"));
-                        dialog.appendChild(document.createTextNode("Average score: " + (Math.round(100 * (storage[name].sum / totalAttempts)) / 100).toString()));
-                        dialog.appendChild(document.createElement("br"));
-                    }
-                    if (storage[name].att != undefined && storage[name].sum != undefined) {
-                        let time = Math.floor(storage[name].sum / storage[name].att);
-                        hours = Math.floor(storage[name].time / 3600000)
-                        minutes = String(Math.floor((time - hours * 3600000) / 60000)).padStart(2, "0");
-                        seconds = String(Math.floor((time - minutes * 60000-hours*3600000) / 1000)).padStart(2, "0");
-                        mseconds = String(time - minutes * 60000 - seconds * 1000-hours*3600000).padStart(3, "0");
-                        dialog.appendChild(document.createTextNode("Attempts to this point: " + storage[name].att));
-                        dialog.appendChild(document.createElement("br"));
-                        dialog.appendChild(document.createTextNode("Average: " + minutes + ":" + seconds + ":" + mseconds));
-                        dialog.appendChild(document.createElement("br"));
-                    }
-                    dialog.appendChild(document.createElement("br"));
-                }else{
-                    if (score != "H") {
-                        dialog.appendChild(document.createTextNode("Best Time: " + hours + ":" + minutes + ":" + seconds + ":" + mseconds));
-                        dialog.appendChild(document.createElement("br"));
-                        dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
-                        dialog.appendChild(document.createElement("br"));
-                    }
-                    else {
-                        dialog.appendChild(document.createTextNode("Duration: " + hours + ":" + minutes + ":" + seconds + ":" + mseconds));
-                        dialog.appendChild(document.createElement("br"));
-                        dialog.appendChild(document.createTextNode("Achieved on: " + new Date(storage[name].date).toString()));
-                        dialog.appendChild(document.createElement("br"));
-                        dialog.appendChild(document.createTextNode("Average score: " + (Math.round(100 * (storage[name].sum / totalAttempts)) / 100).toString()));
-                        dialog.appendChild(document.createElement("br"));
-                    }
-                    if (storage[name].att != undefined && storage[name].sum != undefined) {
-                        let time = Math.floor(storage[name].sum / storage[name].att);
-                        hours = Math.floor(storage[name].time / 3600000)
-                        minutes = String(Math.floor((time - hours * 3600000) / 60000)).padStart(2, "0");
-                        seconds = String(Math.floor((time - minutes * 60000-hours*3600000) / 1000)).padStart(2, "0");
-                        mseconds = String(time - minutes * 60000 - seconds * 1000-hours*3600000).padStart(3, "0");
-                        dialog.appendChild(document.createTextNode("Attempts to this point: " + storage[name].att));
-                        dialog.appendChild(document.createElement("br"));
-                        dialog.appendChild(document.createTextNode("Average: " + hours + ":" + minutes + ":" + seconds + ":" + mseconds));
-                        dialog.appendChild(document.createElement("br"));
-                    }
-                    dialog.appendChild(document.createElement("br"));
-                }
+        function buildHighscoreCell() {
+            const cell = document.createElement("div");
+            cell.style = cellStyle;
+            titleLine(cell, "Highscore:");
+            const name = window.timeKeeper.buildKey("H", ctx);
+            const data = storage[name];
+            if (typeof data == "undefined" || data.high == null) {
+                line(cell, "None");
+                return cell;
+            }
+            line(cell, String(data.high));
+            line(cell, "Duration: " + window.timeKeeper.formatDuration(data.time));
+            line(cell, "Achieved on: " + window.timeKeeper.formatAchievedOnWithTime(data.date));
+            return cell;
+        }
+
+        function buildAttemptsCell() {
+            const cell = document.createElement("div");
+            cell.style = cellStyle;
+            titleLine(cell, "Total Attempts:");
+            line(cell, String(attemptRec.total));
+            if (attemptRec.lastAttempt != null) {
+                line(
+                    cell,
+                    "Latest: " + window.timeKeeper.formatAchievedOn(attemptRec.lastAttempt)
+                );
+            }
+            line(cell, "This session: " + attemptRec.session);
+            line(cell, "Last session: " + attemptRec.lastSession);
+            return cell;
+        }
+
+        function buildRow(left, right) {
+            const row = document.createElement("div");
+            row.style = "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;";
+            row.appendChild(left);
+            row.appendChild(right);
+            return row;
+        }
+
+        dialog.appendChild(buildRow(buildTimedCell("25"), buildTimedCell("50")));
+        dialog.appendChild(buildRow(buildTimedCell("100"), buildTimedCell("ALL")));
+        dialog.appendChild(buildRow(buildHighscoreCell(), buildAttemptsCell()));
+
+        if (window.SpeedrunMod && typeof window.buildSpeedInfoTrackingControls === "function") {
+            const trackingControls = window.buildSpeedInfoTrackingControls();
+            dialog.appendChild(trackingControls);
+            if (typeof window.wireSpeedInfoTrackingControls === "function") {
+                window.wireSpeedInfoTrackingControls(trackingControls);
             }
         }
 
-        //buttonClose
-        //dialog.appendChild(document.createElement("br"));
-        buttonClose = document.createElement("button");
+        const buttonClose = document.createElement("button");
         buttonClose.appendChild(document.createTextNode("Close"));
-        buttonClose.addEventListener("click", (e) => {
+        buttonClose.addEventListener("click", function () {
             window.timeKeeper.toggleDialog();
         });
-
-        buttonClose.style = 'color:white;background-color:' + window.button_color+';';
-        buttonClose.className = 'btn';
+        buttonClose.style =
+            "display:block;margin:12px auto 0;color:white;background-color:" +
+            window.button_color +
+            ";";
+        buttonClose.className = "btn";
         dialog.appendChild(buttonClose);
 
-        //buttonExport
-        buttonExport = document.createElement("button");
-        buttonExport.appendChild(document.createTextNode("Export"));
-        buttonExport.addEventListener("click", function () {
-            download("timeKeeper - " + new Date().toString() + ".txt", "To import: open snake -> open console -> paste the following:\nlocalStorage[\"snake_timeKeeper\"]='" + localStorage["snake_timeKeeper"] + "'");
-        });
-        //dialog.appendChild(buttonExport); // Disabled export button, I don't want this.
-
-        //add dialog
-        div = document.querySelector("body");
-        dialog.setAttribute("style", "outline: none;border-radius: 10px;z-index:10100;background:"+window.real_topbar_color+";color:white;font-family:Roboto,Arial;");
-        dialog.style.outline = "none";
+        dialog.setAttribute(
+            "style",
+            "outline: none;border-radius: 10px;z-index:10100;background:" +
+                window.real_topbar_color +
+                ";color:white;font-family:Roboto,Arial;min-width:420px;max-width:560px;"
+        );
         dialog.classList.add("custom-dialog");
-
-        div.insertBefore(dialog, div.firstChild)
-
-
+        body.insertBefore(dialog, body.firstChild);
     };
 
-    //Function to find the snake code, and apply changes.
-    window.timeKeeper.setup = function () {
-        //just make storage, this used to also alter snake code
-        window.timeKeeper.makeStorage();
-        return;
-    }
-
-    //console.log("Enabling TimeKeeper")
-    window.timeKeeper.setup();
-
     window.timeKeeper.hideDialog = function () {
-        //remove dialog when click on ok
-        child = document.getElementById("timeKeeperDialog");
-        child.parentElement.removeChild(child);
+        const child = document.getElementById("timeKeeperDialog");
+        if (child && child.parentElement) child.parentElement.removeChild(child);
+        const backdrop = document.getElementById("timeKeeperBackdrop");
+        if (backdrop && backdrop.parentElement) backdrop.parentElement.removeChild(backdrop);
         window.timeKeeper.dialogActive = false;
-        document.getElementById('time-keeper').innerHTML = 'Show Details';
-
-    }
+        const btn = document.getElementById("time-keeper");
+        if (btn) btn.innerHTML = "Details";
+    };
 
     window.timeKeeper.toggleDialog = function () {
-        if (window.timeKeeper.dialogActive) {
-            window.timeKeeper.hideDialog();
-        }
-        else {
-            window.timeKeeper.showDialog();
-        }
-    }
+        if (window.timeKeeper.dialogActive) window.timeKeeper.hideDialog();
+        else window.timeKeeper.showDialog();
+    };
 
-    /*
-    tempID = "time-keeper"; // Inspect element on Timer and take jsname from it
-    document.querySelector("button[jsname^=\"" + tempID + "\"]").addEventListener("click", (e) => {
-        window.timeKeeper.toggleDialog();
-    });
-    TimerID = "yddQF"; // Inspect element on Timer and take jsname from it
-    document.querySelector("div[jsname^=\"" + TimerID + "\"]").addEventListener("click", (e) => {
-        window.timeKeeper.toggleDialog();
-    });
-    */
-}
+    window.timeKeeper.setup = function () {
+        window.timeKeeper.makeStorage();
+        if (window.ModeRegistry && typeof window.ModeRegistry.has === "function") {
+            window.isBridge = window.ModeRegistry.has("bridge");
+        }
+    };
+
+    window.timeKeeper.setup();
+};
 
 window.TimeKeeper.alterCode = function (code) {
-    // TimeKeeper stuff start
-    //change stepfunction to run gotApple(), gotAll() and death()
-
-    // This is the full tick function
-    func_regex = new RegExp(/tick\(\){[^\\]{1,4000}light=Math.max[\s\S]*?=function/)
-    window.catchError(func_regex, code)
+    func_regex = new RegExp(/tick\(\){[^\\]{1,4000}light=Math.max[\s\S]*?=function/);
+    window.catchError(func_regex, code);
     let func = code.match(/tick\(\){[^\\]{1,4000}light=Math.max[\s\S]*?=function/)[0];
     StartOfNext = func.substring(func.lastIndexOf(";"), func.length);
     func = func.substring(0, func.lastIndexOf(";"));
-    if (window.NepDebug) {
-        console.log(func);
+
+    // v12: this.header=c;this.Oh=this.Eb=this.ticks=this.ob=0
+    // v13: this.header=c;this.Sh=this.Fb=this.ticks=this.ob=0
+    const scoreCtor = code.match(
+        /this\.header=[a-zA-Z0-9_$];this\.([a-zA-Z0-9_$]{1,8})=this\.([a-zA-Z0-9_$]{1,8})=this\.ticks=/
+    );
+    let scoreFunc;
+    let timeFunc;
+    if (scoreCtor) {
+        scoreFunc = "this." + scoreCtor[1];
+        timeFunc = "this.ticks*this." + scoreCtor[2];
+    } else {
+        scoreFuncVar = func.match(/[a-zA-Z0-9$]{1,8}\=\=\=\n?25/)[0].split("=")[0];
+        scoreFunc = func.match(
+            `${window.escapeRegex(scoreFuncVar.replace("\n", ""))}=\n?this.[a-zA-Z0-9$]{1,8}`
+        )[0].split("=")[1];
+        timeFunc = func.match(/\([a-zA-Z0-9$]{1,8}\*[a-zA-Z0-9$]{1,8}\)/)[0];
+        ticksVar = timeFunc.split("(")[1].split("*")[0];
+        tickLengthVar = timeFunc.split("*")[1].split(")")[0];
+        realTicks = func.match(`${escapeRegex(ticksVar)}=this.[a-zA-Z0-9$]{1,8}`)[0].split("=")[1];
+        realTickLength = func.match(`${escapeRegex(tickLengthVar)}=this.[a-zA-Z0-9$]{1,8}`)[0].split(
+            "="
+        )[1];
+        timeFunc = `${realTicks}*${realTickLength}`;
     }
-    //let modeFunc = func.match(/1}\);[^%]{0,10}/)[0];
-    //let modeFunc = func.match(/[a-zA-Z0-9$]{1,4}\([a-zA-Z0-9$]{1,4}.[a-zA-Z0-9$]{1,8},11\)&&/)[0];
 
-    //modeFunc = modeFunc.substring(modeFunc.indexOf("(") + 1, modeFunc.lastIndexOf("("));
-    //modeFunc = modeFunc.split('(')[0];
-    //scoreFunc = func.match(/25\!\=\=this.[a-zA-Z0-9$]{1,4}/)[0]; // Need to figure this out
-    scoreFuncVar = func.match(/[a-zA-Z0-9$]{1,4}\=\=\=\n?25/)[0].split('=')[0]; // Assuming he wanted just the "this.score"
-    scoreFunc = func.match(`${window.escapeRegex(scoreFuncVar.replace('\n', ''))}=\n?this.[a-zA-Z0-9$]{1,6}`)[0].split('=')[1]
-    ////console.log(scoreFunc)
-    //scoreFunc = scoreFunc.substring(scoreFunc.indexOf("this."),scoreFunc.size);
-    //timeFunc = func.match(/this.[a-zA-Z0-9$]{1,6}\*this.[a-zA-Z0-9$]{1,6}/)[0];
-    // Now has weird vars that obfuscate, it's "this.ticks" * "this.{1,4}"
-    timeFunc = func.match(/\([a-zA-Z0-9$]{1,6}\*[a-zA-Z0-9$]{1,6}\)/)[0];
-    ticksVar = timeFunc.split('(')[1].split("*")[0];
-    tickLengthVar = timeFunc.split("*")[1].split(')')[0];
-    realTicks = func.match(`${escapeRegex(ticksVar)}=this.[a-zA-Z0-9$]{1,6}`)[0].split('=')[1];
-    realTickLength = func.match(`${escapeRegex(tickLengthVar)}=this.[a-zA-Z0-9$]{1,6}`)[0].split('=')[1];
-    realTimeFunc = `${realTicks}*${realTickLength}`;
-    timeFunc = realTimeFunc;
-    ////console.log(timeFunc)
-    //ownFuncIndex = func.indexOf(func.match(/!1}\);\([^%]{0,10}/)[0])+5; // No idea how this ever worked
-    ownFunc = "window.timeKeeper.gotApple(Math.floor(" + timeFunc + ")," + scoreFunc + ");"
-    //func = func.slice(0, ownFuncIndex) + ownFunc + func.slice(ownFuncIndex); // Cool but no, just going to insert before the if 25 50 100 instead
-    if25_regex = new RegExp(/if\([a-zA-Z0-9$]{1,4}\=\=\=\n?25/)
-    ownFuncIndex = func.indexOf(func.match(if25_regex)[0]);
-    func = func.slice(0, ownFuncIndex) + ownFunc + func.slice(ownFuncIndex);
-    ////console.log(func);
+    ownFunc = "window.timeKeeper.gotApple(Math.floor(" + timeFunc + ")," + scoreFunc + ");";
+    if25_regex = new RegExp(/if\([a-zA-Z0-9$]{1,8}\=\=\=\n?25/);
+    const if25_in_tick = func.match(if25_regex);
+    if (if25_in_tick) {
+        ownFuncIndex = func.indexOf(if25_in_tick[0]);
+        func = func.slice(0, ownFuncIndex) + ownFunc + func.slice(ownFuncIndex);
+    }
 
+    func =
+        func.slice(0, func.indexOf("WIN.play()") + 11) +
+        "window.timeKeeper.gotAll(Math.floor(" +
+        timeFunc +
+        ")," +
+        scoreFunc +
+        ")," +
+        func.slice(func.indexOf("WIN.play()") + 11);
 
-
-    //change all apples to run gotAll()
-    func = func.slice(0, func.indexOf("WIN.play()") + 11) + "window.timeKeeper.gotAll(Math.floor(" + timeFunc + ")," + scoreFunc + ")," + func.slice(func.indexOf("WIN.play()") + 11);
-
-    death = func.match(/if\(this.[a-zA-Z0-9$]{1,4}\|\|this.[a-zA-Z0-9$]{1,4}\)/)[0];
+    death = func.match(/if\(this.[a-zA-Z0-9$]{1,8}\|\|this.[a-zA-Z0-9$]{1,8}\)/)[0];
     death = death.slice(death.indexOf("(") + 1, death.indexOf("|"));
-    func = func.slice(0, func.indexOf("{") + 1) + "if(" + death + "){window.timeKeeper.death(Math.floor(" + timeFunc + ")," + scoreFunc + ");}" + func.slice(func.indexOf("{") + 1)
-    //eval(func)
+    func =
+        func.slice(0, func.indexOf("{") + 1) +
+        "if(" +
+        death +
+        "){window.timeKeeper.death(Math.floor(" +
+        timeFunc +
+        ")," +
+        scoreFunc +
+        ");}else if(!window.timeKeeper.runStarted){window.timeKeeper.start();}" +
+        func.slice(func.indexOf("{") + 1);
 
     code = code.assertReplace(func_regex, func + StartOfNext);
 
-    ////console.log(code)
-
-    //change start function to run gameStart() - The "start" here fails, but this section is required for the code to work -- not anymore, fixed it earlier.
-
-    //func_regex = new RegExp(/[a-zA-Z0-9_$]{1,6}=function\(a,b\){if\(!\(a.[a-zA-Z0-9$]{1,4}[^\\]*?=function/)
-    //func = code.match(/[a-zA-Z0-9_$]{1,6}=function\(a,b\){if\(!\(a.[a-zA-Z0-9$]{1,4}[^\\]*?=function/)[0];
-    //StartOfNext = func.substring(func.lastIndexOf(";"), func.length);
-    //func = func.substring(0, func.lastIndexOf(";"));
-    //step = timeFunc.substring(0, timeFunc.indexOf("*"));
-    //step = "a" + step.slice(step.indexOf("."));
-
-    //func = func.slice(0, func.indexOf("{") + 1) + "if(" + step + "==0){window.timeKeeper.start();}" + func.slice(func.indexOf("{") + 1);
-    //eval(func)
-    //code = code.assertReplace(func_regex, func + StartOfNext);
-
-    //add eventhandler to click on time
-    //let id = code.match(/function\(a\){if\(\!a.[a-zA-Z0-9]{1,4}&&[^"]*?"[^"]*?"/)[0];
-    //id = id.substring(id.indexOf("\"")+1, id.lastIndexOf("\""));
-    //let id = code.match(/"[^"]{1,9}"[^"]{1,200}"00:00:000/)[0]; // Whatever this crap gives is the wrong thing sadly
-    //window.TimerID = id.substring(1, id.indexOf("\"",2));
-    //document.querySelector("div[jsname^=\""+id+"\"]").addEventListener("click",(e)=>{
-    //	window.timeKeeper.showDialog();
-    //});
-
-    // TimeKeeper stuff end
-    ////console.log(code)
-    // Counter stuff
+    // v13 moved the 25/50/100 HUD update out of tick() into a helper.
+    if (!if25_in_tick) {
+        const appleHud = /([a-zA-Z0-9_$]{1,8})=function\(a,b,c,d\)\{if\(b===25\|\|b===50\|\|b===100\)/;
+        window.catchError(appleHud, code);
+        code = code.assertReplace(
+            appleHud,
+            "$1=function(a,b,c,d){window.timeKeeper.gotApple(Math.floor(c*d),b);if(b===25||b===50||b===100)"
+        );
+    }
     return code;
-}
+};
 window.Fruit = {};
 
 window.Fruit.make = function () {
@@ -1742,17 +2116,41 @@ window.Fruit.make = function () {
         "Real": "https://i.postimg.cc/pTCF6hCJ/redpudding-real.png",
         "Poison_values": 'b,\'#ff3f3f\',\'#909090\',20',
     });
-    new_fruit.push({ // Cabbage
-        "Normal": 'https://i.postimg.cc/j59z8v1m/cabbage.png',
-        "Pixel": 'https://i.postimg.cc/FR1ygwT0/cabbage-px.png',
-        "Real": "https://i.postimg.cc/yd1GyLFv/cabbage-real.png",
-        "Poison_values": 'b,\'#ff3f3f\',\'#909090\',20',
+    new_fruit.push({ // Boiled Egg
+        "Normal": 'https://i.postimg.cc/NMgtGCTG/boiled-egg-normal.png',
+        "Pixel": 'https://i.postimg.cc/hjSn4ZxK/boiled-egg-pixel.png',
+        "Real": "https://i.postimg.cc/XJVWN1FJ/boiled-egg-real.png",
+        "Poison_values": 'b,\'#e7dfa4\',\'#909090\',20',
     });
-    new_fruit.push({ // Heart
-        "Normal": 'https://i.postimg.cc/8PGLRXCb/heart.png',
-        "Pixel": 'https://i.postimg.cc/v8fW6wGB/pixel-heart.png',
-        "Real": "https://i.postimg.cc/3NXmMmtp/real-heart.png",
-        "Poison_values": 'b,\'#ff3f3f\',\'#909090\',20',
+    new_fruit.push({ // Bacon
+        "Normal": 'https://i.postimg.cc/ZRTmYs3m/bacon-normal.png',
+        "Pixel": 'https://i.postimg.cc/C1F0MrDS/bacon-pixel.png',
+        "Real": "https://i.postimg.cc/XJVWN1FV/bacon-real.png",
+        "Poison_values": 'b,\'#9b441c\',\'#909090\',20',
+    });
+    new_fruit.push({ // White Onion
+        "Normal": 'https://i.postimg.cc/262D1dF5/white-onion-normal.png',
+        "Pixel": 'https://i.postimg.cc/qRjTNcXg/white-onion-pixel.png',
+        "Real": "https://i.postimg.cc/LXNpJkBJ/white-onion-real.png",
+        "Poison_values": 'b,\'#f5f0e6\',\'#909090\',20',
+    });
+    new_fruit.push({ // Purple Onion
+        "Normal": 'https://i.postimg.cc/j5sTq3N7/purple-onion-normal.png',
+        "Pixel": 'https://i.postimg.cc/j5ZbD6Qd/purple-onion-pixel.png',
+        "Real": "https://i.postimg.cc/nz0JXKYz/purple-onion-real.png",
+        "Poison_values": 'b,\'#7b3fa0\',\'#909090\',20',
+    });
+    new_fruit.push({ // Cooked Steak
+        "Normal": 'https://i.postimg.cc/C1F0MrDK/cooked-steak-normal.png',
+        "Pixel": 'https://i.postimg.cc/NMgtGCTF/cooked-steak-pixel.png',
+        "Real": "https://i.postimg.cc/FR9vFCcf/cooked-steak-real.png",
+        "Poison_values": 'b,\'#6d2e1c\',\'#909090\',20',
+    });
+    new_fruit.push({ // Cucumber
+        "Normal": 'https://i.postimg.cc/zBJND2WR/cucumber-normal.png',
+        "Pixel": 'https://i.postimg.cc/50xJ9KvQ/cucumber-pixel.png',
+        "Real": "https://i.postimg.cc/PxtHfVZp/cucumber-real.png",
+        "Poison_values": 'b,\'#93ef13\',\'#909090\',20',
     });
 
     last_fruit_num = document.querySelector('#apple').children.length - 1;
@@ -1931,6 +2329,104 @@ window.Fruit.alterCode = function (code) {
 
     return code;
 }
+window.GraphicsMix = {};
+
+window.GraphicsMix.make = function () {
+
+    window.nativeGraphicsCount = 4;
+
+    window.puddingMixStyle = function (g) {
+        if (typeof g !== "number") g = window.graphics_selected;
+        const n = window.nativeGraphicsCount || 4;
+        const pools = {};
+        pools[n - 1] = [0, 1, 2];
+        pools[n] = [0, 1];
+        pools[n + 1] = [1, 2];
+        pools[n + 2] = [0, 2];
+        const pool = pools[g];
+        if (!pool) return g;
+        return pool[Math.floor(Math.random() * pool.length)];
+    };
+
+    // Left half of A | right half of B. CSS split so it works even when canvas is CORS-tainted.
+    function makeSplitIcon(leftSrc, rightSrc) {
+        const wrap = document.createElement("div");
+        wrap.classList.add("DqMRee");
+        wrap.classList.add("SsAred");
+        wrap.style.position = "relative";
+        wrap.style.overflow = "hidden";
+        wrap.style.display = "inline-block";
+        wrap.style.verticalAlign = "top";
+
+        const leftClip = document.createElement("div");
+        leftClip.style.cssText = "position:absolute;left:0;top:0;width:50%;height:100%;overflow:hidden;";
+        const leftImg = document.createElement("img");
+        leftImg.src = leftSrc;
+        leftImg.alt = "";
+        leftImg.style.cssText = "position:absolute;left:0;top:0;height:100%;width:200%;max-width:none;object-fit:cover;object-position:left center;pointer-events:none;";
+        leftClip.appendChild(leftImg);
+
+        const rightClip = document.createElement("div");
+        rightClip.style.cssText = "position:absolute;left:50%;top:0;width:50%;height:100%;overflow:hidden;";
+        const rightImg = document.createElement("img");
+        rightImg.src = rightSrc;
+        rightImg.alt = "";
+        rightImg.style.cssText = "position:absolute;right:0;top:0;height:100%;width:200%;max-width:none;object-fit:cover;object-position:right center;pointer-events:none;";
+        rightClip.appendChild(rightImg);
+
+        wrap.appendChild(leftClip);
+        wrap.appendChild(rightClip);
+        return wrap;
+    }
+
+    window.appendPairGraphicsIcons = function () {
+        if (window._puddingPairGraphicsAdded) return true;
+        const row = document.querySelector("#graphics");
+        if (!row || !row.children || row.children.length < 3) return false;
+
+        window.nativeGraphicsCount = row.children.length;
+        const srcs = [row.children[0].src, row.children[1].src, row.children[2].src];
+        const pairs = [[0, 1], [1, 2], [0, 2]];
+        for (let i = 0; i < pairs.length; i++) {
+            row.appendChild(makeSplitIcon(srcs[pairs[i][0]], srcs[pairs[i][1]]));
+        }
+        window._puddingPairGraphicsAdded = true;
+        return true;
+    };
+
+    function tryAppend(attemptsLeft) {
+        try {
+            if (window.appendPairGraphicsIcons()) return;
+        } catch (e) {
+            console.error("[GraphicsMix] append failed", e);
+        }
+        if (attemptsLeft <= 0) return;
+        setTimeout(function () { tryAppend(attemptsLeft - 1); }, 100);
+    }
+
+    tryAppend(50);
+}
+
+window.GraphicsMix.alterCode = function (code) {
+
+    const mixPicker = new RegExp(
+        /function\(\)\{(?:var|let|const) [a-zA-Z0-9_$]{1,8}=\[0,1,2\];return [a-zA-Z0-9_$]{1,8}\[Math\.floor\(Math\.random\(\)\*[a-zA-Z0-9_$]{1,8}\.length\)\]\}/
+    );
+    catchError(mixPicker, code);
+    code = code.assertReplace(mixPicker, "function(){return window.puddingMixStyle(window.graphics_selected)}");
+
+    const mixAssign = new RegExp(
+        /[a-zA-Z0-9_$]{1,8}:[a-zA-Z0-9_$]{1,8}\.settings\.([a-zA-Z0-9_$]{1,8})===3\?[a-zA-Z0-9_$]{1,8}\(\):void 0/
+    );
+    catchError(mixAssign, code);
+    const gfxField = code.match(mixAssign)[1];
+
+    const mixCheck = new RegExp(`\\.settings\\.${gfxField}===3`, "g");
+    catchError(mixCheck, code);
+    code = code.assertReplaceAll(mixCheck, `.settings.${gfxField}>=3`);
+
+    return code;
+}
 window.TopBar = {};
 
 window.TopBar.make = function () {
@@ -1947,7 +2443,29 @@ window.TopBar.make = function () {
 
   window.toggle_topbar_icons = function () {
     window.pudding_settings.TopBar = !window.pudding_settings.TopBar;
+    if (typeof window.saveSettings === "function") {
+      window.saveSettings();
+    }
+    if (typeof window.apply_topbar_icons === "function") {
+      window.apply_topbar_icons();
+    }
   }
+
+  window.setup_topbar_checkbox = function () {
+    const settingsBox = document.getElementById("settings-popup-pudding");
+    const topbarCheckbox = (settingsBox && settingsBox.querySelector("#TopBarIcons"))
+      || document.getElementById("TopBarIcons");
+    if (!topbarCheckbox) return;
+    if (topbarCheckbox.dataset.topbarBound === "1") {
+      topbarCheckbox.checked = !!window.pudding_settings.TopBar;
+      return;
+    }
+    topbarCheckbox.addEventListener("change", window.toggle_topbar_icons);
+    topbarCheckbox.checked = !!window.pudding_settings.TopBar;
+    topbarCheckbox.dataset.topbarBound = "1";
+  };
+
+  window.setup_topbar_checkbox();
 
 }
 
@@ -1955,6 +2473,63 @@ window.TopBar.alterCode = function (code) {
 
   window.count_img_arr = Array.from(document.querySelector('#count').children).map(el=>el.src);
   window.speed_img_arr = Array.from(document.querySelector('#speed').children).map(el=>el.src);
+  const appleRoot = document.querySelector('#apple');
+  window.apple_img_arr = appleRoot ? Array.from(appleRoot.children).map(el => el.src) : [];
+
+  window.getSelectorRowIndex = function (selectorId) {
+    const elementList = document.getElementById(selectorId);
+    if (!elementList || !elementList.children.length) return 0;
+    let number = 0;
+    const classNames = [];
+    let notUnique = "";
+    for (const element of elementList.children) {
+      if (classNames.indexOf(element.className) === -1) {
+        classNames.push(element.className);
+      } else {
+        notUnique = element.className;
+        break;
+      }
+    }
+    for (const element of elementList.children) {
+      if (element.className !== notUnique) return number;
+      number++;
+    }
+    return 0;
+  };
+
+  window.apply_topbar_icons = function () {
+    if (typeof window.control_mute_img !== "function") return;
+    if (!window.speed_img_arr || !window.count_img_arr) return;
+
+    const daily = !!window.daily_challenge;
+    const topBar = !!(window.pudding_settings && window.pudding_settings.TopBar) && !daily;
+
+    let speedIdx = 0;
+    let countIdx = 0;
+    if (window.timeKeeper && typeof window.timeKeeper.getCurrentSetting === "function") {
+      try {
+        speedIdx = window.timeKeeper.getCurrentSetting("speed");
+        countIdx = window.timeKeeper.getCurrentSetting("count");
+      } catch (e) { /* settings refs may be unavailable early */ }
+    }
+
+    const speedSrc = window.speed_img_arr[speedIdx] || window.speed_img_arr[0];
+    window.control_mute_img(topBar, speedSrc);
+
+    if (!window.fruit_jsname) return;
+    const fruitImg = document.querySelector('[jsname="' + window.fruit_jsname + '"]');
+    if (!fruitImg) return;
+
+    if (topBar) {
+      fruitImg.src = window.count_img_arr[countIdx] || window.count_img_arr[0];
+      return;
+    }
+
+    if (window.apple_img_arr && window.apple_img_arr.length) {
+      const appleIdx = window.getSelectorRowIndex("apple");
+      fruitImg.src = window.apple_img_arr[appleIdx] || window.apple_img_arr[0];
+    }
+  };
 
   count_regex = new RegExp(/case "count"\:[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/)
   speed_regex = new RegExp(/case "speed"\:[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}\.[a-zA-Z0-9_$]{1,8}/)
@@ -1980,6 +2555,7 @@ window.TopBar.alterCode = function (code) {
   //code = code.assertReplace(speed_regex, set_speed_code);
 
   fruit_jsname = document.querySelector('[src$="apple_00.png"]').getAttribute("jsname")
+  window.fruit_jsname = fruit_jsname;
   fruit_src = `document.querySelector('[jsname="${fruit_jsname}"]').src `
 
   window.mute_divs = document.querySelectorAll('[aria-label="Mute"]');
@@ -2025,6 +2601,8 @@ window.TopBar.alterCode = function (code) {
   eval(speed_var + `=0`)
   eval(count_var + `=0`)
   eval(size_var + `=0`)
+
+  window.apply_topbar_icons();
 
   return code;
 }
@@ -2317,6 +2895,105 @@ window.SettingsSaver = {};
 window.SettingsSaver.make = function () {
     const COUNT_KEYS = ["0", "1", "2", "3", "4", "5", "6"];
     const COUNT_MINIMA = { 0: 1, 1: 3, 2: 5, 3: 10, 4: 6, 5: 24, 6: 5 };
+    const PUDDING_SETTINGS_VERSION = 1;
+
+    const GAME_SETTING_KEYS = [
+        "trophy",
+        "count",
+        "speed",
+        "size",
+        "graphics",
+        "theme",
+        "color",
+        "apple",
+    ];
+
+    // v12/v13 share the same menu rows today; caps are fallbacks when DOM is not ready yet.
+    const FALLBACK_ROW_LIMITS = {
+        trophy: 25,
+        count: 7,
+        speed: 3,
+        size: 3,
+        graphics: 7,
+        theme: 24,
+        color: 24,
+        apple: 50,
+    };
+
+    function getSelectorRowLength(selectorId) {
+        const row = document.getElementById(selectorId);
+        return row && row.children ? row.children.length : 0;
+    }
+
+    function clampSettingIndex(index, maxLen) {
+        let i = Number(index);
+        if (isNaN(i) || i < 0) return 0;
+        if (!maxLen || maxLen <= 0) return i;
+        return Math.min(i, maxLen - 1);
+    }
+
+    function nativeGraphicsCount() {
+        return window.nativeGraphicsCount || 4;
+    }
+
+    // Pair-mix slots (indices >= native count) map back to a native style if mix icons are missing.
+    function fallbackNativeGraphics(savedIndex) {
+        const n = nativeGraphicsCount();
+        const g = Number(savedIndex);
+        if (isNaN(g) || g < 0) return 0;
+        if (g < n - 1) return g;
+        const pools = {};
+        pools[n - 1] = 0;
+        pools[n] = 0;
+        pools[n + 1] = 1;
+        pools[n + 2] = 0;
+        return Object.prototype.hasOwnProperty.call(pools, g) ? pools[g] : 0;
+    }
+
+    function requiredGraphicsRowLength(savedGraphics) {
+        const g = Number(savedGraphics);
+        if (isNaN(g) || g < 0) return nativeGraphicsCount();
+        const n = nativeGraphicsCount();
+        if (g < n) return n;
+        return n + 3;
+    }
+
+    function graphicsRowReady(savedGraphics) {
+        const len = getSelectorRowLength("graphics");
+        if (!len) return false;
+        return len >= requiredGraphicsRowLength(savedGraphics);
+    }
+
+    function sanitizeSavedGameSettings(snap, options) {
+        if (!snap || typeof snap !== "object") return snap;
+        const out = Object.assign({}, snap);
+        const savedRows = out._rowLengths && typeof out._rowLengths === "object" ? out._rowLengths : null;
+        const allowGraphicsFallback = !!(options && options.allowGraphicsFallback);
+
+        for (const key of GAME_SETTING_KEYS) {
+            if (typeof out[key] !== "number" || isNaN(out[key])) continue;
+
+            let maxLen = getSelectorRowLength(key);
+            if (!maxLen && savedRows && typeof savedRows[key] === "number") {
+                maxLen = savedRows[key];
+            }
+            if (!maxLen && FALLBACK_ROW_LIMITS[key]) {
+                maxLen = FALLBACK_ROW_LIMITS[key];
+            }
+
+            if (key === "graphics" && maxLen && out[key] >= nativeGraphicsCount()) {
+                if (allowGraphicsFallback && maxLen < requiredGraphicsRowLength(out[key])) {
+                    out[key] = fallbackNativeGraphics(out[key]);
+                } else {
+                    out[key] = clampSettingIndex(out[key], maxLen);
+                }
+            } else if (maxLen) {
+                out[key] = clampSettingIndex(out[key], maxLen);
+            }
+        }
+
+        return out;
+    }
 
     function defaultPoolForCount(count) {
         const min = COUNT_MINIMA[count] || 1;
@@ -2355,44 +3032,118 @@ window.SettingsSaver.make = function () {
         return settings;
     }
 
+    function copyPool(pool, fallbackCount) {
+        if (Array.isArray(pool)) {
+            return pool.map(Number).filter((n) => !isNaN(n) && n !== 24);
+        }
+        return defaultPoolForCount(fallbackCount);
+    }
+
+    function migrateSelectedPairsByCountGeneral(settings) {
+        if (!settings.SelectedPairsByCountGeneral || typeof settings.SelectedPairsByCountGeneral !== "object") {
+            settings.SelectedPairsByCountGeneral = {};
+        }
+        for (const key of COUNT_KEYS) {
+            if (!Array.isArray(settings.SelectedPairsByCountGeneral[key])) {
+                const src = settings.SelectedPairsByCount && settings.SelectedPairsByCount[key];
+                settings.SelectedPairsByCountGeneral[key] = copyPool(src, Number(key));
+            }
+        }
+        return settings;
+    }
+
+    function migrateRemixSettings(settings) {
+        if (!settings || typeof settings !== "object") return settings;
+
+        if (typeof settings.StorageVersion !== "number") {
+            settings.StorageVersion = PUDDING_SETTINGS_VERSION;
+        }
+
+        settings = migrateSelectedPairsByCount(settings);
+        settings.SelectedPairs = settings.SelectedPairsByCount["0"];
+        settings = migrateSelectedPairsByCountGeneral(settings);
+
+        if (settings.SavedGameSettings && typeof settings.SavedGameSettings === "object") {
+            settings.SavedGameSettings = sanitizeSavedGameSettings(settings.SavedGameSettings, {
+                allowGraphicsFallback: true,
+            });
+        }
+
+        settings.StorageVersion = PUDDING_SETTINGS_VERSION;
+        return settings;
+    }
+
     window.loadSettings = function () {
-        let pudding_settings = localStorage.getItem('PuddingSettings');
+        let pudding_settings = localStorage.getItem('RemixSettings');
         if (pudding_settings === null) {
             pudding_settings = {
+                StorageVersion: PUDDING_SETTINGS_VERSION,
                 Skull: false,
                 SokoGoals: true,
                 InputDisplay: false,
                 TopBar: true,
                 SpeedInfo: false,
+                ShowWrHolders: true,
+                TrackedPlayerName: "",
                 PortalPairs: false,
-                AlwaysUniqueFruit: false,
+                AlwaysUniqueFruit: true,
                 SelectedPairs: defaultPoolForCount(0),
                 SelectedPairsByCount: {},
+                SelectedPairsByCountGeneral: {},
                 DisableRandom: false,
                 randomizeThemeApple: false,
-                ScrollBar: false
+                ScrollBar: false,
+                SaveGameSettings: true,
+                SavedGameSettings: null,
+                SplitPanel: false,
             };
             for (const key of COUNT_KEYS) {
                 pudding_settings.SelectedPairsByCount[key] = defaultPoolForCount(Number(key));
+                pudding_settings.SelectedPairsByCountGeneral[key] = defaultPoolForCount(Number(key)).slice();
             }
         } else {
             pudding_settings = JSON.parse(pudding_settings);
+            const needsPersist = typeof pudding_settings.StorageVersion !== "number";
             if (typeof pudding_settings.PortalPairs !== 'boolean') {
                 pudding_settings.PortalPairs = false;
             }
             if (typeof pudding_settings.AlwaysUniqueFruit !== 'boolean') {
-                pudding_settings.AlwaysUniqueFruit = false;
+                pudding_settings.AlwaysUniqueFruit = true;
             }
             if (typeof pudding_settings.ScrollBar !== 'boolean') {
                 pudding_settings.ScrollBar = false;
             }
-            pudding_settings = migrateSelectedPairsByCount(pudding_settings);
-            pudding_settings.SelectedPairs = pudding_settings.SelectedPairsByCount["0"];
+            if (typeof pudding_settings.ShowWrHolders !== 'boolean') {
+                pudding_settings.ShowWrHolders = true;
+            }
+            if (typeof pudding_settings.TrackedPlayerName !== 'string') {
+                pudding_settings.TrackedPlayerName = "";
+            }
+            if (typeof pudding_settings.SaveGameSettings !== 'boolean') {
+                pudding_settings.SaveGameSettings = true;
+            }
+            if (typeof pudding_settings.SplitPanel !== 'boolean') {
+                pudding_settings.SplitPanel = false;
+            }
+            if (
+                pudding_settings.SavedGameSettings !== null &&
+                typeof pudding_settings.SavedGameSettings !== 'object'
+            ) {
+                pudding_settings.SavedGameSettings = null;
+            }
+            pudding_settings = migrateRemixSettings(pudding_settings);
+            if (needsPersist) {
+                window._puddingSettingsNeedsPersist = true;
+            }
         }
 
         return pudding_settings;
     }
     window.pudding_settings = window.loadSettings();
+    if (window._puddingSettingsNeedsPersist && typeof window.saveSettings === "function") {
+        window.saveSettings();
+        window._puddingSettingsNeedsPersist = false;
+    }
 
     window.saveSettings = function () {
         const s = window.pudding_settings;
@@ -2406,9 +3157,215 @@ window.SettingsSaver.make = function () {
             typeof s.DisableRandom !== 'undefined' &&
             typeof s.randomizeThemeApple !== 'undefined'
         ) {
-            localStorage.setItem('PuddingSettings', JSON.stringify(s));
+            localStorage.setItem('RemixSettings', JSON.stringify(s));
         }
     }
+
+    // Read selected child index for a Google Snake selector row
+    window.readGameSettingIndex = function (selectorId) {
+        const root = document.getElementById(selectorId);
+        if (!root || !root.children || !root.children.length) return 0;
+
+        // Selected icon uses tuJOWd (optionally with other classes)
+        for (let i = 0; i < root.children.length; i++) {
+            const el = root.children[i];
+            const cls = el.className || "";
+            if (cls === "tuJOWd" || cls === "DqMRee tuJOWd" || cls === "DqMRee") return i;
+            if (el.classList && el.classList.contains("tuJOWd")) return i;
+        }
+
+        // Odd-class-out (trophy / count style)
+        const classNames = [];
+        let notUnique = "";
+        for (const el of root.children) {
+            if (classNames.indexOf(el.className) === -1) classNames.push(el.className);
+            else {
+                notUnique = el.className;
+                break;
+            }
+        }
+        if (notUnique) {
+            let n = 0;
+            for (const el of root.children) {
+                if (el.className !== notUnique) return n;
+                n++;
+            }
+        }
+        return 0;
+    };
+
+    window.clickGameSettingIndex = function (selectorId, index) {
+        let i = Number(index);
+        if (isNaN(i) || i < 0) i = 0;
+
+        // Google's p7 selector (scroll + settings object). Child .click() does not stick.
+        if (typeof window.puddingMenuSelect === "function") {
+            return window.puddingMenuSelect(selectorId, i);
+        }
+        return false;
+    };
+
+    window._openSnakeSettingsPanel = function () {
+        const gear =
+            document.querySelector('div[jsname="iyH4Cb"]') ||
+            document.querySelector('div[jsname^="iyH4Cb"]');
+        if (gear && typeof gear.click === "function") {
+            gear.click();
+            return true;
+        }
+        return false;
+    };
+
+    window._closeSnakeSettingsPanel = function () {
+        // Native back control uses class p17HVe
+        const back =
+            document.querySelector(".p17HVe") ||
+            document.querySelector('[class^="p17HVe"]') ||
+            document.querySelector('[class*="p17HVe"]');
+        if (back && typeof back.click === "function") {
+            back.click();
+            return true;
+        }
+        return false;
+    };
+
+    window.saveCurrentGameSettings = function () {
+        if (!window.pudding_settings) return;
+        const snap = {};
+        for (const key of GAME_SETTING_KEYS) {
+            snap[key] = window.readGameSettingIndex(key);
+        }
+        // Prefer live vars when DOM class detection is ambiguous
+        if (typeof window.graphics_selected === "number") {
+            snap.graphics = window.graphics_selected;
+        }
+        if (typeof window.fruit_selected === "number") {
+            snap.apple = window.fruit_selected;
+        }
+        snap._rowLengths = {};
+        for (const key of GAME_SETTING_KEYS) {
+            const len = getSelectorRowLength(key);
+            if (len) snap._rowLengths[key] = len;
+        }
+        snap._nativeGraphicsCount = nativeGraphicsCount();
+        window.pudding_settings.SavedGameSettings = sanitizeSavedGameSettings(snap, {
+            allowGraphicsFallback: false,
+        });
+        if (typeof window.saveSettings === "function") window.saveSettings();
+    };
+
+    window.applySavedGameSettingsOnce = function () {
+        if (window._puddingGameSettingsApplied) return;
+
+        const s = window.pudding_settings;
+        if (!s || !s.SaveGameSettings) {
+            window._puddingGameSettingsApplied = true;
+            return;
+        }
+        let snap = s.SavedGameSettings;
+        if (!snap || typeof snap !== "object") {
+            window._puddingGameSettingsApplied = true;
+            return;
+        }
+        snap = sanitizeSavedGameSettings(snap, { allowGraphicsFallback: false });
+
+        const gear =
+            document.querySelector('div[jsname="iyH4Cb"]') ||
+            document.querySelector('div[jsname^="iyH4Cb"]');
+        const trophy = document.getElementById("trophy");
+        const p7Ready = typeof window._puddingSnakeP7 === "function";
+
+        if (!gear || !trophy || !trophy.children || !trophy.children.length || !p7Ready) {
+            if (typeof window._puddingGameSettingsApplyTries !== "number") {
+                window._puddingGameSettingsApplyTries = 0;
+            }
+            window._puddingGameSettingsApplyTries++;
+            if (window._puddingGameSettingsApplyTries > 100) {
+                window._puddingGameSettingsApplied = true;
+                return;
+            }
+            setTimeout(window.applySavedGameSettingsOnce, 50);
+            return;
+        }
+
+        window._puddingGameSettingsApplied = true;
+
+        // Open settings → wait until menu is live → apply via p7 → back (p17HVe).
+        window._openSnakeSettingsPanel();
+
+        const order = [
+            "trophy",
+            "count",
+            "speed",
+            "size",
+            "graphics",
+            "theme",
+            "color",
+            "apple",
+        ];
+
+        let waitTries = 0;
+        function waitMenuThenApply() {
+            waitTries++;
+            const menu = window._puddingSnakeMenu;
+            const ready =
+                menu &&
+                menu.oa === "settings" &&
+                typeof window._puddingSnakeP7 === "function";
+
+            if (!ready) {
+                if (waitTries > 80) {
+                    // Still try back so we don't leave settings open
+                    window._closeSnakeSettingsPanel();
+                    return;
+                }
+                setTimeout(waitMenuThenApply, 50);
+                return;
+            }
+
+            if (typeof snap.graphics === "number" && snap.graphics >= nativeGraphicsCount()) {
+                if (typeof window.appendPairGraphicsIcons === "function") {
+                    window.appendPairGraphicsIcons();
+                }
+                if (!graphicsRowReady(snap.graphics)) {
+                    if (waitTries > 80) {
+                        snap = sanitizeSavedGameSettings(snap, { allowGraphicsFallback: true });
+                    } else {
+                        setTimeout(waitMenuThenApply, 50);
+                        return;
+                    }
+                }
+            }
+
+            for (const key of order) {
+                if (typeof snap[key] === "number") {
+                    window.puddingMenuSelect(key, snap[key]);
+                }
+            }
+
+            setTimeout(function () {
+                window._closeSnakeSettingsPanel();
+            }, 100);
+        }
+
+        setTimeout(waitMenuThenApply, 50);
+    };
+
+    // Public helper used after alterCode exposes Google's selector.
+    window.puddingMenuSelect = function (id, index) {
+        const menu = window._puddingSnakeMenu;
+        const p7 = window._puddingSnakeP7;
+        if (!menu || typeof p7 !== "function") return false;
+        const row =
+            (menu.ka && menu.ka.iW && menu.ka.iW.get(id)) ||
+            document.getElementById(id);
+        if (!row || !row.children || !row.children.length) return false;
+        let i = Number(index);
+        if (isNaN(i) || i < 0) i = 0;
+        if (i >= row.children.length) i = row.children.length - 1;
+        p7(menu, row, true, i);
+        return true;
+    };
 }
 
 window.SettingsSaver.alterCode = function (code) {
@@ -2426,37 +3383,404 @@ window.SettingsSaver.alterCode = function (code) {
     save_settings_code = `stop\(a\){saveSettings();`
 
     code = code.assertReplace(stop_regex, save_settings_code);
+
+    // Expose Google's menu selector (p7). Child element .click() does not change settings;
+    // selection is scroll-position based and writes a.settings.* inside this function.
+    const menuSelectRegex = /([a-zA-Z0-9_$]{1,8})=function\(a,b,c,d=-1\)\{d=d!==-1\?d:([a-zA-Z0-9_$]{1,8})\(a,b\);for\(var e=0;e<b\.children\.length/;
+    catchError(menuSelectRegex, code);
+    code = code.assertReplace(
+        menuSelectRegex,
+        `$1=window._puddingSnakeP7=function(a,b,c,d=-1){window._puddingSnakeMenu=a;d=d!==-1?d:$2(a,b);for(var e=0;e<b.children.length`
+    );
+
+    // Capture menu when native settings open (Ec).
+    const openSettingsRegex = /([a-zA-Z0-9_$]{1,8})\(\)\{var a=this\.menu;a\.oa="settings";/;
+    catchError(openSettingsRegex, code);
+    code = code.assertReplace(
+        openSettingsRegex,
+        `$1(){var a=this.menu;window._puddingSnakeMenu=a;a.oa="settings";`
+    );
+
     return code;
 }
 window.SpeedInfo = {};
 
 window.SpeedInfo.make = function () {
 
-    window.isBridge = (Math.floor((Math.random()* 50) + 1) != 32);
+    window.isBridge = true; // refreshed from ModeRegistry when trophies exist
 
     // First game must be CE, the other is the normal game
     const gameIDs = ["o1y9pyk6", "9dow0go1"];
     window.first_time_call = true;
     window.requestsMade = 0;
+    // Invalidate in-flight WR/tracking paints when settings change mid-fetch
+    let srcQueryId = 0;
 
     // FastSnakeStats runs-derived WR timelines (preferred over legacy daily/ snapshots)
     const FASTSNAKE_BASE = "https://raw.githubusercontent.com/DarkSnakeGang/FastSnakeStats/refs/heads/main/time-travel-cache";
     const RUNS_DATES_URL = `${FASTSNAKE_BASE}/metadata/available-dates-runs.json`;
     const TIMELINES_URL = `${FASTSNAKE_BASE}/runs-derived/wr-timelines.json`;
-    const CACHE_STALE_THRESHOLD = 3 * 60 * 60 * 1000; // 3 hours
 
     let timelinesData = null;
     let runsDatesMeta = null;
-    let lastTimelinesUpdate = 0;
     let timelinesPromise = null;
+    let fssVersion = null; // available-dates-runs.json lastUpdated — only reuse memory if this matches
+
+    // In-memory runs boards for the current FSS publish only
+    const runsBoardCache = Object.create(null); // key -> { data, version }
+    const runsBoardPromises = Object.create(null);
+    const LEVEL_TO_RUNS_FILE = {
+        "25": "25_Apples.json",
+        "50": "50_Apples.json",
+        "100": "100_Apples.json",
+        "All": "All_Apples.json",
+        "H": "High_Score.json",
+    };
+
+    // Match FastSnakeStats tally-boards.js (typical dedicated HS modes)
+    const TYPICAL_HIGHSCORE_MODES = {
+        1: "Wall",
+        2: "Portal",
+        8: "Key",
+        9: "Sokoban",
+        10: "Poison",
+        12: "Minesweeper",
+        13: "Statue",
+        15: "Shield",
+        17: "Hotdog",
+        19: "Gate",
+        20: "Bridge",
+    };
+
+    // Dedicated main-game High Score categories (Cheese HS was removed from SRC).
+    // Non-HS modes submit Tally highscores on Category Extensions instead.
+    const TALLY_COUNT = 6;
+    const SRC_GAME = "snake_game";
+    const SRC_GAME_CE = "snake_game_ce";
+
+    const SRC_LEVEL_BY_MODE = {
+        0: "5d7e0vvw", // Classic
+        1: "xd13o769", // Wall
+        2: "rw6e78gd", // Portal
+        3: "rdnq00qd", // Cheese
+        4: "nwl2ll0d", // Borderless
+        5: "n93mv5nd", // Twin
+        6: "z9856279", // Winged
+        7: "n93lkxz9", // Yin Yang
+        8: "z985kzr9", // Key
+        9: "rdn4ej79", // Sokoban
+        10: "ldyrq3r9", // Poison
+        11: "ldy64pz9", // Dimension
+        12: "kwjr0erd", // Minesweeper
+        13: "rdqv8kg9", // Statue
+        14: "rdqkpgmd", // Light
+        15: "xd47pv2d", // Shield
+        16: "rdnjgm69", // Arrow
+        17: "dqzzvn1d", // Hotdog
+        18: "dno527nw", // Magnet
+        19: "wkkjnjxw", // Gate
+        20: "9x1zey3d", // Bridge
+        21: "y9mrvj1w", // Peaceful
+    };
+
+    const SRC_IL_CATEGORY = {
+        "25": "mke9xe9d",
+        "50": "5dw410gk",
+        "100": "wk6nwme2",
+        "ALL": "n2yov4ed",
+        "All": "n2yov4ed",
+    };
+
+    const SRC_HS_CATEGORY_BY_MODE = {
+        1: "7kj63r42", // Wall
+        2: "n2y9g8ed", // Portal
+        8: "q25ewmv2", // Key
+        9: "xd11gn8d", // Sokoban
+        10: "wdmr0lek", // Poison
+        12: "ndxr78rd", // Minesweeper
+        13: "8249v5nd", // Statue
+        15: "02q686jk", // Shield
+        17: "mkemx192", // Hotdog
+        19: "zd31z3n2", // Gate
+        20: "mke3e76d", // Bridge
+    };
+
+    // CE "Tally Highscore (non-highscore modes)" mode values (FSS tally-boards.js)
+    const CE_TALLY_MODE_BY_MODE = {
+        0: "lr3d7n2l", // Classic
+        3: "1dknd7jl", // Cheese
+        4: "q8k3z7kq", // Borderless
+        5: "qyzm4e71", // Twin
+        6: "ln8736dl", // Winged
+        7: "10vy7e5l", // Yin Yang
+        11: "qj7odygq", // Dimension
+        14: "q65w7k7l", // Light
+        16: "lmoenj41", // Arrow
+        18: "1w4j8w5q", // Magnet
+    };
+
+    const SRC_COUNT_VAR = "0nwovxdl";
+    const SRC_COUNT_VAL = {
+        0: "mlnmj661", // 1 Apple
+        1: "5q88w7rq", // 3 Apples
+        2: "4qyoge3l", // 5 Apples
+        3: "qvvpkp7q", // 10 Apples
+        4: "qoxx6dxq", // Dice
+        5: "1pyp3vg1", // Bomb
+        6: "qznw4k2q", // Tally
+    };
+    const SRC_SIZE_VAR = "p854j77l";
+    const SRC_SIZE_VAL = {
+        0: "z19gp0jl", // Standard
+        1: "81pw5rel", // Small
+        2: "p12e0gv1", // Large
+    };
+    const SRC_IL_SPEED_VAR = "68k1g0yl";
+    const SRC_IL_SPEED_VAL = {
+        0: "192dxz4q", // Normal
+        1: "12v4922q", // Fast
+        2: "1py6exn1", // Slow
+    };
+    const SRC_HS_SPEED_VAR = "0nwomwdl";
+    const SRC_HS_SPEED_VAL = {
+        0: "xqkkj49q", // Normal
+        1: "gq7ej4n1", // Fast
+        2: "192d23kq", // Slow
+    };
+
+    const CE_TALLY_HS_CATEGORY = "rkl4elqd";
+    const CE_SPEED_VAR = "gnx3m4gn";
+    const CE_SPEED_VAL = {
+        0: "lmo2pr01", // Normal
+        1: "1w479v6q", // Fast
+        2: "qoxj984q", // Slow
+    };
+    const CE_SIZE_VAR = "ql6mkzw8";
+    const CE_SIZE_VAL = {
+        0: "q75ogky1", // Standard
+        1: "1gn6gyml", // Small
+        2: "qznw4kmq", // Large
+    };
+    const CE_MODE_VAR = "onvxz158";
+
+    // Remix / Category Extensions level boards (Chess, Burger)
+    const CE_LEVEL_BY_MODE_NAME = { Chess: "d1j51lyd", Burger: "wkk1rmqw" };
+    const CE_LEVEL_HS_CATEGORY = "8243lxgd";
+    const CE_LEVEL_IL_CATEGORY = {
+        "25": "02qm9qzd",
+        "50": "824jly32",
+        "100": "9d8eo7qd",
+        "ALL": "xd14168d",
+        "All": "xd14168d",
+    };
+    const CE_LEVEL_COUNT_VAR = "onvjo65n";
+    const CE_LEVEL_COUNT_VAL = {
+        0: "z19m7kyl", // 1 Apple
+        1: "p12d3pdq", // 3 Apples
+        2: "81pp82v1", // 5 Apples
+        3: "1gn6g6nl", // 10a
+        4: "1399n3x1", // Dice
+        5: "qznw4wgq", // Bomb
+        6: "lr3d7djl", // Tally
+    };
+    const CE_LEVEL_SIZE_VAR = "e8mpx9x8";
+    const CE_LEVEL_SIZE_VAL = {
+        0: "ln8e94nl", // Standard
+        1: "10v6popl", // Small
+        2: "14o42xwq", // Large
+    };
+    // Speed shares CE_SPEED_VAR / CE_SPEED_VAL (gnx3m4gn)
+
+    function remixCeLevelName(mode) {
+        if (window.CHESS_MODE != null && mode === window.CHESS_MODE) return "Chess";
+        if (window.BURGER_MODE != null && mode === window.BURGER_MODE) return "Burger";
+        return null;
+    }
+
+    // Match SRC/FastSnakeStats boards: no 100 on Small; Yin Yang has no 50 on Small
+    function shouldShowCategory(level, size, mode) {
+        if (level === "100" && size === 1) return false;
+        if (level === "50" && mode === 7 && size === 1) return false; // Yin Yang: no 50 on Small
+        return true;
+    }
+
+    // SRC removed Statue Bomb and Statue 10a highscore (non-competitive max-score ties)
+    function isRemovedStatueHighscore(mode, count) {
+        return mode === 13 && (count === 3 || count === 5); // Statue + 10 Apples or Bomb
+    }
+
+    // FSS HS boards: typical HS modes on any count; on Tally every mode except Peaceful/Blender
+    function canShowSrcHighscore(mode, count) {
+        if (mode === 21 || mode === 22) return false; // Peaceful, Blender
+        if (TYPICAL_HIGHSCORE_MODES[mode]) return true;
+        if (count === TALLY_COUNT && TALLY_CE_HIGHSCORE_MODES[mode]) return true;
+        // Remix CE levels (Chess/Burger) — full HS boards on snake_game_ce
+        if (window.CHESS_MODE != null && mode === window.CHESS_MODE) return true;
+        if (window.BURGER_MODE != null && mode === window.BURGER_MODE) return true;
+        return false;
+    }
+
+    // Submit link only when SRC has a real board (HS category or CE Tally-HS mode)
+    function canSubmitHighscore(mode, count) {
+        if (mode === 21 || mode === 22) return false;
+        if (isRemovedStatueHighscore(mode, count)) return false;
+        if (SRC_HS_CATEGORY_BY_MODE[mode]) return true;
+        if (count === TALLY_COUNT && CE_TALLY_MODE_BY_MODE[mode]) return true;
+        return false;
+    }
+
+    function srcVarPair(varId, valueId) {
+        return varId + "." + valueId;
+    }
+
+    // Always include defaults (1 Apple / Normal / Standard) so the form matches in-game settings
+    function buildSrcSubmitUrl(score, mode, count, speed, size) {
+        if (size > 2 || count > 6 || speed > 2) return null;
+
+        if (score === "H") {
+            if (typeof canSubmitHighscore === "function" && !canSubmitHighscore(mode, count)) return null;
+            const hsCat = SRC_HS_CATEGORY_BY_MODE[mode];
+            if (hsCat) {
+                const x = [
+                    hsCat,
+                    srcVarPair(SRC_COUNT_VAR, SRC_COUNT_VAL[count]),
+                    srcVarPair(SRC_HS_SPEED_VAR, SRC_HS_SPEED_VAL[speed]),
+                    srcVarPair(SRC_SIZE_VAR, SRC_SIZE_VAL[size]),
+                ].join("-");
+                return `https://www.speedrun.com/${SRC_GAME}/runs/new?x=${x}`;
+            }
+            const ceLevelName = remixCeLevelName(mode);
+            if (ceLevelName && CE_LEVEL_BY_MODE_NAME[ceLevelName]) {
+                const x = [
+                    "l_" + CE_LEVEL_BY_MODE_NAME[ceLevelName],
+                    CE_LEVEL_HS_CATEGORY,
+                    srcVarPair(CE_LEVEL_COUNT_VAR, CE_LEVEL_COUNT_VAL[count]),
+                    srcVarPair(CE_SPEED_VAR, CE_SPEED_VAL[speed]),
+                    srcVarPair(CE_LEVEL_SIZE_VAR, CE_LEVEL_SIZE_VAL[size]),
+                ].join("-");
+                return `https://www.speedrun.com/${SRC_GAME_CE}/runs/new?x=${x}`;
+            }
+            const ceMode = CE_TALLY_MODE_BY_MODE[mode];
+            if (count === TALLY_COUNT && ceMode) {
+                const x = [
+                    CE_TALLY_HS_CATEGORY,
+                    srcVarPair(CE_SPEED_VAR, CE_SPEED_VAL[speed]),
+                    srcVarPair(CE_SIZE_VAR, CE_SIZE_VAL[size]),
+                    srcVarPair(CE_MODE_VAR, ceMode),
+                ].join("-");
+                return `https://www.speedrun.com/${SRC_GAME_CE}/runs/new?x=${x}`;
+            }
+            return null;
+        }
+
+        const ceLevelNameIl = remixCeLevelName(mode);
+        if (ceLevelNameIl && CE_LEVEL_BY_MODE_NAME[ceLevelNameIl]) {
+            const ceCat = CE_LEVEL_IL_CATEGORY[score];
+            if (!ceCat) return null;
+            const x = [
+                "l_" + CE_LEVEL_BY_MODE_NAME[ceLevelNameIl],
+                ceCat,
+                srcVarPair(CE_LEVEL_COUNT_VAR, CE_LEVEL_COUNT_VAL[count]),
+                srcVarPair(CE_SPEED_VAR, CE_SPEED_VAL[speed]),
+                srcVarPair(CE_LEVEL_SIZE_VAR, CE_LEVEL_SIZE_VAL[size]),
+            ].join("-");
+            return `https://www.speedrun.com/${SRC_GAME_CE}/runs/new?x=${x}`;
+        }
+
+        const levelId = SRC_LEVEL_BY_MODE[mode];
+        const catId = SRC_IL_CATEGORY[score];
+        if (!levelId || !catId) return null;
+
+        const x = [
+            "l_" + levelId,
+            catId,
+            srcVarPair(SRC_COUNT_VAR, SRC_COUNT_VAL[count]),
+            srcVarPair(SRC_IL_SPEED_VAR, SRC_IL_SPEED_VAL[speed]),
+            srcVarPair(SRC_SIZE_VAR, SRC_SIZE_VAL[size]),
+        ].join("-");
+        return `https://www.speedrun.com/${SRC_GAME}/runs/new?x=${x}`;
+    }
+
+    function pbValueHtml(text, score, mode, count, speed, size, gold) {
+        const color = gold ? "#FFD700" : "#ADD8E6";
+        const url = buildSrcSubmitUrl(score, mode, count, speed, size);
+        if (url) {
+            return `<a target="_blank" style="text-decoration: none;color:${color} !important;" href="${url}">${text}</a>`;
+        }
+        if (gold) return `<span style="color:${color} !important">${text}</span>`;
+        return text;
+    }
+
+    function goldCacheKey(modeKey, count, speed, size, score, displayText) {
+        return modeKey + "|" + count + "|" + speed + "|" + size + "|" + score + "|" + displayText;
+    }
+
+    // SRC encodes apple count in the duration seconds field (0.187 → 187, 1.234 → 1234)
+    function wrHighscoreFromRun(run) {
+        if (!run || !run.times) return null;
+        if (typeof run.times.primary_t === "number" && isFinite(run.times.primary_t)) {
+            return Math.round(run.times.primary_t * 1000 + 1e-6);
+        }
+        const primary = String(run.times.primary || "");
+        const m = primary.match(/PT(?:\d+H)?(?:\d+M)?(\d+(?:\.\d+)?)S/i);
+        if (m) return Math.round(parseFloat(m[1]) * 1000 + 1e-6);
+        return null;
+    }
+
+    function fssModeName(mode, modeKey) {
+        if (modeKey && window.ModeRegistry && typeof window.ModeRegistry.labelModeKey === "function") {
+            const label = window.ModeRegistry.labelModeKey(modeKey);
+            if (label && label.indexOf(",") < 0) return label;
+        }
+        return window.modeToTxt[mode] && window.modeToTxt[mode].name;
+    }
+
+    // Timed: lower ms wins. Highscore: higher apples wins (only when HS board applies). Unheld → gold.
+    async function shouldGoldPb(score, mode, count, speed, size, pb, modeKey) {
+        if (score === "H" && !canShowSrcHighscore(mode, count)) return false;
+
+        const modeName = fssModeName(mode, modeKey);
+        const countName = window.countToTxt[count] && window.countToTxt[count].name;
+        const speedName = window.speedToTxt[speed] && window.speedToTxt[speed].name;
+        const sizeName = window.sizeToTxt[size] && window.sizeToTxt[size].name;
+        if (!modeName || !countName || !speedName || !sizeName) return false;
+
+        const categoryName =
+            score === "H" ? "High Score" : (score === "ALL" ? "All" : score) + " Apples";
+        const cacheKey = `${countName}|${speedName}|${sizeName}|${modeName}|${categoryName}`;
+
+        try {
+            const record = await getRecordForKey(cacheKey);
+            if (!record.success || !record.runs || !record.runs.length) return true; // unheld
+            const wr = record.runs[0];
+            if (score === "H") {
+                const wrHigh = wrHighscoreFromRun(wr);
+                if (wrHigh == null || pb.high == null) return false;
+                return Number(pb.high) > wrHigh;
+            }
+            if (pb.time == null || !wr.times || typeof wr.times.primary_t !== "number") return false;
+            const wrMs = Math.round(wr.times.primary_t * 1000 + 1e-6);
+            return Number(pb.time) < wrMs;
+        } catch (e) {
+            if (window.NepDebug) console.error("shouldGoldPb failed:", e);
+            return false;
+        }
+    }
 
     function sleepFor(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    async function getJSON(url) {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
+    function withCacheBust(url, bust) {
+        if (!bust) return url;
+        return url + (url.indexOf("?") >= 0 ? "&" : "?") + "v=" + encodeURIComponent(bust);
+    }
+
+    async function getJSON(url, options) {
+        const opts = options || {};
+        const fetchUrl = withCacheBust(url, opts.bust);
+        const res = await fetch(fetchUrl, opts.cache === false ? { cache: "no-store" } : undefined);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${fetchUrl}`);
         return res.json();
     }
 
@@ -2510,37 +3834,54 @@ window.SpeedInfo.make = function () {
     }
 
     async function loadRunsDerived() {
-        if (
-            timelinesData &&
-            runsDatesMeta &&
-            Date.now() - lastTimelinesUpdate < CACHE_STALE_THRESHOLD
-        ) {
-            const date = runsDatesMeta.availableDates[runsDatesMeta.availableDates.length - 1];
+        // Always check FSS metadata — whatever they published is what we use
+        let datesMeta;
+        try {
+            datesMeta = await getJSON(RUNS_DATES_URL, { cache: false });
+            window.requestsMade += 1;
+        } catch (e) {
+            if (timelinesData && runsDatesMeta) {
+                const date = runsDatesMeta.availableDates[runsDatesMeta.availableDates.length - 1];
+                return { timelines: timelinesData, date };
+            }
+            throw e;
+        }
+
+        if (!datesMeta.availableDates || !datesMeta.availableDates.length) {
+            throw new Error("No available dates in runs-derived metadata");
+        }
+
+        const version = datesMeta.lastUpdated || datesMeta.availableDates[datesMeta.availableDates.length - 1];
+
+        // Same FSS publish already in memory — reuse it (no time-based expiry)
+        if (timelinesData && fssVersion === version) {
+            runsDatesMeta = datesMeta;
+            const date = datesMeta.availableDates[datesMeta.availableDates.length - 1];
             return { timelines: timelinesData, date };
         }
+
         if (timelinesPromise) return timelinesPromise;
 
+        const datesMetaForLoad = datesMeta;
+        const versionForLoad = version;
         timelinesPromise = (async () => {
             if (window.NepDebug) {
-                console.log("Loading FastSnakeStats runs-derived timelines...");
+                console.log("Loading FastSnakeStats runs-derived timelines...", versionForLoad);
             }
-            const [dates, timelines] = await Promise.all([
-                getJSON(RUNS_DATES_URL),
-                getJSON(TIMELINES_URL),
-            ]);
-            if (!dates.availableDates || !dates.availableDates.length) {
-                throw new Error("No available dates in runs-derived metadata");
-            }
+            const timelines = await getJSON(TIMELINES_URL, { bust: versionForLoad });
             if (!timelines.boards) {
                 throw new Error("runs-derived timelines missing boards");
             }
-            runsDatesMeta = dates;
+            if (fssVersion && fssVersion !== versionForLoad) {
+                for (const k of Object.keys(runsBoardCache)) delete runsBoardCache[k];
+            }
+            runsDatesMeta = datesMetaForLoad;
             timelinesData = timelines;
-            lastTimelinesUpdate = Date.now();
-            window.requestsMade += 2;
-            const date = dates.availableDates[dates.availableDates.length - 1];
+            fssVersion = versionForLoad;
+            window.requestsMade += 1;
+            const date = datesMetaForLoad.availableDates[datesMetaForLoad.availableDates.length - 1];
             if (window.NepDebug) {
-                console.log(`Runs-derived ready as of ${date} (${Object.keys(timelines.boards).length} boards)`);
+                console.log(`Runs-derived ready as of ${date} (${Object.keys(timelines.boards).length} boards, v=${versionForLoad})`);
             }
             return { timelines, date };
         })().finally(() => {
@@ -2548,6 +3889,100 @@ window.SpeedInfo.make = function () {
         });
 
         return timelinesPromise;
+    }
+
+    function modeFolderName(modeName) {
+        return String(modeName || "").replace(/ /g, "_");
+    }
+
+    function getTrackedPlayerName() {
+        return (window.pudding_settings && window.pudding_settings.TrackedPlayerName || "").trim();
+    }
+
+    function shouldShowWrHolders() {
+        return !!(window.pudding_settings && window.pudding_settings.ShowWrHolders) && !getTrackedPlayerName();
+    }
+
+    function playerNameFromExpandedRun(run) {
+        if (!run || !run.players || !run.players.data || !run.players.data[0]) return "";
+        const p = run.players.data[0];
+        if (p.rel === "guest") return p.name || "";
+        return (p.names && p.names.international) || p.name || "";
+    }
+
+    function wrLink(href, text) {
+        return `<a target="_blank" style="text-decoration: none;color:#ADD8E6 !important;" href="${href}">${text}</a>`;
+    }
+
+    function formatWrRow(label, timeText, weblink, playerName) {
+        let html = `${label}: ${wrLink(weblink, timeText)}`;
+        if (shouldShowWrHolders() && playerName) {
+            html += `<br>${wrLink(weblink, `by ${playerName}`)}`;
+        }
+        return html;
+    }
+
+    function formatTrackRow(label, timeText, weblink) {
+        if (!weblink) return `${label}: ${timeText}`;
+        return `${label}: ${wrLink(weblink, timeText)}`;
+    }
+
+    function formatTimeTSeconds(timeT) {
+        if (typeof timeT !== "number" || !isFinite(timeT)) return "None";
+        const totalMs = Math.round(timeT * 1000);
+        const hours = Math.floor(totalMs / 3600000);
+        const minutes = Math.floor((totalMs % 3600000) / 60000);
+        const seconds = Math.floor((totalMs % 60000) / 1000);
+        const milliseconds = totalMs % 1000;
+        let convertedTime = "";
+        if (hours > 0) convertedTime += hours + "h";
+        if (minutes > 0 || hours > 0) convertedTime += minutes + "m";
+        convertedTime += seconds + "s";
+        if (hours === 0 && milliseconds > 0) {
+            convertedTime += String(milliseconds).padStart(3, "0") + "ms";
+        }
+        if (hours > 0) {
+            convertedTime = convertedTime.split("s")[0] + "s";
+        }
+        return convertedTime;
+    }
+
+    async function loadRunsBoard(modeName, level) {
+        const file = LEVEL_TO_RUNS_FILE[level];
+        if (!file) throw new Error("Unknown level for runs board: " + level);
+        await loadRunsDerived();
+        const folder = modeFolderName(modeName);
+        const cacheKey = `${folder}/${file}`;
+        const cached = runsBoardCache[cacheKey];
+        if (cached && cached.version === fssVersion) {
+            return cached.data;
+        }
+        if (runsBoardPromises[cacheKey]) return runsBoardPromises[cacheKey];
+
+        const url = `${FASTSNAKE_BASE}/runs/${folder}/${file}`;
+        runsBoardPromises[cacheKey] = (async () => {
+            const data = await getJSON(url, { bust: fssVersion });
+            window.requestsMade += 1;
+            runsBoardCache[cacheKey] = { data, version: fssVersion };
+            return data;
+        })().finally(() => {
+            delete runsBoardPromises[cacheKey];
+        });
+        return runsBoardPromises[cacheKey];
+    }
+
+    function findBestTrackedRun(boardData, playerName, categoryKey) {
+        if (!boardData || !boardData.runs) return null;
+        const target = playerName.toLowerCase();
+        let best = null;
+        for (const run of Object.values(boardData.runs)) {
+            if (!run || !run.playerName) continue;
+            if (String(run.playerName).toLowerCase() !== target) continue;
+            if (run.category !== categoryKey) continue;
+            if (typeof run.timeT !== "number") continue;
+            if (!best || run.timeT < best.timeT) best = run;
+        }
+        return best;
     }
 
     // Look up one category key as of the latest runs-derived date
@@ -2652,6 +4087,7 @@ window.SpeedInfo.make = function () {
       });
 
     window.getRecordSRC = async function (level) {
+        const queryId = srcQueryId;
 
         if(window.daily_challenge){
             EmptyAll();
@@ -2708,8 +4144,6 @@ window.SpeedInfo.make = function () {
         let size = window.timeKeeper.getCurrentSetting("size");
         let mode = window.CurrentModeNum;
 
-        const highscore_modes = [WALL, PORTAL, KEY, SOKO, POISON, MINESWEEPER, STATUE, SHIELD, HOTDOG, GATE, CHEESE, BRIDGE];
-
         // > 6 = beyond Tally (MoreMenu / custom counts)
         if (size > 2 || count > 6) {
             EmptyAll();
@@ -2719,8 +4153,19 @@ window.SpeedInfo.make = function () {
             EmptyAll();
             return;
         }
-        if (!highscore_modes.includes(mode) && level == "H") {
-            HandleHighscore("Empty")
+        if (!shouldShowCategory(level, size, mode)) {
+            if (queryId !== srcQueryId) return;
+            if (level === "H") HandleHighscore("Empty");
+            else if (level === "100") Handle100("Empty");
+            else if (level === "50") Handle50("Empty");
+            else if (level === "25") Handle25("Empty");
+            else if (level === "All") HandleAll("Empty");
+            return;
+        }
+        // Highscore WR: FSS typical HS modes; Tally CE-HS modes on Tally (not Peaceful)
+        if (level === "H" && !canShowSrcHighscore(mode, count)) {
+            if (queryId !== srcQueryId) return;
+            HandleHighscore("Empty");
             return;
         }
 
@@ -2752,9 +4197,12 @@ window.SpeedInfo.make = function () {
             if (window.NepDebug) {
                 console.error("Failed to get runs-derived record:", error);
             }
+            if (queryId !== srcQueryId) return;
             EmptyAll();
             return;
         }
+
+        if (queryId !== srcQueryId) return;
 
         if (window.NepDebug) {
             console.log(`Record data for key ${cacheKey}:`, recordData);
@@ -2764,16 +4212,15 @@ window.SpeedInfo.make = function () {
             if (window.NepDebug) {
                 console.log(`No successful runs found for key: ${cacheKey}`);
             }
-            if (level === "H") {
-                HandleHighscore("Empty");
-            } else {
-                switch (level) {
-                    case "25": Handle25("Empty"); break;
-                    case "50": Handle50("Empty"); break;
-                    case "100": Handle100("Empty"); break;
-                    case "All": HandleAll("Empty"); break;
-                    default: break;
-                }
+            // Visible boards with no WR yet should show "None" (N/A boards already returned earlier)
+            const empty = { data: { runs: [] } };
+            switch (level) {
+                case "25": Handle25(empty); break;
+                case "50": Handle50(empty); break;
+                case "100": Handle100(empty); break;
+                case "All": HandleAll(empty); break;
+                case "H": HandleHighscore(empty); break;
+                default: break;
             }
             return;
         }
@@ -2785,16 +4232,14 @@ window.SpeedInfo.make = function () {
             if (window.NepDebug) {
                 console.log(`Invalid run data structure for key: ${cacheKey}`, bestRun);
             }
-            if (level === "H") {
-                HandleHighscore("Empty");
-            } else {
-                switch (level) {
-                    case "25": Handle25("Empty"); break;
-                    case "50": Handle50("Empty"); break;
-                    case "100": Handle100("Empty"); break;
-                    case "All": HandleAll("Empty"); break;
-                    default: break;
-                }
+            const empty = { data: { runs: [] } };
+            switch (level) {
+                case "25": Handle25(empty); break;
+                case "50": Handle50(empty); break;
+                case "100": Handle100(empty); break;
+                case "All": HandleAll(empty); break;
+                case "H": HandleHighscore(empty); break;
+                default: break;
             }
             return;
         }
@@ -2805,10 +4250,13 @@ window.SpeedInfo.make = function () {
                     run: {
                         times: { primary: bestRun.times.primary },
                         weblink: bestRun.weblink
-                    }
+                    },
+                    playerName: playerNameFromExpandedRun(bestRun)
                 }]
             }
         };
+
+        if (queryId !== srcQueryId) return;
 
         switch (level) {
             case "H": HandleHighscore(runData); break;
@@ -2827,6 +4275,13 @@ window.SpeedInfo.make = function () {
 
     //window.getRecordSRC("H");
 
+    function EmptyTracking() {
+        for (const id of ["25track", "50track", "100track", "Alltrack", "Htrack"]) {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = "";
+        }
+    }
+
     function EmptyAll() {
         emp = "Empty"
         Handle25(emp);
@@ -2834,12 +4289,300 @@ window.SpeedInfo.make = function () {
         Handle100(emp);
         HandleAll(emp);
         HandleHighscore(emp);
+        EmptyTracking();
+        updateSrcAndTrackingVisibility();
     }
 
+    function isBlenderMode() {
+        if (window.CurrentModeNum === 22) return true;
+        try {
+            if (window.timeKeeper && typeof window.timeKeeper.getCurrentMode === "function") {
+                return window.timeKeeper.getCurrentMode() === "blender";
+            }
+        } catch (e) { /* ignore */ }
+        return false;
+    }
+
+    function updateSrcAndTrackingVisibility() {
+        const srcSection = document.getElementById("src-section");
+        const trackSection = document.getElementById("tracking-section");
+        const label = document.getElementById("tracking-label");
+        const hideSrc = isBlenderMode() || !!window.daily_challenge;
+
+        if (srcSection) {
+            srcSection.style.display = hideSrc ? "none" : "block";
+        }
+        if (!trackSection) return;
+
+        if (hideSrc) {
+            trackSection.style.display = "none";
+            EmptyTracking();
+            return;
+        }
+
+        const name = getTrackedPlayerName();
+        if (name) {
+            trackSection.style.display = "block";
+            if (label) label.textContent = `Tracking: ${name}`;
+        } else {
+            trackSection.style.display = "none";
+            EmptyTracking();
+        }
+    }
+
+    function updateTrackingSectionVisibility() {
+        updateSrcAndTrackingVisibility();
+    }
+
+    window.refreshTrackedPlayerUi = function () {
+        updateTrackingSectionVisibility();
+    };
+
+    window.buildSpeedInfoTrackingControls = function () {
+        const btnColor = window.button_color || "#1155CC";
+        const section = document.createElement("div");
+        section.className = "speedinfo-tracking-controls";
+        section.style.cssText =
+            "margin:12px 0 0;padding:12px 0 0;border-top:1px solid rgba(255,255,255,0.22);";
+        section.innerHTML = `
+        <div style="font-weight:bold;color:white;font-family:Roboto,Arial,sans-serif;text-align:center;margin-bottom:8px;">SRC / Tracking</div>
+        <div style="display:flex;gap:10px;align-items:flex-start;justify-content:center;flex-wrap:wrap;text-align:left;">
+          <div style="display:flex;align-items:center;gap:6px;padding-top:4px;">
+            <input class="form-check-input" type="checkbox" role="switch" id="ShowWrHolders" style="width:1.3em;height:1.3em;margin:0;">
+            <label class="form-check-label" for="ShowWrHolders" style="margin:0;white-space:nowrap;color:white;font-family:Roboto,Arial,sans-serif;">Show WR holders</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <label for="TrackedPlayerInput" class="form-check-label" style="margin:0;white-space:nowrap;color:white;font-family:Roboto,Arial,sans-serif;">Track player</label>
+            <input type="text" class="form-control" id="TrackedPlayerInput" list="tracked-player-suggestions" placeholder="SRC username" autocomplete="off" style="width:140px;display:inline-block;background-color:${btnColor};color:white;font-family:Roboto,Arial,sans-serif;border:1px solid rgba(255,255,255,0.25);border-radius:4px;outline:none;text-align:left;caret-color:white;padding:2px 6px;">
+            <datalist id="tracked-player-suggestions"></datalist>
+            <button class="btn" type="button" style="margin:0;color:white;background-color:${btnColor};font-family:Roboto,Arial,sans-serif;padding:2px 10px;" id="TrackedPlayerSet">Set</button>
+            <button class="btn" type="button" style="margin:0;color:white;background-color:${btnColor};font-family:Roboto,Arial,sans-serif;padding:2px 10px;" id="TrackedPlayerClear">Clear</button>
+          </div>
+        </div>`;
+        return section;
+    };
+
+    window.wireSpeedInfoTrackingControls = function (root) {
+        if (!root || !window.pudding_settings) return;
+
+        const wrholders_checkbox = root.querySelector("#ShowWrHolders");
+        const tracked_input = root.querySelector("#TrackedPlayerInput");
+        const trackedSetBtn = root.querySelector("#TrackedPlayerSet");
+        const trackedClearBtn = root.querySelector("#TrackedPlayerClear");
+        if (!wrholders_checkbox || !tracked_input || !trackedSetBtn || !trackedClearBtn) return;
+
+        function syncSpeedInfoExclusiveUi() {
+            const tracking = !!(window.pudding_settings.TrackedPlayerName || "").trim();
+            if (tracking) {
+                wrholders_checkbox.checked = false;
+                wrholders_checkbox.disabled = true;
+                wrholders_checkbox.title = "Clear tracked player to show WR holders";
+            } else {
+                wrholders_checkbox.disabled = false;
+                wrholders_checkbox.title = "";
+                wrholders_checkbox.checked = !!window.pudding_settings.ShowWrHolders;
+            }
+            tracked_input.value = window.pudding_settings.TrackedPlayerName || "";
+        }
+
+        function refreshSrcAfterSpeedInfoChange() {
+            if (typeof window.refreshTrackedPlayerUi === "function") {
+                window.refreshTrackedPlayerUi();
+            }
+            if (typeof window.getAllSrc === "function") {
+                window.getAllSrc().catch(function (e) {
+                    console.error("getAllSrc error:", e);
+                });
+            }
+        }
+
+        syncSpeedInfoExclusiveUi();
+        if (typeof window.fillTrackedPlayerSuggestions === "function") {
+            window.fillTrackedPlayerSuggestions();
+        }
+
+        tracked_input.addEventListener("keydown", function (evt) {
+            evt.stopPropagation();
+            if (evt.key === "Enter") {
+                evt.preventDefault();
+                trackedSetBtn.click();
+            }
+        });
+        tracked_input.addEventListener("keyup", function (evt) {
+            evt.stopPropagation();
+        });
+
+        wrholders_checkbox.addEventListener("change", function () {
+            if (wrholders_checkbox.disabled) return;
+            if (wrholders_checkbox.checked) {
+                window.pudding_settings.TrackedPlayerName = "";
+                tracked_input.value = "";
+            }
+            window.pudding_settings.ShowWrHolders = !!wrholders_checkbox.checked;
+            if (typeof window.saveSettings === "function") window.saveSettings();
+            syncSpeedInfoExclusiveUi();
+            refreshSrcAfterSpeedInfoChange();
+        });
+
+        trackedSetBtn.addEventListener("click", function () {
+            const name = (tracked_input.value || "").trim();
+            window.pudding_settings.TrackedPlayerName = name;
+            if (name) {
+                window.pudding_settings.ShowWrHolders = false;
+            }
+            if (typeof window.saveSettings === "function") window.saveSettings();
+            syncSpeedInfoExclusiveUi();
+            refreshSrcAfterSpeedInfoChange();
+        });
+
+        trackedClearBtn.addEventListener("click", function () {
+            tracked_input.value = "";
+            window.pudding_settings.TrackedPlayerName = "";
+            if (typeof window.saveSettings === "function") window.saveSettings();
+            syncSpeedInfoExclusiveUi();
+            refreshSrcAfterSpeedInfoChange();
+        });
+    };
+
+    window.fillTrackedPlayerSuggestions = function () {
+        const list = document.getElementById("tracked-player-suggestions");
+        if (!list) return;
+        list.innerHTML = "";
+        if (!timelinesData || !timelinesData.boards || !runsDatesMeta) return;
+        const date = runsDatesMeta.availableDates[runsDatesMeta.availableDates.length - 1];
+        const names = new Set();
+        for (const timeline of Object.values(timelinesData.boards)) {
+            const top = wrAsOf(timeline, date);
+            for (const r of top) {
+                if (r && r.n) names.add(r.n);
+            }
+        }
+        for (const name of [...names].sort((a, b) => a.localeCompare(b))) {
+            const opt = document.createElement("option");
+            opt.value = name;
+            list.appendChild(opt);
+        }
+    };
+
+    window.getTrackedRecord = async function (level) {
+        const queryId = srcQueryId;
+        const trackIds = {
+            "25": "25track",
+            "50": "50track",
+            "100": "100track",
+            "All": "Alltrack",
+            "H": "Htrack",
+        };
+        const elId = trackIds[level];
+        const el = elId ? document.getElementById(elId) : null;
+        const labels = {
+            "25": "25 Apples",
+            "50": "50 Apples",
+            "100": "100 Apples",
+            "All": "All Apples",
+            "H": "Highscore",
+        };
+
+        if (!el) return;
+
+        const playerName = getTrackedPlayerName();
+        if (!playerName || !window.pudding_settings.SpeedInfo || window.daily_challenge) {
+            el.innerHTML = "";
+            return;
+        }
+
+        let count = window.timeKeeper.getCurrentSetting("count");
+        let speed = window.timeKeeper.getCurrentSetting("speed");
+        let size = window.timeKeeper.getCurrentSetting("size");
+        let mode = window.CurrentModeNum;
+
+        const WALL = 1, PORTAL = 2, CHEESE = 3, KEY = 8, SOKO = 9, POISON = 10;
+        const MINESWEEPER = 12, STATUE = 13, SHIELD = 15, HOTDOG = 17, GATE = 19, BRIDGE = 20, BLENDER = 22;
+        if (size > 2 || count > 6 || mode == BLENDER) {
+            el.innerHTML = "";
+            return;
+        }
+        if (!shouldShowCategory(level, size, mode)) {
+            el.innerHTML = "";
+            return;
+        }
+        // Tracking Highscore: same FSS rules as SRC WR (not Peaceful)
+        if (level === "H" && !canShowSrcHighscore(mode, count)) {
+            el.innerHTML = "";
+            return;
+        }
+
+        const modeName = window.modeToTxt[mode].name;
+        const countName = window.countToTxt[count].name;
+        const speedName = window.speedToTxt[speed].name;
+        const sizeName = window.sizeToTxt[size].name;
+        const categoryName = level === "H" ? "High Score" : level + " Apples";
+        const categoryKey = `${countName}|${speedName}|${sizeName}|${modeName}|${categoryName}`;
+
+        try {
+            const board = await loadRunsBoard(modeName, level);
+            if (queryId !== srcQueryId) return;
+            const best = findBestTrackedRun(board, playerName, categoryKey);
+            if (!best) {
+                el.innerHTML = `${labels[level]}: None`;
+                return;
+            }
+            if (level === "H") {
+                const primary = best.time || ("PT" + best.timeT + "S");
+                const highscore = parseInt(String(primary).split(".")[1]).toString();
+                const text = (isNaN(parseInt(highscore, 10)) ? String(Math.round(best.timeT * 1000)) : highscore) + " Apples";
+                el.innerHTML = formatTrackRow(labels[level], text, best.weblink);
+            } else {
+                const text = best.time ? convertTime(best.time) : formatTimeTSeconds(best.timeT);
+                el.innerHTML = formatTrackRow(labels[level], text, best.weblink);
+            }
+        } catch (error) {
+            if (queryId !== srcQueryId) return;
+            if (window.NepDebug) {
+                console.error("Tracked run lookup failed:", error);
+            }
+            el.innerHTML = `${labels[level]}: None`;
+        }
+    };
+
     window.getAllSrc = async function () {
+        const queryId = ++srcQueryId;
+        if (isBlenderMode() || window.daily_challenge) {
+            EmptyAll();
+            return;
+        }
+        updateSrcAndTrackingVisibility();
+        // Drop previous mode's WR/tracking immediately so it can't linger during fetch
+        Handle25("Empty");
+        Handle50("Empty");
+        Handle100("Empty");
+        HandleAll("Empty");
+        HandleHighscore("Empty");
+        EmptyTracking();
+
         const levels = ["25", "50", "100", "All", "H"];
         for (const element of levels) {
+            if (queryId !== srcQueryId) return;
             await getRecordSRC(element);
+        }
+        if (queryId !== srcQueryId) return;
+        if (getTrackedPlayerName()) {
+            for (const element of levels) {
+                if (queryId !== srcQueryId) return;
+                await window.getTrackedRecord(element);
+            }
+        } else {
+            EmptyTracking();
+        }
+        if (queryId !== srcQueryId) return;
+        if (typeof window.fillTrackedPlayerSuggestions === "function") {
+            window.fillTrackedPlayerSuggestions();
+        }
+        // Refresh personal PB gold colors now that FSS WRs are ready
+        if (typeof window.SpeedInfoUpdate === "function") {
+            window.SpeedInfoUpdate().catch(function (e) {
+                console.error("SpeedInfoUpdate error:", e);
+            });
         }
     }
 
@@ -2855,10 +4598,14 @@ window.SpeedInfo.make = function () {
         }
 
         world_record = convertTime(response["data"]["runs"][0]["run"]["times"]["primary"]);
+        const playerName = response["data"]["runs"][0].playerName || "";
+        document.getElementById('25src').innerHTML = formatWrRow(
+            "25 Apples",
+            world_record,
+            response["data"]["runs"][0]["run"].weblink,
+            playerName
+        );
 
-        document.getElementById('25src').innerHTML = `25 Apples: <a target="_blank" style="text-decoration: none;color:#ADD8E6 !important;" href="` + response["data"]["runs"][0]["run"].weblink + `">` + world_record + `</a>`
-
-        //document.getElementById('Hsrc').href = response["data"]["runs"][0]["run"].weblink
         if (window.NepDebug) {
             //console.log("Found 25 apples " + world_record + " " + response["data"]["runs"][0]["run"].weblink)
         }
@@ -2874,8 +4621,13 @@ window.SpeedInfo.make = function () {
             return;
         }
         world_record = convertTime(response["data"]["runs"][0]["run"]["times"]["primary"]);
-
-        document.getElementById('50src').innerHTML = `50 Apples: <a target="_blank" style="text-decoration: none;color:#ADD8E6 !important;" href="` + response["data"]["runs"][0]["run"].weblink + `">` + world_record + `</a>`
+        const playerName = response["data"]["runs"][0].playerName || "";
+        document.getElementById('50src').innerHTML = formatWrRow(
+            "50 Apples",
+            world_record,
+            response["data"]["runs"][0]["run"].weblink,
+            playerName
+        );
     }
     function Handle100(response) {
         if (response == "Empty") {
@@ -2888,8 +4640,13 @@ window.SpeedInfo.make = function () {
             return;
         }
         world_record = convertTime(response["data"]["runs"][0]["run"]["times"]["primary"]);
-
-        document.getElementById('100src').innerHTML = `100 Apples: <a target="_blank" style="text-decoration: none;color:#ADD8E6 !important;" href="` + response["data"]["runs"][0]["run"].weblink + `">` + world_record + `</a>`
+        const playerName = response["data"]["runs"][0].playerName || "";
+        document.getElementById('100src').innerHTML = formatWrRow(
+            "100 Apples",
+            world_record,
+            response["data"]["runs"][0]["run"].weblink,
+            playerName
+        );
     }
     function HandleAll(response) {
         if (response == "Empty") {
@@ -2902,8 +4659,13 @@ window.SpeedInfo.make = function () {
             return;
         }
         world_record = convertTime(response["data"]["runs"][0]["run"]["times"]["primary"]);
-
-        document.getElementById('Allsrc').innerHTML = `All Apples: <a target="_blank" style="text-decoration: none;color:#ADD8E6 !important;" href="` + response["data"]["runs"][0]["run"].weblink + `">` + world_record + `</a>`
+        const playerName = response["data"]["runs"][0].playerName || "";
+        document.getElementById('Allsrc').innerHTML = formatWrRow(
+            "All Apples",
+            world_record,
+            response["data"]["runs"][0]["run"].weblink,
+            playerName
+        );
     }
 
     function HandleHighscore(response) {
@@ -2920,9 +4682,14 @@ window.SpeedInfo.make = function () {
 
         highscore = parseInt(response["data"]["runs"][0]["run"]["times"]["primary"].toString().split('.')[1]).toString();
         world_record = highscore + " Apples";
+        const playerName = response["data"]["runs"][0].playerName || "";
 
-        document.getElementById('Hsrc').innerHTML = `Highscore: <a target="_blank" style="text-decoration: none;color:#ADD8E6 !important;" href="` + response["data"]["runs"][0]["run"].weblink + `">` + world_record + `</a>`
-        //document.getElementById('Hsrc').href = response["data"]["runs"][0]["run"].weblink
+        document.getElementById('Hsrc').innerHTML = formatWrRow(
+            "Highscore",
+            world_record,
+            response["data"]["runs"][0]["run"].weblink,
+            playerName
+        );
         if (window.NepDebug) {
             //console.log("Found highscore " + highscore + " " + response["data"]["runs"][0]["run"].weblink)
         }
@@ -2970,7 +4737,11 @@ window.SpeedInfo.make = function () {
     }
 
     // Prefetch runs-derived timelines on startup
-    getLatestCacheData().catch(error => {
+    getLatestCacheData().then(() => {
+        if (typeof window.fillTrackedPlayerSuggestions === "function") {
+            window.fillTrackedPlayerSuggestions();
+        }
+    }).catch(error => {
         if (window.NepDebug) {
             console.error("Failed to initialize runs-derived data:", error);
         }
@@ -2980,7 +4751,7 @@ window.SpeedInfo.make = function () {
 
     window.SpeedInfoShow = function () {
         const speedinfoBox = document.getElementById('speedinfo-popup-pudding');
-        speedinfoBox.style.display = 'block';
+        speedinfoBox.style.display = 'flex';
         speedinfoBox.style.visibility = 'visible';
         window.pudding_settings.SpeedInfo = true;
 
@@ -2989,10 +4760,11 @@ window.SpeedInfo.make = function () {
 
     window.SpeedInfoHide = function () {
         const speedinfoBox = document.getElementById('speedinfo-popup-pudding');
-        speedinfoBox.style.display = 'block';
+        speedinfoBox.style.display = 'flex';
         speedinfoBox.style.visibility = 'hidden';
         window.pudding_settings.SpeedInfo = false;
-        document.getElementById('AlwaysOnTimeKeeper').checked = false;
+        const speedInfoToggle = document.getElementById("AlwaysOnTimeKeeper");
+        if (speedInfoToggle) speedInfoToggle.checked = false;
     }
 
     window.SpeedInfoSetup = function () {
@@ -3008,35 +4780,81 @@ window.SpeedInfo.make = function () {
         speedinfoBox.style = window.puddingSidebarStyle;
         speedinfoBox.id = 'speedinfo-popup-pudding';
         speedinfoBox.style.visibility = 'hidden';
+        speedinfoBox.style.display = 'flex';
+        speedinfoBox.style.flexDirection = 'column';
+        speedinfoBox.style.boxSizing = 'border-box';
         window.speedinfoInput = speedinfoBox;
+        const siSection =
+            "margin:0 0 6px;padding:0 0 6px;border-bottom:1px solid rgba(255,255,255,0.22);";
+        const siLabel =
+            "margin:3px;color:white;font-family:Roboto,Arial,sans-serif;";
+        const siTitle =
+            "font-weight:bold;color:white;font-family:Roboto,Arial,sans-serif;";
         speedinfoBox.innerHTML = `
 
-        <span style="text-decoration: underline;color:white;font-family:Roboto,Arial,sans-serif;display:flex; justify-content: center; align-items: center; text-align: center;">Speed Info</span>
-        <label id="mode-selected" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="mode-selected2" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="25" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="50" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="100" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="ALL" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="H" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="att" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <span style="display:flex; justify-content: center; align-items: center; text-align: center;">
-        <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;justify-content: center; align-items: center; text-align: center;" id="time-keeper" jsname="time-keeper">Show Details</button>
-        </span>
-        <br>
+        <div id="si-main" style="flex:1;min-height:0;overflow:hidden;">
+        <div id="si-personal" style="${siSection}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin:0 3px;">
+        <span style="${siTitle}">Speed Info</span>
+        <button class="btn" style="margin:0;padding:2px 8px;font-size:12px;line-height:1.2;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="time-keeper" jsname="time-keeper">Details</button>
+        </div>
+        <label id="mode-selected" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="mode-selected2" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="25" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="50" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="100" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="ALL" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="H" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="att" class="form-check-label" style="${siLabel}"></label><br>
+        </div>
 
-        <span style="text-decoration: underline;color:white;font-family:Roboto,Arial,sans-serif;display:flex; justify-content: center; align-items: center; text-align: center;">SRC World Records</span>
-        <label id="25src" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="50src" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="100src" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="Allsrc" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <label id="Hsrc" class="form-check-label" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;"></label><br>
-        <br>
+        <div id="src-section" style="${siSection}">
+        <span style="${siTitle}display:flex;justify-content:center;align-items:center;text-align:center;">SRC World Records</span>
+        <label id="25src" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="50src" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="100src" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="Allsrc" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="Hsrc" class="form-check-label" style="${siLabel}"></label><br>
+        </div>
+
+        <div id="tracking-section" style="display:none;${siSection}">
+        <span id="tracking-label" style="${siTitle}display:flex;justify-content:center;align-items:center;text-align:center;">Tracking</span>
+        <label id="25track" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="50track" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="100track" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="Alltrack" class="form-check-label" style="${siLabel}"></label><br>
+        <label id="Htrack" class="form-check-label" style="${siLabel}"></label><br>
+        </div>
+        </div>
+
+        <div id="speedrun-controls-section" style="display:none;flex-shrink:0;margin-top:auto;padding:6px 3px 0;border-top:1px solid rgba(255,255,255,0.22);">
+        <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" data-speedrun-topbar>
+        <label class="form-check-label" data-speedrun-topbar-label style="${siLabel}">Top Bar Icons</label>
+        </div>
+        <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="ResetKeybind">Reset Key: Shift</button>
+        </div>
+
+        <div id="input-display-section" style="display:none;flex-shrink:0;margin-top:auto;margin-bottom:0;width:100%;min-height:104px;box-sizing:border-box;padding:6px 0 0;border-top:1px solid rgba(255,255,255,0.22);justify-content:center;align-items:flex-end;"></div>
+
   <button class="btn" style="display:none;margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="speedinfo-close" jsname="speedinfo-close">Close</button>
 
   `;
 
   document.getElementsByClassName('sEOCsb')[0].appendChild(speedinfoBox);
+        updateTrackingSectionVisibility();
+
+        if (window.SpeedrunMod) {
+            const speedrunControls = document.getElementById("speedrun-controls-section");
+            if (speedrunControls) speedrunControls.style.display = "block";
+            const speedrunTopbar = speedinfoBox.querySelector("[data-speedrun-topbar]");
+            if (speedrunTopbar) speedrunTopbar.id = "TopBarIcons";
+            const speedrunTopbarLabel = speedinfoBox.querySelector("[data-speedrun-topbar-label]");
+            if (speedrunTopbarLabel) speedrunTopbarLabel.setAttribute("for", "TopBarIcons");
+            if (typeof window.setup_topbar_checkbox === "function") {
+                window.setup_topbar_checkbox();
+            }
+        }
 
         const speedinfoCloseElements = document.getElementById('speedinfo-close');
         speedinfoCloseElements.addEventListener('click', window.SpeedInfoHide);
@@ -3082,128 +4900,216 @@ window.SpeedInfo.make = function () {
         window.SpeedInfoUpdate().catch(e=>console.error('SpeedInfoUpdate error:',e));
     });
 
-    window.SpeedInfoUpdate = async function () {
-        // Mainly for TimeKeeper, runs when "play" is clicked
-        let count = window.timeKeeper.getCurrentSetting("count");
-        let speed = window.timeKeeper.getCurrentSetting("speed");
-        let size = window.timeKeeper.getCurrentSetting("size");
-        let modeStr = window.timeKeeper.getCurrentMode("size");
-        storage = JSON.parse(localStorage["snake_timeKeeper"]);
+    window.SpeedInfoUpdate = function () {
+        // Coalesce death/reset/addAttempt bursts into one paint
+        if (window._speedInfoUpdateTimer) {
+            return window._speedInfoUpdatePromise || Promise.resolve();
+        }
+        window._speedInfoUpdatePromise = new Promise(function (resolve, reject) {
+            window._speedInfoUpdateTimer = setTimeout(function () {
+                window._speedInfoUpdateTimer = null;
+                runSpeedInfoUpdate()
+                    .then(resolve, reject)
+                    .finally(function () {
+                        window._speedInfoUpdatePromise = null;
+                    });
+            }, 0);
+        });
+        return window._speedInfoUpdatePromise;
+    };
 
-        //change modeStr to gamemode
-        var counter = 0
-        var gamemode = "";
-        for (t of modeStr) {
-            if (t == 1) {
+    async function runSpeedInfoUpdate() {
+        const gen = (window._speedInfoUpdateGen = (window._speedInfoUpdateGen || 0) + 1);
+        if (!window._speedInfoGoldCache) window._speedInfoGoldCache = {};
 
-                if(window.isBridge){
-                    switch (counter) {
-                        case 0: gamemode += "Wall, "; break;
-                        case 1: gamemode += "Portal, "; break;
-                        case 2: gamemode += "Cheese, "; break;
-                        case 3: gamemode += "Borderless, "; break;
-                        case 4: gamemode += "Twin, "; break;
-                        case 5: gamemode += "Winged, "; break;
-                        case 6: gamemode += "YinYang, "; break;
-                        case 7: gamemode += "Key, "; break;
-                        case 8: gamemode += "Sokoban, "; break;
-                        case 9: gamemode += "Poison, "; break;
-                        case 10: gamemode += "Dimension, "; break;
-                        case 11: gamemode += "Minesweeper, "; break;
-                        case 12: gamemode += "Statue, "; break;
-                        case 13: gamemode += "Light, "; break;
-                        case 14: gamemode += "Shield, "; break;
-                        case 15: gamemode += "Arrow, "; break;
-                        case 16: gamemode += "Hotdog, "; break;
-                        case 17: gamemode += "Magnet, "; break;
-                        case 18: gamemode += "Gate, "; break;
-                        case 19: gamemode += "Bridge, "; break;
-                        case 20: gamemode += "Peaceful, "; break;
-                        default: gamemode += "Unknown, "; break;
-                    }
-                }else{
-                    switch (counter) {
-                        case 0: gamemode += "Wall, "; break;
-                        case 1: gamemode += "Portal, "; break;
-                        case 2: gamemode += "Cheese, "; break;
-                        case 3: gamemode += "Borderless, "; break;
-                        case 4: gamemode += "Twin, "; break;
-                        case 5: gamemode += "Winged, "; break;
-                        case 6: gamemode += "YinYang, "; break;
-                        case 7: gamemode += "Key, "; break;
-                        case 8: gamemode += "Sokoban, "; break;
-                        case 9: gamemode += "Skull, "; break;
-                        case 10: gamemode += "Dimension, "; break;
-                        case 11: gamemode += "Minesweeper, "; break;
-                        case 12: gamemode += "Statue, "; break;
-                        case 13: gamemode += "Light, "; break;
-                        case 14: gamemode += "Shield, "; break;
-                        case 15: gamemode += "Arrow, "; break;
-                        case 16: gamemode += "Hotdog, "; break;
-                        case 17: gamemode += "Magnet, "; break;
-                        case 18: gamemode += "Gate, "; break;
-                        case 19: gamemode += "Skip, "; break;
-                        case 20: gamemode += "Peaceful, "; break;
-                        default: gamemode += "Unknown, "; break;
-                    }
-                }
+        let count;
+        let speed;
+        let size;
+        let modeKey;
+        let mode = window.CurrentModeNum;
+        const midRun =
+            window.timeKeeper &&
+            (window.timeKeeper.runStarted || window.timeKeeper.playing) &&
+            typeof window.timeKeeper.mode === "string" &&
+            typeof window.timeKeeper.count === "number";
+
+        if (midRun) {
+            modeKey = window.timeKeeper.mode;
+            count = window.timeKeeper.count;
+            speed = window.timeKeeper.speed;
+            size = window.timeKeeper.size;
+        } else {
+            if (window.ModeRegistry && typeof window.ModeRegistry.has === "function") {
+                try {
+                    window.isBridge = window.ModeRegistry.has("bridge");
+                } catch (e) { /* trophy DOM may be missing early */ }
             }
-            counter++;
+            count = window.timeKeeper.getCurrentSetting("count");
+            speed = window.timeKeeper.getCurrentSetting("speed");
+            size = window.timeKeeper.getCurrentSetting("size");
+            modeKey = window.timeKeeper.getCurrentMode();
         }
-        if (gamemode == "") {
-            gamemode = "Classic, ";
+
+        let storage = {};
+        try {
+            storage =
+                typeof window.timeKeeper.getStorage === "function"
+                    ? window.timeKeeper.getStorage()
+                    : JSON.parse(localStorage["snake_timeKeeper_remix"] || "{}");
+        } catch (e) {
+            storage = {};
         }
-        //gamemode = gamemode.substring(0, gamemode.lastIndexOf(","));
+
+        const gamemode = window.ModeRegistry
+            ? window.ModeRegistry.labelModeKey(modeKey)
+            : modeKey;
+
         mode_label = document.getElementById("mode-selected");
         mode_label2 = document.getElementById("mode-selected2");
 
-        mode_label.innerHTML = gamemode + window.HandleCount(count).substring(0, window.HandleCount(count).lastIndexOf(","));
+        if (window.daily_challenge) {
+            mode_label.innerHTML = "Daily Challenge";
+            mode_label2.innerHTML = "(TimeKeeper disabled)";
+            for (const score of ["att", "25", "50", "100", "ALL", "H"]) {
+                const el = document.getElementById(score);
+                if (el) el.innerHTML = "";
+            }
+            updateSrcAndTrackingVisibility();
+            return;
+        }
+
+        updateSrcAndTrackingVisibility();
+
+        mode_label.innerHTML =
+            gamemode +
+            ", " +
+            window.HandleCount(count).substring(0, window.HandleCount(count).lastIndexOf(","));
         mode_label2.innerHTML = window.HandleSpeed(speed) + window.HandleSize(size);
 
-        //dialog = document.getElementById("speedinfo-popup-pudding");
+        const fmt = window.timeKeeper.formatTimeSrcStyle
+            ? window.timeKeeper.formatTimeSrcStyle.bind(window.timeKeeper)
+            : function (ms) {
+                  return String(ms);
+              };
 
-        for (let score of ["att", "25", "50", "100", "ALL", "H"]) {
-            let name = score + "-" + modeStr + "-" + count + "-" + speed + "-" + size;
-            bold = document.getElementById(score);
-            if(window.daily_challenge) {
-                bold.innerHTML = '';
+        const goldJobs = [];
+
+        for (const score of ["att", "25", "50", "100", "ALL", "H"]) {
+            const name = score + "-" + modeKey + "-" + count + "-" + speed + "-" + size;
+            const bold = document.getElementById(score);
+            if (!bold) continue;
+
+            if (score == "att") {
+                const totalAttempts =
+                    typeof window.timeKeeper.getAttemptTotal === "function"
+                        ? window.timeKeeper.getAttemptTotal(storage[name])
+                        : typeof storage[name] === "number"
+                          ? storage[name]
+                          : 0;
+                bold.innerHTML = "Total Attempts: " + totalAttempts;
                 continue;
             }
 
-            if (typeof (storage[name]) != "undefined") {
-
-                if (score == "att") {
-                    totalAttempts = storage[name];
-                    bold.innerHTML = "Total Attempts: " + totalAttempts;
-                    continue;
-                }
-                else if (score == "H") {
-                    bold.innerHTML = "Highscore: " + storage[name].high;
-                    continue;
-                }
-
-                hours = Math.floor(storage[name].time / 3600000);
-                minutes = String(Math.floor((storage[name].time / 60000)-hours*60)).padStart(2, "0");
-                seconds = String(Math.floor((storage[name].time - minutes * 60000-hours*3600000) / 1000)).padStart(2, "0");
-                mseconds = String(storage[name].time - minutes * 60000 - seconds * 1000-hours*3600000).padStart(3, "0");
-                score_label = "ALL" === score ? "All" : score;
-                if(hours==0){
-                    bold.innerHTML = score_label + " Apples: " + minutes + "m" + seconds + "s" + mseconds + "ms";
-                }else{
-                    bold.innerHTML = score_label + " Apples: " + hours + "h" + minutes + "m" + seconds + "s" + mseconds + "ms";
-                }
-
-            }
-            else {
+            // Match SRC visibility (100/YY50); Highscore always shown locally
+            if (!shouldShowCategory(score === "ALL" ? "All" : score, size, mode)) {
                 bold.innerHTML = "";
+                continue;
+            }
+
+            if (score == "H") {
+                if (typeof storage[name] != "undefined" && storage[name].high != null) {
+                    const highText = String(storage[name].high) + " Apples";
+                    const gKey = goldCacheKey(modeKey, count, speed, size, "H", highText);
+                    const knownGold = window._speedInfoGoldCache[gKey];
+                    bold.innerHTML =
+                        "Highscore: " +
+                        pbValueHtml(highText, "H", mode, count, speed, size, !!knownGold);
+                    if (canShowSrcHighscore(mode, count)) {
+                        goldJobs.push({
+                            score: "H",
+                            elId: "H",
+                            labelPrefix: "Highscore: ",
+                            displayText: highText,
+                            pb: storage[name],
+                            gKey: gKey,
+                        });
+                    }
+                } else {
+                    bold.innerHTML = "Highscore: None";
+                }
+                continue;
+            }
+
+            const label = score === "ALL" ? "All Apples" : score + " Apples";
+            if (typeof storage[name] != "undefined" && storage[name].time != null) {
+                const displayText = fmt(storage[name].time);
+                const gKey = goldCacheKey(modeKey, count, speed, size, score, displayText);
+                const knownGold = window._speedInfoGoldCache[gKey];
+                bold.innerHTML =
+                    label +
+                    ": " +
+                    pbValueHtml(displayText, score, mode, count, speed, size, !!knownGold);
+                goldJobs.push({
+                    score: score,
+                    elId: score,
+                    labelPrefix: label + ": ",
+                    displayText: displayText,
+                    pb: storage[name],
+                    gKey: gKey,
+                });
+            } else {
+                bold.innerHTML = label + ": None";
             }
         }
 
-        if(window.daily_challenge) {
-            mode_label.innerHTML = 'Daily Challenge'
-            mode_label2.innerHTML = '(TimeKeeper disabled)'
-        }
+        if (goldJobs.length === 0) return;
 
+        const goldMode = mode;
+        const goldCount = count;
+        const goldSpeed = speed;
+        const goldSize = size;
+        const goldModeKey = modeKey;
+        setTimeout(function () {
+            if (gen !== window._speedInfoUpdateGen) return;
+            Promise.all(
+                goldJobs.map(function (job) {
+                    return shouldGoldPb(
+                        job.score,
+                        goldMode,
+                        goldCount,
+                        goldSpeed,
+                        goldSize,
+                        job.pb,
+                        goldModeKey
+                    ).then(function (gold) {
+                        return { job: job, gold: gold };
+                    });
+                })
+            )
+                .then(function (results) {
+                    if (gen !== window._speedInfoUpdateGen) return;
+                    for (let i = 0; i < results.length; i++) {
+                        const r = results[i];
+                        window._speedInfoGoldCache[r.job.gKey] = !!r.gold;
+                        const el = document.getElementById(r.job.elId);
+                        if (!el) continue;
+                        el.innerHTML =
+                            r.job.labelPrefix +
+                            pbValueHtml(
+                                r.job.displayText,
+                                r.job.score,
+                                goldMode,
+                                goldCount,
+                                goldSpeed,
+                                goldSize,
+                                !!r.gold
+                            );
+                    }
+                })
+                .catch(function (e) {
+                    if (window.NepDebug) console.error("SpeedInfo gold update failed:", e);
+                });
+        }, 0);
     }
 
     window.HandleCount = function (count) {
@@ -3256,22 +5162,21 @@ window.SpeedInfo.alterCode = function (code) {
 
     window.CurrentModeNum = 0;
     mode_regex = new RegExp(/case "trophy"\:/)
-    mode_get_code = `case "trophy":window.CurrentModeNum = `
+    // Set mode first, then refresh personal + SRC after CurrentModeNum is assigned
+    mode_get_code = `case "trophy":queueMicrotask(function(){window.SpeedInfoUpdate().catch(function(e){console.error('SpeedInfoUpdate error:',e);});window.getAllSrc().catch(function(e){console.error('getAllSrc error:',e);});});window.CurrentModeNum = `
     code = code.assertReplace(mode_regex, mode_get_code);
 
-    /*
-    count_regex = new RegExp(/case "count"\:/)
-    count_get_code = `case "count":window.getAllSrc();`
-    code = code.assertReplace(mode_regex, count_get_code);
+    const settings_refresh =
+        'queueMicrotask(function(){window.SpeedInfoUpdate().catch(function(e){console.error("SpeedInfoUpdate error:",e);});window.getAllSrc().catch(function(e){console.error("getAllSrc error:",e);});if(typeof window.apply_topbar_icons==="function")window.apply_topbar_icons();});';
 
-    speed_regex = new RegExp(/case "speed"\:/)
-    speed_get_code = `case "speed":window.getAllSrc();`
-    code = code.assertReplace(speed_regex, speed_get_code);
+    count_regex = new RegExp(/case "count"\:/);
+    code = code.assertReplace(count_regex, 'case "count":' + settings_refresh);
 
-    size_regex = new RegExp(/case "size"\:/)
-    size_get_code = `case "size":window.getAllSrc();`
-    code = code.assertReplace(size_regex, size_get_code);
-    */
+    speed_regex = new RegExp(/case "speed"\:/);
+    code = code.assertReplace(speed_regex, 'case "speed":' + settings_refresh);
+
+    size_regex = new RegExp(/case "size"\:/);
+    code = code.assertReplace(size_regex, 'case "size":' + settings_refresh);
 
     return code;
 }
@@ -3279,133 +5184,137 @@ window.InputDisplay = {};
 
 window.InputDisplay.make = function () {
 
-  let displayPosition = parseInt((window.puddingSidebarStyle.split(';').find(style => style.trim().startsWith('width')) ? window.puddingSidebarStyle.split(';').find(style => style.trim().startsWith('width')).split(':')[1].trim() : null),10);
+  // Bottom reserved strip in Speed Info — same region as the old D-pad.
+  const section =
+    document.getElementById("input-display-section") ||
+    window.speedinfoInput ||
+    document.getElementById("speedinfo-popup-pudding");
 
-  // Code that runs before anything else here, loading variables, etc.
-  // Recommended to use "window." for things
-  const e = document.createElement('div');
-  e.id = 'input-display-container';
-  e.style = `position:absolute;left:${(-553+displayPosition/2)}px;top:530px;z-index:10001;display:block;line-height:normal;`;
-  window.speedinfoInput.appendChild(e);
+  const pad = document.createElement("div");
+  pad.id = "input-display-container";
+  pad.style =
+    "display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;width:100%;z-index:10001;line-height:normal;";
+  section.appendChild(pad);
 
-  const f = document.createElement('div');
-  f.id = 'input-display-container2';
-  f.style = `position:absolute;left:${(-553+displayPosition/2)}px;top:460px;z-index:10001;display:block;line-height:normal;width: 0;height: 0;`;
-  window.speedinfoInput.appendChild(f);
+  const btnBase =
+    "border-radius:8px;font-size:28px;color:white;display:none;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;vertical-align:middle;text-align:center;line-height:40px;width:44px;height:40px;box-sizing:border-box;flex-shrink:0;";
 
-  const InpBox = document.querySelector('#input-display-container');
+  function makeBtn(id, label) {
+    const el = document.createElement("div");
+    el.className = "input-button";
+    el.id = id;
+    el.style.cssText = btnBase;
+    el.textContent = label;
+    return el;
+  }
 
-  const LeftButton = document.createElement('div');
-  LeftButton.style = 'position:absolute;left:460px;top"450px;z-index:10001;width:200px;';
-  LeftButton.innerHTML = '<div class="input-button" id="left-button-id" style="border-radius: 10px;font-size:40px;color:white;display:none;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;vertical-align:middle;padding-bottom:12px;padding-right:10px;padding-left:10px;">←</div>'
-  InpBox.appendChild(LeftButton);
+  const topBtn = makeBtn("top-button-id", "↑");
+  pad.appendChild(topBtn);
 
-  const DownButton = document.createElement('div');
-  DownButton.style = 'position:absolute;left:530px;top"452px;z-index:10001;width:200px;';
-  DownButton.innerHTML = '<div class="input-button" id="down-button-id" style="border-radius: 10px;font-size:40px;color:white;display:none;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;vertical-align:middle;padding-bottom:10px;padding-top:2px;padding-right:21px;padding-left:21px;">↓</div>'
-  InpBox.appendChild(DownButton);
+  const row = document.createElement("div");
+  row.style = "display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;";
+  row.appendChild(makeBtn("left-button-id", "←"));
+  row.appendChild(makeBtn("down-button-id", "↓"));
+  row.appendChild(makeBtn("right-button-id", "→"));
+  pad.appendChild(row);
 
-  const RightButton = document.createElement('div');
-  RightButton.style = 'position:absolute;left:601px;top"550px;z-index:10001;width:200px;';
-  RightButton.innerHTML = '<div class="input-button" id="right-button-id" style="border-radius: 10px;font-size:40px;color:white;display:none;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;vertical-align:middle;padding-bottom:12px;padding-right:10px;padding-left:10px;">→</div>'
-  InpBox.appendChild(RightButton);
-
-  const TopButton = document.createElement('div');
-  TopButton.style = 'position:relative;left:530px;top"152px;z-index:10001;width:200px;';
-  TopButton.innerHTML = '<div class="input-button" id="top-button-id" style="border-radius: 10px;font-size:40px;color:white;display:none;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;vertical-align:middle;padding-bottom:10px;padding-top:2px;padding-right:21px;padding-left:21px;">↑</div>'
-  f.appendChild(TopButton);
+  function syncInputSectionVisibility() {
+    const sec = document.getElementById("input-display-section");
+    if (!sec) return;
+    const on = !!(window.pudding_settings && window.pudding_settings.InputDisplay);
+    // flex so the D-pad can center horizontally and sit on the bottom edge
+    sec.style.display = on ? "flex" : "none";
+  }
 
   let first_time_checker = true;
   window.toggle_input_display = function toggle_input_display() {
-    // this is so that if the input display starts on, it doesnt trigger it to be off, like what normally unchecking the box would do, since I'm using the same function.
-    if(first_time_checker){
-      first_time_checker=false;
+    // First call syncs from saved settings without flipping the flag
+    if (first_time_checker) {
+      first_time_checker = false;
+    } else {
+      window.pudding_settings.InputDisplay = !window.pudding_settings.InputDisplay;
     }
-    else
-    {window.pudding_settings.InputDisplay = !window.pudding_settings.InputDisplay;}
-    //console.log("hmmm");
-    if (window.pudding_settings.InputDisplay) {
-      document.getElementById('left-button-id').style.display = 'inline-block';
-      document.getElementById('down-button-id').style.display = 'inline-block';
-      document.getElementById('right-button-id').style.display = 'inline-block';
-      document.getElementById('top-button-id').style.display = 'inline-block';
 
-      document.getElementById('left-button-id').style.visibility = 'visible';
-      document.getElementById('down-button-id').style.visibility = 'visible';
-      document.getElementById('right-button-id').style.visibility = 'visible';
-      document.getElementById('top-button-id').style.visibility = 'visible';
+    const ids = ["left-button-id", "down-button-id", "right-button-id", "top-button-id"];
+    if (window.pudding_settings.InputDisplay) {
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.style.display = "inline-block";
+        el.style.visibility = "visible";
+      }
+    } else {
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.style.display = "none";
+      }
     }
-    else {
-      document.getElementById('left-button-id').style.display = 'none';
-      document.getElementById('down-button-id').style.display = 'none';
-      document.getElementById('right-button-id').style.display = 'none';
-      document.getElementById('top-button-id').style.display = 'none';
-    }
-  }
+    syncInputSectionVisibility();
+  };
+
   window.LightInputOn = function (direction) {
-    //console.log(incrementColor(window.button_color))
     if (window.button_color == "#FFFFFF" || window.button_color == "white") {
-      document.getElementById(direction).style.backgroundColor = "#999999"
+      document.getElementById(direction).style.backgroundColor = "#999999";
     }
     document.getElementById(direction).style.backgroundColor = incrementColor(window.button_color);
-  }
+  };
 
-  window.LightInputOff= function (direction) {
-
+  window.LightInputOff = function (direction) {
     document.getElementById(direction).style.backgroundColor = window.button_color;
-
-  }
+  };
 
   function incrementColor(hexColor) {
-    return '#' + hexColor.slice(1).replace(/../g, char => {
-      const incrementedValue = parseInt(char, 16) + 32;
-      return incrementedValue > 255 ? 'FF' : incrementedValue.toString(16).padStart(2, '0');
-    });
+    return (
+      "#" +
+      hexColor.slice(1).replace(/../g, (char) => {
+        const incrementedValue = parseInt(char, 16) + 32;
+        return incrementedValue > 255 ? "FF" : incrementedValue.toString(16).padStart(2, "0");
+      })
+    );
   }
-}
+};
 window.InputDisplay.alterCode = function (code) {
 
   // Code to alter snake code here
   document.addEventListener('keydown', (event)=> {
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
 
     if (event.key === 'ArrowRight' || (event.code === 'KeyD')){
 
       window.LightInputOn("right-button-id");
       //console.log('aaaaaas')
     }
-    else if (event.key === 'ArrowLeft'|| (event.code === 'KeyA'))
-    {
+    else if (event.key === 'ArrowLeft' || (event.code === 'KeyA')) {
       window.LightInputOn("left-button-id");
     }
-    else if (event.key === 'ArrowDown'|| (event.code === 'KeyS'))
-    {
+    else if (event.key === 'ArrowDown' || (event.code === 'KeyS')) {
       window.LightInputOn("down-button-id");
     }
-    else if (event.key === 'ArrowUp'|| (event.code === 'KeyW'))
-    {
+    else if (event.key === 'ArrowUp' || (event.code === 'KeyW')) {
       window.LightInputOn("top-button-id");
     }
-
   });
 
   document.addEventListener('keyup', (event)=> {
-    if ((event.key === 'ArrowRight') || (event.code === 'KeyD')){
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
 
+    if (event.key === 'ArrowRight' || (event.code === 'KeyD')){
       window.LightInputOff("right-button-id");
     }
-    else if (event.key === 'ArrowLeft'|| (event.code === 'KeyA'))
-    {
+    else if (event.key === 'ArrowLeft' || (event.code === 'KeyA')) {
       window.LightInputOff("left-button-id");
     }
-    else if (event.key === 'ArrowDown'|| (event.code === 'KeyS'))
-    {
+    else if (event.key === 'ArrowDown' || (event.code === 'KeyS')) {
       window.LightInputOff("down-button-id");
     }
-    else if (event.key === 'ArrowUp'|| (event.code === 'KeyW'))
-    {
+    else if (event.key === 'ArrowUp' || (event.code === 'KeyW')) {
       window.LightInputOff("top-button-id");
     }
   });
+
   return code;
 }
 
@@ -3469,6 +5378,10 @@ window.Timer = {
 
     window._cat = 3
 
+    function refreshSplitPanel() {
+      if (typeof window.SplitPanelRefresh === "function") window.SplitPanelRefresh()
+    }
+
     localStorage._snake_timer_format = localStorage._snake_timer_format ?? 1
     window._format = localStorage._snake_timer_format
 
@@ -3477,13 +5390,29 @@ window.Timer = {
 
     localStorage._snake_pb = localStorage._snake_pb ?? '{}'
     window._pb = JSON.parse(localStorage._snake_pb)
+    window._snakePbDirty = false
+
+    // Persist timer split PBs; mid-run only marks dirty until flush/persist
+    window.flushSnakePb = function () {
+      if (!window._snakePbDirty || !window._pb) return
+      localStorage._snake_pb = JSON.stringify(window._pb)
+      window._snakePbDirty = false
+    }
+    window.persistSnakePb = function () {
+      if (!window._pb) return
+      localStorage._snake_pb = JSON.stringify(window._pb)
+      window._snakePbDirty = false
+    }
+    window.markSnakePbDirty = function () {
+      window._snakePbDirty = true
+    }
 
     // Bridge inserted before Peaceful: old mode index 20 (Peaceful) -> 21
     if (!localStorage._snake_pb_bridge_migrated) {
       if (window._pb[20] && !window._pb[21]) {
         window._pb[21] = window._pb[20];
         delete window._pb[20];
-        localStorage._snake_pb = JSON.stringify(window._pb);
+        window.persistSnakePb();
       }
       localStorage._snake_pb_bridge_migrated = '1';
     }
@@ -3527,167 +5456,221 @@ window.Timer = {
     window.editTimer = function() {
       // console.warn(window.themes)
 
+      function closeEditBox() {
+        const box = document.getElementById('edit-box')
+        const bd = document.getElementById('edit-box-backdrop')
+        if (box) box.remove()
+        if (bd) bd.remove()
+      }
+
       let editBox = document.getElementById('edit-box')
       if(editBox) {
-        editBox.remove()
+        closeEditBox()
       } else {
         const theme = window.themes[getSelected('#theme', 'DqMRee tuJOWd') || getSelected('#theme', 'tuJOWd')]
 
+        const btnColor = window.button_color || '#1155CC'
         editBox = document.createElement('div')
         editBox.id = 'edit-box'
         editBox.style = `
           background-color: ${theme.real_top_bar ?? '#aaaaff'};
           border-radius: 0.5vw;
           position: absolute;
-          height: 93vh;
+          height: auto;
+          max-height: 94vh;
           z-index: 1000000;
-          top: 30px;
+          top: 20px;
           left: 50%;
           backdrop-filter: blur(5px);
           text-align: center;
-          padding: 4px;
+          padding: 6px 14px 10px;
           transform: translate(-50%, 0);
           box-shadow: 0px 0px 8px rgba(0,0,0,0.4);
           border: 1px solid ${theme.topbar_color ?? '#4444dd'};
-          font-size: 2.5vh;
+          font-size: 2vh;
           color: #ffffff;
-          width: 50vw;
+          width: 58vw;
+          max-width: 640px;
           font-family: Roboto,Arial,sans-serif;
-          overflow-y: auto;
+          overflow: hidden;
+          box-sizing: border-box;
         `
+        const sectionTitle = 'margin:4px 0 2px;font-size:2.1vh;font-weight:600;letter-spacing:0.02em;opacity:0.95;'
+        const iconRow = 'display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0.3vh;margin:0 auto 1px;'
+        const iconStyle = 'cursor: pointer; border: 0.45vh ridge #00000000; border-radius: 1vh; width: 3.2vh; height: 3.2vh;'
+        const iconSel = 'cursor: pointer; border: 0.45vh ridge #af4490ff; border-radius: 1vh; width: 3.2vh; height: 3.2vh;'
+        const halfCol = 'flex:1;min-width:0;'
         editBox.innerHTML = `
-        <span id="close-box" style="
-        position: absolute;
-        top: 10px;
-        right: 15px;
-        cursor: pointer;
-        color: #ffffff;
-        font-size: 0.9em;
-      ">&#x2715</span>
-</br>
-<label class="form-check-label" style="font-size: 3.5vh">
+<label class="form-check-label" style="font-size: 2.8vh; display:block; margin-top:2px; margin-bottom:2px;">
         Custom Timer/Splits Settings
-      </label> </br>
-</br>
+      </label>
 
-<div id="edit-mode">
-  <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_00.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_01.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_02.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_03.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_04.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_05.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_06.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_07.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_08.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_09.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_10.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_11.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_12.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_13.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_14.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/trophy_15.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/trophy_16.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v19/trophy_17.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v20/trophy_18.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v21/trophy_19.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v22/trophy_20.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_15.png" />
-</div>
-<br/>
-<div id="edit-count">
-  <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_00.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_01.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_02.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_03.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_04.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_05.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v19/count_06.png" />
-</div>
-<br/>
-<div id="edit-speed">
-  <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_00.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_01.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_02.png" />
-</div>
-<br/>
-<div id="edit-size">
-  <img class="sel" style="cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_00.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_01.png" />
-  <img class="uns" style="cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_02.png" />
-</div>
-<br/>
-
-<div id="edit-cat">
-  <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/d1R1Y648/25.png" />
-  <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/7hmZC6vh/50.png" />
-  <img class="uns" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #00000000; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/qqk7MK5W/100.png" />
-  <img class="sel" style="background-color: #ffffff55; cursor: pointer; border: 0.5vh ridge #af4490ff; border-radius: 1vh; width: 3.5vh; height: 3.5vh;" src="https://i.postimg.cc/52j6Cw2V/all.png" />
-</div>
-
-<br/>
-<div id="edit-times" style="left:0px;">
-  <div>
-      <label class="form-check-label" for="edit-25"> 25</label>
-      <input class="text-input" size="9" name="edit-25" id="edit-25" type="text" style="font-family:Consolas;" />
+<div style="${sectionTitle}">SpeedInfo</div>
+<div style="display:flex;gap:10px;align-items:flex-start;justify-content:center;flex-wrap:wrap;text-align:left;">
+  <div style="display:flex;align-items:center;gap:6px;padding-top:4px;">
+    <input class="form-check-input" type="checkbox" role="switch" id="ShowWrHolders" style="width:1.3em;height:1.3em;margin:0;">
+    <label class="form-check-label" for="ShowWrHolders" style="margin:0;white-space:nowrap;">Show WR holders</label>
   </div>
-  <div>
-      <label class="form-check-label" for="edit-50"> 50</label>
-      <input class="text-input" size="9" name="edit-50" id="edit-50" type="text" style="font-family:Consolas;" />
-  </div>
-  <div>
-      <label class="form-check-label" for="edit-100">100</label>
-      <input class="text-input" size="9" name="edit-100" id="edit-100" type="text" style="font-family:Consolas;" />
-  </div>
-  <div>
-      <label class="form-check-label" for="edit-ALL">ALL</label>
-      <input class="text-input" size="9" name="edit-ALL" id="edit-ALL" type="text" style="font-family:Consolas;" />
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <label for="TrackedPlayerInput" class="form-check-label" style="margin:0;white-space:nowrap;">Track player</label>
+    <input type="text" class="form-control" id="TrackedPlayerInput" list="tracked-player-suggestions" placeholder="SRC username" autocomplete="off" style="width:140px;display:inline-block;background-color:${btnColor};color:white;font-family:Roboto,Arial,sans-serif;border:1px solid rgba(255,255,255,0.25);border-radius:4px;outline:none;text-align:center;caret-color:white;padding:2px 6px;">
+    <datalist id="tracked-player-suggestions"></datalist>
+    <button class="btn" type="button" style="margin:0;color:white;background-color:${btnColor};font-family:Roboto,Arial,sans-serif;padding:2px 10px;" id="TrackedPlayerSet">Set</button>
+    <button class="btn" type="button" style="margin:0;color:white;background-color:${btnColor};font-family:Roboto,Arial,sans-serif;padding:2px 10px;" id="TrackedPlayerClear">Clear</button>
   </div>
 </div>
 
+<div style="${sectionTitle}">Mode</div>
+<div id="edit-mode" style="${iconRow}">
+  <img class="sel" style="${iconSel}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_00.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_01.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_02.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_03.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_04.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_05.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_06.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_07.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_08.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_09.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_10.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_11.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_12.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_13.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_14.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v17/trophy_15.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v18/trophy_16.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v19/trophy_17.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v20/trophy_18.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v21/trophy_19.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v22/trophy_20.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v16/trophy_15.png" />
+</div>
+
+<div style="${sectionTitle}">Count</div>
+<div id="edit-count" style="${iconRow}">
+  <img class="sel" style="${iconSel}" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_00.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_01.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v17/count_02.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_03.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_04.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v18/count_05.png" />
+  <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v19/count_06.png" />
+</div>
+
+<div style="display:flex;gap:12px;justify-content:center;align-items:flex-start;">
+  <div style="${halfCol}">
+    <div style="${sectionTitle}">Speed</div>
+    <div id="edit-speed" style="${iconRow}">
+      <img class="sel" style="${iconSel}" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_00.png" />
+      <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_01.png" />
+      <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v3/speed_02.png" />
+    </div>
+  </div>
+  <div style="${halfCol}">
+    <div style="${sectionTitle}">Size</div>
+    <div id="edit-size" style="${iconRow}">
+      <img class="sel" style="${iconSel}" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_00.png" />
+      <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_01.png" />
+      <img class="uns" style="${iconStyle}" src="https://www.google.com/logos/fnbx/snake_arcade/v4/size_02.png" />
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:12px;justify-content:center;align-items:flex-start;flex-wrap:wrap;">
+  <div style="${halfCol}">
+    <div style="${sectionTitle}">Category</div>
+    <div id="edit-cat" style="${iconRow}">
+      <img class="uns" style="background-color: #ffffff55; ${iconStyle}" src="https://i.postimg.cc/d1R1Y648/25.png" />
+      <img class="uns" style="background-color: #ffffff55; ${iconStyle}" src="https://i.postimg.cc/7hmZC6vh/50.png" />
+      <img class="uns" style="background-color: #ffffff55; ${iconStyle}" src="https://i.postimg.cc/qqk7MK5W/100.png" />
+      <img class="sel" style="background-color: #ffffff55; ${iconSel}" src="https://i.postimg.cc/52j6Cw2V/all.png" />
+    </div>
+  </div>
+  <div style="${halfCol}">
+    <div style="${sectionTitle}">Personal bests</div>
+    <div id="edit-times" style="left:0px;display:inline-grid;grid-template-columns:auto auto;gap:3px 8px;justify-content:center;text-align:left;">
+      <div>
+          <label class="form-check-label" for="edit-25"> 25</label>
+          <input class="text-input" size="9" name="edit-25" id="edit-25" type="text" style="font-family:Consolas;" />
+      </div>
+      <div>
+          <label class="form-check-label" for="edit-50"> 50</label>
+          <input class="text-input" size="9" name="edit-50" id="edit-50" type="text" style="font-family:Consolas;" />
+      </div>
+      <div>
+          <label class="form-check-label" for="edit-100">100</label>
+          <input class="text-input" size="9" name="edit-100" id="edit-100" type="text" style="font-family:Consolas;" />
+      </div>
+      <div>
+          <label class="form-check-label" for="edit-ALL">ALL</label>
+          <input class="text-input" size="9" name="edit-ALL" id="edit-ALL" type="text" style="font-family:Consolas;" />
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="${sectionTitle}">Custom splits</div>
 <div id="edit-customsplit" style="border-top:0px solid black">
 
 </div>
 
-<div id="edit-split">
+<div id="edit-split" style="margin-top:2px;">
   <label class="form-check-label" for="edit-splitscore">New Split</label>
   <input class="text-input" size="6" name="edit-splitscore" id="edit-splitscore" type="number" placeholder="Score" />
-  <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="edit-addsplit">Add</button>
+  <button class="btn" style="margin:3px;color:white;background-color:${btnColor};font-family:Roboto,Arial,sans-serif;" id="edit-addsplit">Add</button>
 </div>
-<div id="edit-customsplit" style="border-top:0px solid black">
-</br>
-<label class="form-check-label" style="flex:center;">Timer Format</label>
-<select class="form-control" id="edit-format" style="flex:center;">
-    <option value="0">0:00:00:000</option>
-    <option value="1">  00:00:000</option>
-    <option value="2">   0:00:000</option>
-    <option value="3">     00:000</option>
-    <option value="4">      0:000</option>
-    <option value="5">0:00:00.000</option>
-    <option value="6">  00:00.000</option>
-    <option value="7">   0:00.000</option>
-    <option value="8">     00.000</option>
-    <option value="9">      0.000</option>
-  </select>
-<br/>
-<input class="form-check-input" style="width: 1.5em; height: 1.5em;" type="checkbox" checked="true" name="edit-delta" id="edit-delta" />
-<label class="form-check-label" for="edit-delta">Show Delta</label>
-<br/>
-<br/>
-<label class="form-check-label" for="edit-aheadg">Ahead (gaining time)</label>
-<input class="text-input" style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-aheadg" id="edit-aheadg" type="color" />
-<label class="form-check-label" for="edit-aheadl">Ahead (losing time)</label>
-<input class="text-input" style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-aheadl" id="edit-aheadl" type="color" />
-<br/>
-<label class="form-check-label" for="edit-behindg">Behind (gaining time)</label>
-<input class="text-input" style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-behindg" id="edit-behindg" type="color" />
-<label class="form-check-label" for="edit-behindl">Behind (losing time)</label>
-<input class="text-input" style="margin: 0; padding: 0; border: 0; width: 6vh; height: 3vh;" name="edit-behindl" id="edit-behindl" type="color" />
+
+<div id="edit-display" style="margin-top:2px;">
+<div style="${sectionTitle}">Display</div>
+<div style="display:flex;gap:24px;justify-content:center;align-items:center;flex-wrap:wrap;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <label class="form-check-label" for="edit-format" style="margin:0;">Timer Format</label>
+    <select class="form-control" id="edit-format" style="display:inline-block;width:auto;margin:0;background-color:${btnColor};color:white;border:1px solid rgba(255,255,255,0.25);">
+      <option value="0">0:00:00:000</option>
+      <option value="1">  00:00:000</option>
+      <option value="2">   0:00:000</option>
+      <option value="3">     00:000</option>
+      <option value="4">      0:000</option>
+      <option value="5">0:00:00.000</option>
+      <option value="6">  00:00.000</option>
+      <option value="7">   0:00.000</option>
+      <option value="8">     00.000</option>
+      <option value="9">      0.000</option>
+    </select>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <input class="form-check-input" style="width: 1.5em; height: 1.5em; margin:0;" type="checkbox" checked="true" name="edit-delta" id="edit-delta" />
+    <label class="form-check-label" for="edit-delta" style="margin:0;">Show Delta</label>
+  </div>
+</div>
+<div style="${sectionTitle}">Delta colors</div>
+<div style="display:inline-grid;grid-template-columns:auto auto;gap:4px 18px;justify-content:center;text-align:left;align-items:center;">
+  <div><label class="form-check-label" for="edit-aheadg">Ahead (gaining)</label>
+  <input class="text-input" style="margin: 0 0 0 6px; padding: 0; border: 0; width: 5vh; height: 2.6vh; vertical-align:middle;" name="edit-aheadg" id="edit-aheadg" type="color" /></div>
+  <div><label class="form-check-label" for="edit-aheadl">Ahead (losing)</label>
+  <input class="text-input" style="margin: 0 0 0 6px; padding: 0; border: 0; width: 5vh; height: 2.6vh; vertical-align:middle;" name="edit-aheadl" id="edit-aheadl" type="color" /></div>
+  <div><label class="form-check-label" for="edit-behindg">Behind (gaining)</label>
+  <input class="text-input" style="margin: 0 0 0 6px; padding: 0; border: 0; width: 5vh; height: 2.6vh; vertical-align:middle;" name="edit-behindg" id="edit-behindg" type="color" /></div>
+  <div><label class="form-check-label" for="edit-behindl">Behind (losing)</label>
+  <input class="text-input" style="margin: 0 0 0 6px; padding: 0; border: 0; width: 5vh; height: 2.6vh; vertical-align:middle;" name="edit-behindl" id="edit-behindl" type="color" /></div>
+</div>
 
 </div>
+<button type="button" class="btn" id="close-box" style="margin:10px auto 2px;display:block;color:white;background-color:${btnColor};font-family:Roboto,Arial,sans-serif;">Close</button>
         `
+        const backdrop = document.createElement('div')
+        backdrop.id = 'edit-box-backdrop'
+        backdrop.style.cssText =
+          'position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:999999;' +
+          'background:rgba(0,0,0,0.45);'
+        backdrop.addEventListener('click', closeEditBox)
+        document.body.appendChild(backdrop)
         document.body.appendChild(editBox)
-        document.getElementById('close-box').addEventListener('click', function() { document.getElementById('edit-box').remove() })
+        document.getElementById('close-box').addEventListener('click', closeEditBox)
+
+        if (typeof window.wireSpeedInfoTrackingControls === "function") {
+          window.wireSpeedInfoTrackingControls(editBox)
+        }
 
         const toggleDelta = document.getElementById('edit-delta')
         toggleDelta.checked = +_showDelta
@@ -3757,9 +5740,11 @@ window.Timer = {
             while(_splits.includes(+splitScore)) {
               _splits.splice(_splits.indexOf(+splitScore), 1)
             }
+            refreshSplitPanel()
           })
 
           if(!window._splits.includes(+splitScore)) window._splits.push(+splitScore)
+          refreshSplitPanel()
 
           function handleChange() {
             const val = splitInput.value.split(':')
@@ -3788,6 +5773,7 @@ window.Timer = {
             _pb[_mode][_count][_speed][_size][_cat][key] = time || ''
 
             localStorage._snake_pb = JSON.stringify(_pb)
+            refreshSplitPanel()
 
 
             splitInput.value = time === 0 ? '' : time.timeFormat()
@@ -3858,6 +5844,7 @@ window.Timer = {
             _pb[_mode][_count][_speed][_size][_cat][key] = time || ''
 
             localStorage._snake_pb = JSON.stringify(_pb)
+            refreshSplitPanel()
 
 
             el.value = time === 0 ? '' : time.timeFormat()
@@ -3926,6 +5913,7 @@ window.Timer = {
                 while(window._splits.includes(+_splitName)) {
                   window._splits.splice(window._splits.indexOf(+_splitName), 1)
                 }
+                refreshSplitPanel()
               })
 
               if(!window._splits.includes(+_splitName)) window._splits.push(+_splitName)
@@ -3957,6 +5945,7 @@ window.Timer = {
                 _pb[_mode][_count][_speed][_size][_cat][key] = time || ''
 
                 localStorage._snake_pb = JSON.stringify(_pb)
+                refreshSplitPanel()
 
                 splitInput.value = time === 0 ? '' : time.timeFormat()
               }
@@ -3980,6 +5969,7 @@ window.Timer = {
 
             }
           }
+          refreshSplitPanel()
         }
         updateToMode()
 
@@ -4049,6 +6039,7 @@ window.Timer = {
       resetFunction.replace(
         'reset(){',
         `reset(){this.xdddd=[];
+          if (typeof window.flushSnakePb === "function") window.flushSnakePb();
 
           const _mode  = getSelected('#trophy')
           const _count = getSelected('#count')
@@ -4087,6 +6078,7 @@ window.Timer = {
           deltaDiv.innerHTML = '-'.color('white')
 
           window._lastDelta = 0
+          if (typeof window.SplitPanelOnReset === "function") window.SplitPanelOnReset()
 
         `
       )
@@ -4102,8 +6094,17 @@ window.Timer = {
       timeFormatFunction.replace(
         'function(a){',
         `window._flj = function(a) {
-          const _splitTimeDiv = document.getElementsByClassName('Jc72He rc48Qb')[0].children[1]
-          _splitTimeDiv.innerHTML = _splitTimeDiv.innerHTML.trimStart()
+          // Cache node; only rewrite when leading whitespace is present (avoid per-tick layout thrash)
+          try {
+            if (!window._splitTimeDivEl) {
+              window._splitTimeDivEl = document.getElementsByClassName('Jc72He rc48Qb')[0].children[1]
+            }
+            const _el = window._splitTimeDivEl
+            const _html = _el.innerHTML
+            if (_html && /^[\\s\\u2000-\\u200B\\uFEFF]/.test(_html)) {
+              _el.innerHTML = _html.trimStart()
+            }
+          } catch (e) {}
         `
       ).replace(
         '"00:00:000"',
@@ -4134,12 +6135,31 @@ window.Timer = {
       )
     )
 
+    let score
+    let ticks
+    let dt
+    let winTicks
+    let winDt
     const stuffBlock = code.match(
       /[a-zA-Z0-9_$]{1,8}=this\.header,[a-zA-Z0-9_$]{1,8}=\n?this\.[a-zA-Z0-9_$]{1,8},[a-zA-Z0-9_$]{1,8}=this\.ticks,[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8};/
-    )[0]
-    const score = stuffBlock.match(/header,[a-zA-Z0-9_$]{1,8}=\n?this\.[a-zA-Z0-9_$]{1,8}/)[0].replace(/header,[a-zA-Z0-9_$]{1,8}=/,'')
-    const ticks = stuffBlock.match(/[a-zA-Z0-9_$]{1,8}=this\.ticks/)[0].replace(/[a-zA-Z0-9_$]{1,8}=/,'')
-    const dt    = stuffBlock.match(/ticks,[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8}/)[0].replace(/ticks,[a-zA-Z0-9_$]{1,8}=/,'')
+    )
+    if (stuffBlock) {
+      score = stuffBlock[0].match(/header,[a-zA-Z0-9_$]{1,8}=\n?this\.[a-zA-Z0-9_$]{1,8}/)[0].replace(/header,[a-zA-Z0-9_$]{1,8}=/,'')
+      ticks = stuffBlock[0].match(/[a-zA-Z0-9_$]{1,8}=this\.ticks/)[0].replace(/[a-zA-Z0-9_$]{1,8}=/,'')
+      dt    = stuffBlock[0].match(/ticks,[a-zA-Z0-9_$]{1,8}=this\.[a-zA-Z0-9_$]{1,8}/)[0].replace(/ticks,[a-zA-Z0-9_$]{1,8}=/,'')
+      winTicks = ticks
+      winDt = dt
+    } else {
+      // v13: 25/50/100 HUD lives in q7E=function(a,b,c,d){if(b===25...
+      score = 'b'
+      ticks = 'c'
+      dt = 'd'
+      const scoreCtor = code.match(
+        /this\.header=[a-zA-Z0-9_$];this\.([a-zA-Z0-9_$]{1,8})=this\.([a-zA-Z0-9_$]{1,8})=this\.ticks=/
+      )
+      winTicks = 'this.ticks'
+      winDt = scoreCtor ? ('this.' + scoreCtor[2]) : 'this.Fb'
+    }
 
 
 
@@ -4160,9 +6180,10 @@ window.Timer = {
         const _split = ${ticks} * ${dt} * 1e-3
 
         window._run[_mode][_count][_speed][_size][_cat][${score}] = _split
+        let _delta = NaN
 
         if(window._pb[_mode][_count][_speed][_size][_cat][${score}]) {
-          const _delta = _split - window._pb[_mode][_count][_speed][_size][_cat][${score}]
+          _delta = _split - window._pb[_mode][_count][_speed][_size][_cat][${score}]
           const _absDeltaString = Math.abs(_delta).timeFormat()
           if(_delta !== 0)
             deltaDiv.innerHTML = ((_delta < 0 ? '-' : '+') + _absDeltaString).color(
@@ -4194,9 +6215,11 @@ window.Timer = {
           )
         ) {
           window._pb[_mode][_count][_speed][_size][_cat] = window._run[_mode][_count][_speed][_size][_cat]
-          localStorage._snake_pb = JSON.stringify(window._pb)
+          if (typeof window.markSnakePbDirty === "function") window.markSnakePbDirty()
+          else localStorage._snake_pb = JSON.stringify(window._pb)
         }
 
+        if (typeof window.SplitPanelOnSplit === "function") window.SplitPanelOnSplit(${score}, _split, _delta)
 
 
 
@@ -4223,7 +6246,7 @@ window.Timer = {
       const _speed = getSelected('#speed')
       const _size  = getSelected('#size')
 
-      const _time = ${ticks} * ${dt} * 1e-3
+      const _time = ${winTicks} * ${winDt} * 1e-3
 
       let _delta = NaN
 
@@ -4248,8 +6271,11 @@ window.Timer = {
 
       if(_delta < 0 || isNaN(_delta)) {
         window._pb[_mode][_count][_speed][_size][_cat] = window._run[_mode][_count][_speed][_size][_cat]
-        localStorage._snake_pb = JSON.stringify(window._pb)
+        if (typeof window.persistSnakePb === "function") window.persistSnakePb()
+        else localStorage._snake_pb = JSON.stringify(window._pb)
       }
+
+      if (typeof window.SplitPanelOnSplit === "function") window.SplitPanelOnSplit("ALL", _time, _delta)
 
 
 
@@ -4259,6 +6285,319 @@ window.Timer = {
     return code
   }
 }
+window.SplitPanel = {};
+
+window.SplitPanel.make = function () {
+
+    const CAT_MAX = { 0: 25, 1: 50, 2: 100, 3: Infinity };
+    const CAT_STANDARDS = {
+        0: [25],
+        1: [25, 50],
+        2: [25, 50, 100],
+        3: [25, 50, 100, "ALL"],
+    };
+
+    window.splitPanelVisible = false;
+    window._splitPanelRows = {};
+
+    function selectedIndex(sel) {
+        const el = document.querySelector(sel);
+        if (!el || !el.children) return 0;
+        const kids = Array.from(el.children);
+        let idx = kids.findIndex(function (q) {
+            return q.className && String(q.className).includes("tuJOWd");
+        });
+        if (idx >= 0) return idx;
+        if (typeof getSelected === "function") {
+            try { return getSelected(sel); } catch (e) {}
+        }
+        return 0;
+    }
+
+    function nestGet(root, path) {
+        let cur = root;
+        for (let i = 0; i < path.length; i++) {
+            if (cur == null) return undefined;
+            const p = path[i];
+            if (cur[p] != null) cur = cur[p];
+            else if (cur[String(p)] != null) cur = cur[String(p)];
+            else return undefined;
+        }
+        return cur;
+    }
+
+    function currentBucket() {
+        const _mode = selectedIndex("#trophy");
+        const _count = selectedIndex("#count");
+        const _speed = selectedIndex("#speed");
+        const _size = selectedIndex("#size");
+        const _cat = window._cat != null ? window._cat : 3;
+        const path = [_mode, _count, _speed, _size, _cat];
+        return {
+            pb: nestGet(window._pb, path) || {},
+            run: nestGet(window._run, path) || {},
+            cat: _cat,
+        };
+    }
+
+    function splitSortKey(key) {
+        if (key === "ALL" || key === "all") return 1e9;
+        return Number(key) || 0;
+    }
+
+    function splitLabel(key) {
+        if (key === "ALL" || key === "all") return "ALL";
+        return String(key);
+    }
+
+    function listSplitKeys() {
+        const { cat } = currentBucket();
+        const max = CAT_MAX[cat] != null ? CAT_MAX[cat] : Infinity;
+        const standards = CAT_STANDARDS[cat] || CAT_STANDARDS[3];
+        const keys = new Set();
+        const splits = Array.isArray(window._splits) ? window._splits : [];
+        for (const s of splits) {
+            const n = +s;
+            if (!n) continue;
+            if (n <= max) keys.add(n);
+        }
+        const { pb } = currentBucket();
+        for (const k of Object.keys(pb || {})) {
+            if (k === "ALL" || k === "all") continue;
+            const n = +k;
+            if (!n) continue;
+            if (n <= max) keys.add(n);
+        }
+        for (const s of standards) keys.add(s);
+        return Array.from(keys).sort((a, b) => splitSortKey(a) - splitSortKey(b));
+    }
+
+    function lookup(obj, key) {
+        if (!obj) return undefined;
+        if (obj[key] != null && obj[key] !== "") return obj[key];
+        if (obj[String(key)] != null && obj[String(key)] !== "") return obj[String(key)];
+        return undefined;
+    }
+
+    function formatTime(t) {
+        const n = +t;
+        if (!isFinite(n) || n <= 0) return "";
+        if (typeof n.timeFormat === "function") return n.timeFormat();
+        return String(n);
+    }
+
+    function formatDelta(delta) {
+        if (delta == null || !isFinite(delta) || delta === 0) {
+            return { text: "—", color: "white" };
+        }
+        const abs = typeof Math.abs(delta).timeFormat === "function"
+            ? Math.abs(delta).timeFormat()
+            : String(Math.abs(delta));
+        const last = window._lastDelta || 0;
+        const storageKey = delta > 0
+            ? (delta > last ? "_snake_behindl" : "_snake_behindg")
+            : (delta > last ? "_snake_aheadl" : "_snake_aheadg");
+        const color = localStorage[storageKey] || (delta < 0 ? "#008010" : "#dd3333");
+        return { text: (delta < 0 ? "-" : "+") + abs, color: color };
+    }
+
+    function rowStyle(active) {
+        return "display:flex;align-items:center;justify-content:space-between;gap:4px;padding:3px 4px;margin:0;border-radius:3px;font-family:Roboto,Arial,sans-serif;font-size:12px;line-height:1.25;color:white;"
+            + (active ? "background:rgba(255,255,255,0.14);" : "");
+    }
+
+    window.SplitPanelShow = function () {
+        const box = document.getElementById("split-panel-pudding");
+        if (!box) return;
+        box.style.display = "flex";
+        box.style.visibility = "visible";
+        window.splitPanelVisible = true;
+        if (window.pudding_settings) window.pudding_settings.SplitPanel = true;
+        window.SplitPanelRefresh();
+    };
+
+    window.SplitPanelHide = function () {
+        const box = document.getElementById("split-panel-pudding");
+        if (!box) return;
+        box.style.visibility = "hidden";
+        window.splitPanelVisible = false;
+        if (window.pudding_settings) window.pudding_settings.SplitPanel = false;
+        const cb = document.getElementById("ShowSplitPanel");
+        if (cb) cb.checked = false;
+    };
+
+    window.ToggleSplitPanel = function () {
+        if (window.pudding_settings) {
+            window.pudding_settings.SplitPanel = !window.pudding_settings.SplitPanel;
+        }
+        if (window.pudding_settings && window.pudding_settings.SplitPanel) {
+            window.SplitPanelShow();
+        } else {
+            window.SplitPanelHide();
+        }
+        if (typeof window.saveSettings === "function") window.saveSettings();
+    };
+
+    window.SplitPanelRefresh = function () {
+        const list = document.getElementById("split-panel-list");
+        if (!list) return;
+        const keys = listSplitKeys();
+        const { pb, run } = currentBucket();
+        window._splitPanelRows = {};
+        list.innerHTML = "";
+
+        let nextKey = null;
+        for (const key of keys) {
+            if (lookup(run, key) == null) {
+                nextKey = key;
+                break;
+            }
+        }
+
+        for (const key of keys) {
+            const row = document.createElement("div");
+            const isNext = key === nextKey;
+            row.style.cssText = rowStyle(isNext);
+            row.dataset.splitKey = String(key);
+
+            const nameEl = document.createElement("span");
+            nameEl.style.cssText = "flex:0 0 42px;font-weight:" + (isNext ? "700" : "500") + ";";
+            nameEl.textContent = splitLabel(key);
+
+            const timeEl = document.createElement("span");
+            timeEl.style.cssText = "flex:1;text-align:right;font-variant-numeric:tabular-nums;";
+            const runVal = lookup(run, key);
+            const pbVal = lookup(pb, key);
+            if (runVal != null) {
+                timeEl.textContent = formatTime(runVal);
+            } else if (pbVal) {
+                timeEl.textContent = formatTime(pbVal);
+                timeEl.style.color = "rgba(255,255,255,0.55)";
+            } else {
+                timeEl.textContent = "";
+            }
+
+            const deltaEl = document.createElement("span");
+            deltaEl.style.cssText = "flex:0 0 72px;text-align:right;font-variant-numeric:tabular-nums;";
+            if (runVal != null && pbVal) {
+                const d = +runVal - +pbVal;
+                const fmt = formatDelta(d);
+                deltaEl.textContent = fmt.text;
+                deltaEl.style.color = fmt.color;
+                if (d < 0) timeEl.style.color = fmt.color;
+                else timeEl.style.color = "white";
+            } else {
+                deltaEl.textContent = "—";
+                deltaEl.style.color = "rgba(255,255,255,0.55)";
+            }
+
+            row.appendChild(nameEl);
+            row.appendChild(timeEl);
+            row.appendChild(deltaEl);
+            list.appendChild(row);
+            window._splitPanelRows[String(key)] = { row: row, nameEl: nameEl, timeEl: timeEl, deltaEl: deltaEl };
+        }
+    };
+
+    window.SplitPanelOnReset = function () {
+        window.SplitPanelRefresh();
+    };
+
+    window.SplitPanelOnSplit = function (score, splitTime, delta) {
+        const key = score === "ALL" || score === "all" ? "ALL" : score;
+        const rec = window._splitPanelRows && window._splitPanelRows[String(key)];
+        if (!rec) {
+            window.SplitPanelRefresh();
+            return;
+        }
+        rec.timeEl.textContent = formatTime(splitTime);
+        rec.timeEl.style.color = "white";
+        let d = delta;
+        if (d == null || !isFinite(d)) {
+            const pbVal = lookup(currentBucket().pb, key);
+            if (pbVal) d = +splitTime - +pbVal;
+        }
+        if (d != null && isFinite(d) && d !== 0) {
+            const fmt = formatDelta(d);
+            rec.deltaEl.textContent = fmt.text;
+            rec.deltaEl.style.color = fmt.color;
+            rec.timeEl.style.color = d < 0 ? fmt.color : "white";
+        } else {
+            rec.deltaEl.textContent = "—";
+            rec.deltaEl.style.color = "white";
+        }
+        rec.row.style.cssText = rowStyle(false);
+        rec.nameEl.style.fontWeight = "500";
+
+        const keys = listSplitKeys();
+        let found = false;
+        for (const k of keys) {
+            if (String(k) === String(key)) {
+                found = true;
+                continue;
+            }
+            if (found) {
+                const next = window._splitPanelRows[String(k)];
+                if (next) {
+                    next.row.style.cssText = rowStyle(true);
+                    next.nameEl.style.fontWeight = "700";
+                }
+                break;
+            }
+        }
+    };
+
+    window.SplitPanelSetup = function () {
+        const host = document.getElementsByClassName("sEOCsb")[0];
+        if (!host) return;
+
+        const box = document.createElement("div");
+        box.id = "split-panel-pudding";
+        box.style.cssText = window.puddingSidebarStyleLeft || window.puddingSidebarStyle;
+        box.style.display = "flex";
+        box.style.flexDirection = "column";
+        box.style.boxSizing = "border-box";
+        box.style.visibility = "hidden";
+
+        const title = document.createElement("div");
+        title.style.cssText = "font-weight:bold;color:white;font-family:Roboto,Arial,sans-serif;text-align:center;margin:0 0 6px;padding:0 0 6px;border-bottom:1px solid rgba(255,255,255,0.22);";
+        title.textContent = "Splits";
+
+        const header = document.createElement("div");
+        header.style.cssText = "display:flex;justify-content:space-between;gap:4px;padding:0 4px 4px;font-family:Roboto,Arial,sans-serif;font-size:11px;color:rgba(255,255,255,0.7);";
+        header.innerHTML = '<span style="flex:0 0 42px;">Split</span><span style="flex:1;text-align:right;">Time</span><span style="flex:0 0 72px;text-align:right;">+/-</span>';
+
+        const list = document.createElement("div");
+        list.id = "split-panel-list";
+        list.style.cssText = "flex:1;min-height:0;overflow:auto;";
+
+        box.appendChild(title);
+        box.appendChild(header);
+        box.appendChild(list);
+        host.appendChild(box);
+
+        window.SplitPanelRefresh();
+
+        ["trophy", "count", "speed", "size"].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener("click", function () {
+                    setTimeout(window.SplitPanelRefresh, 0);
+                });
+            }
+        });
+
+        if (window.pudding_settings && window.pudding_settings.SplitPanel && !window.isSnakeMobileVersion) {
+            window.SplitPanelShow();
+        }
+    };
+
+    window.SplitPanelSetup();
+};
+
+window.SplitPanel.alterCode = function (code) {
+    return code;
+};
 window.BootstrapMenu = {};
 
 window.BootstrapMenu.make = function () {
@@ -4290,32 +6629,34 @@ window.BootstrapMenu.make = function () {
 
     // Get the button by its jsname attribute
     window.random_button = document.querySelector(`[jsname="${random_button_jsname}"]`);
+    if (window.random_button) {
+        window._randomButtonOriginalHtml = window.random_button.innerHTML;
+        window._randomButtonOriginalColor = window.random_button.style.color || "";
+    }
+
+    window.applyRandomButtonState = function (disabled) {
+        const btn = window.random_button;
+        if (!btn) return;
+        if (disabled) {
+            btn.style.pointerEvents = "none";
+            btn.textContent = "Disabled";
+            btn.style.color = "grey";
+        } else {
+            btn.style.pointerEvents = "auto";
+            if (window._randomButtonOriginalHtml != null) {
+                btn.innerHTML = window._randomButtonOriginalHtml;
+            } else {
+                btn.textContent = "Shuffle";
+            }
+            btn.style.color = window._randomButtonOriginalColor || "";
+        }
+    };
 
     // Disable the button
     window.ToggleRandom = function () {
         window.pudding_settings.DisableRandom = !window.pudding_settings.DisableRandom;
-        if (window.pudding_settings.DisableRandom) {
-            // Disable it
-            random_button.style.pointerEvents = 'none';
-        }
-        else {
-            // Enable it
-            random_button.style.pointerEvents = 'auto';
-        }
+        window.applyRandomButtonState(window.pudding_settings.DisableRandom);
     }
-
-    window.ToggleScrollbar = function () {
-        window.pudding_settings.ScrollBar = !window.pudding_settings.ScrollBar;
-        if (window.pudding_settings.ScrollBar) {
-            // Disable it
-            document.body.style.overflow = 'hidden';
-        }
-        else {
-            // Enable it
-            document.body.style.overflow = '';
-        }
-    }
-
 
     window.BootstrapSetup = function () {
 
@@ -4403,7 +6744,6 @@ window.BootstrapMenu.make = function () {
 
   <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="edit-stat">Edit stat</button>
   <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="reset-stats">Reset stats</button><br>
-  <button class="btn" style="display:none;margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="time-keeper" jsname="time-keeper">Show TimeKeeper</button>
   <div class="form-check form-check-inline">
     <input class="form-check-input" type="checkbox" role="switch" id="SkullPoisonFruit">
     <label class="form-check-label" for="SkullPoisonFruit" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Skull Poison Fruit</label>
@@ -4422,17 +6762,21 @@ window.BootstrapMenu.make = function () {
     </div>
     <div class="form-check form-check-inline">
     <input class="form-check-input" type="checkbox" role="switch" id="AlwaysOnTimeKeeper">
-    <label class="form-check-label" for="AlwaysOnTimeKeeper" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Show SpeedInfo</label>
+    <label class="form-check-label" for="AlwaysOnTimeKeeper" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Show Speed Info</label>
     </div>
-    <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="TimerSettings">Timer settings</button><br>
+    <div class="form-check form-check-inline">
+    <input class="form-check-input" type="checkbox" role="switch" id="ShowSplitPanel">
+    <label class="form-check-label" for="ShowSplitPanel" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Show Split Panel</label>
+    </div>
     <div class="form-check form-check-inline">
     <input class="form-check-input" type="checkbox" role="switch" id="DisableRandom">
     <label class="form-check-label" for="DisableRandom" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Disable Randomizer</label>
     </div>
     <div class="form-check form-check-inline">
-    <input class="form-check-input" type="checkbox" role="switch" id="RemoveScrollbar">
-    <label class="form-check-label" for="RemoveScrollbar" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Remove Scrollbar</label>
+    <input class="form-check-input" type="checkbox" role="switch" id="SaveGameSettings">
+    <label class="form-check-label" for="SaveGameSettings" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;">Save Game Settings</label>
     </div>
+    <button class="btn" style="margin:3px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="TimerSettings">Timer settings</button><br>
     <div class="form-check form-check-inline">
     <input class="form-check-input" type="checkbox" role="switch" id="EatThemeRandomizer">
     <label class="form-check-label" for="EatThemeRandomizer" style="margin:3px;color:white;font-family:Roboto,Arial,sans-serif;" id="EatThemeRandomizer2">"Dragon Fruit"</label>
@@ -4481,39 +6825,41 @@ window.BootstrapMenu.make = function () {
         input_checkbox.checked = window.pudding_settings.InputDisplay;
         toggle_input_display();
 
-        topbar_checkbox = document.getElementById("TopBarIcons");
-        topbar_checkbox.addEventListener("change", window.toggle_topbar_icons);
-        topbar_checkbox.checked = window.pudding_settings.TopBar;
+        if (typeof window.setup_topbar_checkbox === "function") {
+            window.setup_topbar_checkbox();
+        } else {
+            const topbar_checkbox = settingsBox.querySelector("#TopBarIcons");
+            if (topbar_checkbox) {
+                topbar_checkbox.addEventListener("change", window.toggle_topbar_icons);
+                topbar_checkbox.checked = window.pudding_settings.TopBar;
+            }
+        }
 
         speedinfo_checkbox = document.getElementById("AlwaysOnTimeKeeper");
         speedinfo_checkbox.addEventListener("change", window.ToggleSpeedInfo);
         speedinfo_checkbox.checked = window.pudding_settings.SpeedInfo;
 
+        splitpanel_checkbox = document.getElementById("ShowSplitPanel");
+        if (typeof window.pudding_settings.SplitPanel !== "boolean") {
+            window.pudding_settings.SplitPanel = false;
+        }
+        splitpanel_checkbox.checked = !!window.pudding_settings.SplitPanel;
+        splitpanel_checkbox.addEventListener("change", window.ToggleSplitPanel);
+
         randombtn_checkbox = document.getElementById("DisableRandom");
         randombtn_checkbox.addEventListener("change", window.ToggleRandom);
         randombtn_checkbox.checked = window.pudding_settings.DisableRandom;
+        window.applyRandomButtonState(window.pudding_settings.DisableRandom);
 
-        if (window.pudding_settings.DisableRandom) {
-            // Disable it
-            random_button.style.pointerEvents = 'none';
+        const saveGameSettingsCheckbox = document.getElementById("SaveGameSettings");
+        if (typeof window.pudding_settings.SaveGameSettings !== "boolean") {
+            window.pudding_settings.SaveGameSettings = true;
         }
-        else {
-            // Enable it
-            random_button.style.pointerEvents = 'auto';
-        }
-
-        scrollbtn_checkbox = document.getElementById("RemoveScrollbar");
-        scrollbtn_checkbox.addEventListener("change", window.ToggleScrollbar);
-        scrollbtn_checkbox.checked = window.pudding_settings.ScrollBar;
-
-        if (window.pudding_settings.ScrollBar) {
-            // Disable it
-            document.body.style.overflow = 'hidden';
-        }
-        else {
-            // Enable it
-            document.body.style.overflow = '';
-        }
+        saveGameSettingsCheckbox.checked = !!window.pudding_settings.SaveGameSettings;
+        saveGameSettingsCheckbox.addEventListener("change", function () {
+            window.pudding_settings.SaveGameSettings = !!saveGameSettingsCheckbox.checked;
+            if (typeof window.saveSettings === "function") window.saveSettings();
+        });
 
         if (localStorage.getItem('snakeChosenMod') === "PuddingMod" || window.NepDebug) {
             EatThemeRandomizer.style.display = 'none';
@@ -4534,6 +6880,10 @@ window.BootstrapMenu.make = function () {
             speedinfo_checkbox.disabled = true;
             speedinfo_checkbox.checked = false;
             window.SpeedInfoHide();
+
+            splitpanel_checkbox.disabled = true;
+            splitpanel_checkbox.checked = false;
+            if (typeof window.SplitPanelHide === "function") window.SplitPanelHide();
 
             input_checkbox.disabled = true;
             ScrollLeftBtn.style.display = '';
@@ -4629,6 +6979,9 @@ window.BootstrapMenu.make = function () {
 
     const playButton = 'NSjDf';
     document.querySelector("[jsname^=\"" + playButton + "\"]").addEventListener("click", (e) => {
+        if (typeof window.saveCurrentGameSettings === "function") {
+            window.saveCurrentGameSettings();
+        }
         window.BootstrapHide();
         if (window.isSnakeMobileVersion) {
             if (localStorage.getItem('snakeChosenMod') === "VisibilityMod") {
@@ -4652,6 +7005,13 @@ window.BootstrapMenu.alterCode = function (code) {
     {
         window.SpeedInfoShow();
     }
+    // After patched game is live: restore saved selectors once per page load
+    // (applySavedGameSettingsOnce polls until #trophy exists)
+    setTimeout(function () {
+        if (typeof window.applySavedGameSettingsOnce === "function") {
+            window.applySavedGameSettingsOnce();
+        }
+    }, 0);
     return code;
 }
 window.ResetKey = {}
@@ -4663,6 +7023,7 @@ window.ResetKey.make = function (){
   let keybinds = JSON.parse(localStorage.getItem("keybinds")) || {};
   function setupKeybindPicker(buttonId, keybindType) {
       const button = document.getElementById(buttonId);
+      if (!button) return;
       if(!keybinds[keybindType]){
           keybinds[keybindType] = "Shift";
       }
@@ -4684,11 +7045,31 @@ window.ResetKey.make = function (){
 }
 
 window.ResetKey.alterCode = function(code){
+  if (window.SpeedrunMod) {
+    const keyHandler =
+      /([a-zA-Z0-9_$]{1,8})\(a\)\{if\(!this\.closed\)\{var b=\s*a\.VTa\?a\.Qh:void 0/;
+    code = code.assertReplace(
+      keyHandler,
+      "$1(a){if(!this.closed){var _ae=document.activeElement;if(_ae&&(_ae.tagName==='INPUT'||_ae.tagName==='TEXTAREA'||_ae.tagName==='SELECT'||_ae.isContentEditable))return;var b= a.VTa?a.Qh:void 0"
+    );
+  }
+
+  function isTypingInField() {
+    const ae = document.activeElement;
+    return !!(
+      ae &&
+      (ae.tagName === "INPUT" ||
+        ae.tagName === "TEXTAREA" ||
+        ae.tagName === "SELECT" ||
+        ae.isContentEditable)
+    );
+  }
+
   document.addEventListener('keydown', function(e){
     let keybinds = JSON.parse(localStorage.getItem("keybinds")) || {};
     let resetButton = document.getElementById('ResetKeybind');
     let isSettingKeybind = resetButton && resetButton.textContent === "Press any key...";
-    if(!(isSettingKeybind || window.timeKeeper.dialogActive || document.getElementById('edit-box'))){
+    if(!(isSettingKeybind || isTypingInField() || window.timeKeeper.dialogActive || document.getElementById('edit-box'))){
         if(e.key === keybinds["resetKey"]){
             const keydownEvent = new KeyboardEvent('keydown', {
                 keyCode: 27
@@ -4730,7 +7111,7 @@ window.RenderDelayFix.alterCode = function (code) {
   code = assertReplace(
     code,
     /([a-zA-Z0-9_$]{1,8})\s*\(\s*a\s*\)\s*\{\s*if\s*\(\s*!this\.closed\s*\)\s*\{/,
-    "$1=window.stuffKeys=function(a){if(!this.closed){if(window.resetTime<window.lastFrameTime){"
+    "$1=window.stuffKeys=function(a){var _ae=document.activeElement;if(_ae&&(_ae.tagName==='INPUT'||_ae.tagName==='TEXTAREA'||_ae.tagName==='SELECT'||_ae.isContentEditable))return;if(!this.closed){if(window.resetTime<window.lastFrameTime){"
   );
   code = assertReplace(
     code,
@@ -4757,34 +7138,95 @@ window.CustomBowl.make = function () {
     window.custom_pair_call_counter = 0;
     window.__portalAppleArrayName = window.__portalAppleArrayName || "ka";
     window.__customBowlCountOverride = null;
+    window._fruitBowlTab = window._fruitBowlTab || "general";
+
+    function clampCountIndex(count) {
+        const n = Number(count);
+        if (isNaN(n)) return 0;
+        if (n < 0) return 0;
+        if (n > 6) return 6;
+        return n;
+    }
+
+    function readCountIndexFromDom() {
+        const root = document.getElementById("count");
+        if (!root || !root.children || !root.children.length) return null;
+        for (let i = 0; i < root.children.length; i++) {
+            const el = root.children[i];
+            const cls = el.className || "";
+            if ((el.classList && el.classList.contains("tuJOWd")) || /\btuJOWd\b/.test(cls)) {
+                return i;
+            }
+        }
+        const classNames = [];
+        let notUnique = "";
+        for (const el of root.children) {
+            if (classNames.indexOf(el.className) === -1) classNames.push(el.className);
+            else {
+                notUnique = el.className;
+                break;
+            }
+        }
+        if (notUnique) {
+            let n = 0;
+            for (const el of root.children) {
+                if (el.className !== notUnique) return n;
+                n++;
+            }
+        }
+        return null;
+    }
 
     function getCountIndex() {
         if (typeof window.__customBowlCountOverride === "number" && !isNaN(window.__customBowlCountOverride)) {
-            return window.__customBowlCountOverride;
+            return clampCountIndex(window.__customBowlCountOverride);
         }
-        if (window.timeKeeper && typeof window.timeKeeper.getCurrentSetting === "function") {
-            const c = window.timeKeeper.getCurrentSetting("count");
-            if (typeof c === "number" && !isNaN(c)) return c;
-        }
-        if (typeof window.count_var !== "undefined") {
-            const c = Number(window.count_var);
-            if (!isNaN(c)) return c;
-        }
+        const fromDom = readCountIndexFromDom();
+        if (fromDom !== null) return clampCountIndex(fromDom);
+        try {
+            if (window.timeKeeper && typeof window.timeKeeper.getCurrentSetting === "function") {
+                const c = window.timeKeeper.getCurrentSetting("count");
+                if (typeof c === "number" && !isNaN(c)) return clampCountIndex(c);
+            }
+        } catch (e) { /* set_ref may not exist yet */ }
         return 0;
     }
 
-    window.getPortalPairMinimum = function () {
-        const count = getCountIndex();
+    function countMinima(count) {
         return COUNT_MINIMA.hasOwnProperty(count) ? COUNT_MINIMA[count] : 1;
+    }
+
+    window.getPortalPairMinimum = function () {
+        return countMinima(getCountIndex());
     };
 
     function countKey(count) {
         return String(count);
     }
 
+    function isPortalTab() {
+        return window._fruitBowlTab === "portal";
+    }
+
+    function storeNameForKind(kind) {
+        return kind === "general" ? "SelectedPairsByCountGeneral" : "SelectedPairsByCount";
+    }
+
+    function minForKind(kind, count) {
+        count = clampCountIndex(count);
+        if (kind === "portal") return countMinima(count);
+        if (window.pudding_settings && window.pudding_settings.AlwaysUniqueFruit) {
+            return countMinima(count);
+        }
+        return 1;
+    }
+
+    function minForTab() {
+        return minForKind(isPortalTab() ? "portal" : "general", getCountIndex());
+    }
+
     function defaultPoolForCount(count) {
-        const min = COUNT_MINIMA.hasOwnProperty(count) ? COUNT_MINIMA[count] : 1;
-        return normalizePool([], min);
+        return normalizePool([], countMinima(count));
     }
 
     function normalizePool(pool, min) {
@@ -4799,41 +7241,78 @@ window.CustomBowl.make = function () {
         return next;
     }
 
-    function ensurePairsByCountStore() {
-        if (!window.pudding_settings.SelectedPairsByCount || typeof window.pudding_settings.SelectedPairsByCount !== "object") {
-            window.pudding_settings.SelectedPairsByCount = {};
+    function copyPoolArray(pool, fallbackCount) {
+        if (Array.isArray(pool)) {
+            return pool.map(Number).filter((n) => !isNaN(n) && n !== FRUIT_BOWL_INDEX);
         }
-        for (const c of Object.keys(COUNT_MINIMA)) {
-            const key = countKey(c);
-            if (!Array.isArray(window.pudding_settings.SelectedPairsByCount[key])) {
-                window.pudding_settings.SelectedPairsByCount[key] = defaultPoolForCount(Number(c));
-            }
-        }
+        return defaultPoolForCount(fallbackCount);
     }
 
-    function getPoolForCurrentCount(minOverride) {
-        ensurePairsByCountStore();
+    function ensureStore(kind) {
+        const name = storeNameForKind(kind);
+        if (!window.pudding_settings[name] || typeof window.pudding_settings[name] !== "object") {
+            window.pudding_settings[name] = {};
+        }
+        const store = window.pudding_settings[name];
+        const portalStore = window.pudding_settings.SelectedPairsByCount;
+        for (const c of Object.keys(COUNT_MINIMA)) {
+            const key = countKey(c);
+            if (!Array.isArray(store[key])) {
+                const src = kind === "general" && portalStore && Array.isArray(portalStore[key])
+                    ? portalStore[key]
+                    : null;
+                store[key] = copyPoolArray(src, Number(c));
+            }
+        }
+        return store;
+    }
+
+    function getPoolForKind(kind, minOverride) {
+        const store = ensureStore(kind);
         const count = getCountIndex();
         const key = countKey(count);
-        const min = Math.max(window.getPortalPairMinimum(), minOverride || 0);
-        const pool = normalizePool(window.pudding_settings.SelectedPairsByCount[key], min);
-        window.pudding_settings.SelectedPairsByCount[key] = pool;
-        window.pudding_settings.SelectedPairs = pool;
+        const min = Math.max(minForKind(kind, count), minOverride || 0);
+        const pool = normalizePool(store[key], min);
+        store[key] = pool;
+        if (kind === "portal") {
+            window.pudding_settings.SelectedPairs = pool;
+        }
         return pool;
     }
 
-    function setPoolForCurrentCount(pool) {
-        ensurePairsByCountStore();
+    function setPoolForKind(kind, pool) {
+        const store = ensureStore(kind);
         const count = getCountIndex();
         const key = countKey(count);
-        const min = window.getPortalPairMinimum();
+        const min = minForKind(kind, count);
         const next = normalizePool(pool, min);
-        window.pudding_settings.SelectedPairsByCount[key] = next;
-        window.pudding_settings.SelectedPairs = next;
+        store[key] = next;
+        if (kind === "portal") {
+            window.pudding_settings.SelectedPairs = next;
+        }
         return next;
     }
 
+    function getPoolForCurrentCount(minOverride) {
+        return getPoolForKind(isPortalTab() ? "portal" : "general", minOverride);
+    }
+
+    function setPoolForCurrentCount(pool) {
+        return setPoolForKind(isPortalTab() ? "portal" : "general", pool);
+    }
+
     function ensurePoolMeetsMinimum() {
+        ensureStore("portal");
+        ensureStore("general");
+        getPoolForKind("portal");
+        if (window.pudding_settings && window.pudding_settings.AlwaysUniqueFruit) {
+            const store = ensureStore("general");
+            for (const c of Object.keys(COUNT_MINIMA)) {
+                const key = countKey(c);
+                store[key] = normalizePool(store[key], countMinima(Number(c)));
+            }
+        }
+        getPoolForKind("general");
         return getPoolForCurrentCount();
     }
 
@@ -4846,16 +7325,108 @@ window.CustomBowl.make = function () {
     }
 
     // Types currently visible on the board (type < 0 = slot being reassigned, not showing).
-    function typesOnBoard(appleManager) {
+    function typesOnBoard(appleManager, ctx) {
         const showing = new Set();
         const apples = getAppleList(appleManager);
         if (!apples) return showing;
+        ctx = ctx || {};
         for (const apple of apples) {
             if (!apple) continue;
             const t = Number(apple.type);
-            if (!isNaN(t) && t >= 0) showing.add(t);
+            if (isNaN(t) || t < 0) continue;
+            if (ctx.lh !== undefined && !!apple.Lh !== ctx.lh) continue;
+            if (ctx.oka !== undefined && !!apple.Oka !== ctx.oka) continue;
+            if (ctx.pairOka && ctx.pairOka.indexOf(!!apple.Oka) < 0) continue;
+            showing.add(t);
         }
         return showing;
+    }
+
+    function pendingApple(appleManager) {
+        const apples = getAppleList(appleManager);
+        if (!apples) return null;
+        for (const apple of apples) {
+            if (!apple) continue;
+            const t = Number(apple.type);
+            if (isNaN(t) || t < 0) return apple;
+        }
+        return null;
+    }
+
+    function assignContext(appleManager, opts) {
+        opts = opts || {};
+        const settings = appleManager && appleManager.settings;
+        const pending = pendingApple(appleManager);
+        const ctx = {};
+        if (opts.pairOka) {
+            ctx.pairOka = opts.pairOka;
+        } else if (pending && pending.Oka !== undefined &&
+            window.__bowlIsMode && window.__bowlIsMode(settings, 10)) {
+            ctx.oka = !!pending.Oka;
+        }
+        if (opts.lh !== undefined) {
+            ctx.lh = !!opts.lh;
+        } else if (pending && window.__bowlIsMode && window.__bowlIsMode(settings, 9)) {
+            ctx.lh = !!pending.Lh;
+        }
+        return ctx;
+    }
+
+    function pickMatchesCtx(entry, ctx) {
+        if (entry.lh !== undefined && ctx.lh !== undefined && entry.lh !== ctx.lh) return false;
+        if (entry.oka !== undefined && ctx.oka !== undefined && entry.oka !== ctx.oka) return false;
+        if (entry.pairOka && ctx.pairOka) {
+            for (let i = 0; i < entry.pairOka.length; i++) {
+                if (ctx.pairOka.indexOf(entry.pairOka[i]) >= 0) return true;
+            }
+            return false;
+        }
+        if (entry.pairOka && ctx.oka !== undefined) {
+            return entry.pairOka.indexOf(ctx.oka) >= 0;
+        }
+        return true;
+    }
+
+    function mergeUniquePicks(showing, ctx) {
+        if (!window.__bowlUniquePicks) return;
+        window.__bowlUniquePicks.forEach(function (entry) {
+            if (pickMatchesCtx(entry, ctx)) showing.add(entry.type);
+        });
+    }
+
+    // Dimension pairs alternate Oka; assign before type picks when unique needs it.
+    window.ensureCustomBowlDimensionOka = function (appleManager) {
+        if (!appleManager || !window.__bowlIsMode || !window.__bowlIsMode(appleManager.settings, 10)) return;
+        const apples = getAppleList(appleManager);
+        if (!apples || apples.length < 2) return;
+        for (let b = 0; b + 1 < apples.length; b += 2) {
+            const c = Math.random() < 0.5;
+            apples[b].Oka = c;
+            apples[b + 1].Oka = !c;
+        }
+    };
+
+    // When every pool type still looks "on board", pick the least-used ones
+    // (the eaten slot, once cleared to -1, is the only 0-count type at minimum).
+    function rarestPoolTypes(appleManager, pool, ctx) {
+        ctx = ctx || {};
+        const counts = new Map();
+        for (let i = 0; i < pool.length; i++) counts.set(pool[i], 0);
+        const apples = getAppleList(appleManager);
+        if (apples) {
+            for (const apple of apples) {
+                if (!apple) continue;
+                const t = Number(apple.type);
+                if (!counts.has(t)) continue;
+                if (ctx.lh !== undefined && !!apple.Lh !== ctx.lh) continue;
+                if (ctx.oka !== undefined && !!apple.Oka !== ctx.oka) continue;
+                if (ctx.pairOka && ctx.pairOka.indexOf(!!apple.Oka) < 0) continue;
+                counts.set(t, counts.get(t) + 1);
+            }
+        }
+        let best = Infinity;
+        counts.forEach(function (n) { if (n < best) best = n; });
+        return pool.filter(function (t) { return counts.get(t) === best; });
     }
 
     function isCustomBowlActive(settings) {
@@ -4870,26 +7441,49 @@ window.CustomBowl.make = function () {
         }
     }
 
+    function rememberUniquePick(type, ctx) {
+        if (!window.__bowlUniquePicks) window.__bowlUniquePicks = [];
+        const entry = { type: type };
+        if (ctx) {
+            if (ctx.lh !== undefined) entry.lh = ctx.lh;
+            if (ctx.oka !== undefined) entry.oka = ctx.oka;
+            if (ctx.pairOka) entry.pairOka = ctx.pairOka.slice();
+        }
+        window.__bowlUniquePicks.push(entry);
+        if (!window.__bowlUniquePicksClear) {
+            window.__bowlUniquePicksClear = true;
+            setTimeout(function () {
+                window.__bowlUniquePicks = [];
+                window.__bowlUniquePicksClear = false;
+            }, 0);
+        }
+    }
+
     /**
      * Roll a fruit from the custom bowl pool.
-     * Unique (pool − showing) when portal OR AlwaysUniqueFruit is on.
-     * Portal always uses unique logic; the checkbox enables it for other modes.
-     * If allowed is empty, fall back to full pool (re-roll eaten type when board is full).
+     * Portal always unique + portal store.
+     * Other modes use General store; unique iff AlwaysUniqueFruit.
+     * Simultaneous 3a/5a picks in one turn share __bowlUniquePicks.
      */
-    window.pickCustomPortalType = function (appleManager, isPortal) {
+    window.pickCustomPortalType = function (appleManager, isPortal, opts) {
         syncCountOverride(appleManager && appleManager.settings);
         try {
-            const pool = ensurePoolMeetsMinimum();
+            const kind = isPortal ? "portal" : "general";
+            const pool = getPoolForKind(kind);
             if (!pool.length) return 0;
             const useUnique = !!isPortal ||
                 !!(window.pudding_settings && window.pudding_settings.AlwaysUniqueFruit);
             if (!useUnique) {
                 return pool[Math.floor(Math.random() * pool.length)];
             }
-            const showing = typesOnBoard(appleManager);
+            const ctx = assignContext(appleManager, opts || {});
+            const showing = typesOnBoard(appleManager, ctx);
+            mergeUniquePicks(showing, ctx);
             const available = pool.filter((t) => !showing.has(t));
-            const source = available.length > 0 ? available : pool;
-            return source[Math.floor(Math.random() * source.length)];
+            const source = available.length > 0 ? available : rarestPoolTypes(appleManager, pool, ctx);
+            const picked = source[Math.floor(Math.random() * source.length)];
+            rememberUniquePick(picked, ctx);
+            return picked;
         } finally {
             window.__customBowlCountOverride = null;
         }
@@ -4901,10 +7495,20 @@ window.CustomBowl.make = function () {
         const apples = getAppleList(appleManager);
         if (!apples || apples.length < 2) return false;
 
+        window.ensureCustomBowlDimensionOka(appleManager);
+
         for (let i = 0; i < apples.length; i++) apples[i].type = -1;
 
         for (let i = 0; i < apples.length; i += 2) {
-            const t = window.pickCustomPortalType(appleManager, true);
+            const a0 = apples[i];
+            const a1 = apples[i + 1];
+            const opts = {};
+            if (window.__bowlIsMode && window.__bowlIsMode(appleManager.settings, 10)) {
+                opts.pairOka = [!!a0.Oka, a1 ? !!a1.Oka : !!a0.Oka];
+            } else if (window.__bowlIsMode && window.__bowlIsMode(appleManager.settings, 9)) {
+                opts.lh = !!a0.Lh;
+            }
+            const t = window.pickCustomPortalType(appleManager, true, opts);
             apples[i].type = t;
             if (apples[i + 1]) apples[i + 1].type = t;
         }
@@ -4914,6 +7518,8 @@ window.CustomBowl.make = function () {
     // Portal-only safety: if two pairs share a type, re-roll with showing-list rules.
     window.enforceUniquePortalFruitTypes = function (appleManager) {
         if (!appleManager || !isCustomBowlActive(appleManager.settings)) return;
+        // assignCustomPortalPairTypes already enforces per-dimension uniqueness.
+        if (window.__bowlIsMode && window.__bowlIsMode(appleManager.settings, 10)) return;
         const apples = getAppleList(appleManager);
         if (!apples || apples.length < 2) return;
 
@@ -4925,7 +7531,11 @@ window.CustomBowl.make = function () {
             if (isNaN(t) || t < 0 || seen.has(t)) {
                 if (a0) a0.type = -1;
                 if (a1) a1.type = -1;
-                t = window.pickCustomPortalType(appleManager, true);
+                const opts = {};
+                if (window.__bowlIsMode && window.__bowlIsMode(appleManager.settings, 9)) {
+                    opts.lh = !!a0.Lh;
+                }
+                t = window.pickCustomPortalType(appleManager, true, opts);
                 if (a0) a0.type = t;
                 if (a1) a1.type = t;
             } else if (a1 && Number(a1.type) !== t) {
@@ -4965,23 +7575,41 @@ window.CustomBowl.make = function () {
         return options;
     }
 
+    function tabButtonStyle(active) {
+        const bg = active ? "#1155CC" : "rgba(17,85,204,0.45)";
+        return "margin:0;padding:4px 16px;color:white;background-color:" + bg +
+            ";font-family:Roboto,Arial,sans-serif;border:1px solid rgba(255,255,255,0.25);";
+    }
+
+    function syncTabUi() {
+        const portalBtn = document.getElementById("fruit-bowl-tab-portal");
+        const generalBtn = document.getElementById("fruit-bowl-tab-general");
+        const uniqueRow = document.getElementById("fruit-bowl-unique-row");
+        const portalNote = document.getElementById("fruit-bowl-portal-note");
+        const portalOn = isPortalTab();
+        if (portalBtn) portalBtn.style.cssText = tabButtonStyle(portalOn);
+        if (generalBtn) generalBtn.style.cssText = tabButtonStyle(!portalOn);
+        if (uniqueRow) uniqueRow.style.display = portalOn ? "none" : "flex";
+        if (portalNote) portalNote.style.display = portalOn ? "block" : "none";
+    }
+
     function updateStatusLabel() {
         const el = document.getElementById("fruit-bowl-status");
         if (!el) return;
         const pool = getPoolForCurrentCount();
-        const min = window.getPortalPairMinimum();
+        const min = minForTab();
         el.textContent = `Selected ${pool.length} / min ${min}`;
     }
 
     function renderFruitGrid() {
         const grid = document.getElementById("fruit-bowl-grid");
         if (!grid) return;
-        const pool = new Set(ensurePoolMeetsMinimum());
+        const pool = new Set(getPoolForCurrentCount());
         const options = buildFruitOptions();
-        const min = window.getPortalPairMinimum();
+        const min = minForTab();
         grid.innerHTML = "";
 
-        const rowSize = 6;
+        const rowSize = 7;
         for (let i = 0; i < options.length; i += rowSize) {
             const row = document.createElement("div");
             row.style = "display:flex;flex-wrap:nowrap;gap:8px;margin-bottom:8px;justify-content:center;";
@@ -5033,13 +7661,21 @@ window.CustomBowl.make = function () {
             grid.style.opacity = window.pudding_settings.PortalPairs ? "1" : "0.45";
             grid.style.pointerEvents = window.pudding_settings.PortalPairs ? "auto" : "none";
         }
+        syncTabUi();
+    }
+
+    function setFruitBowlTab(tab) {
+        window._fruitBowlTab = tab === "general" ? "general" : "portal";
+        ensurePoolMeetsMinimum();
+        syncPanelEnabledState();
+        renderFruitGrid();
     }
 
     // Theme background is applied separately via applyPanelTheme (Theme.js sets real_topbar_color).
     const PANEL_STYLE =
         "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:100000;" +
         "padding:18px 20px 16px;display:none;border-radius:8px;" +
-        "width:min(480px,92vw);min-width:280px;height:auto;min-height:320px;max-height:min(720px,88vh);" +
+        "width:min(560px,92vw);min-width:280px;height:auto;min-height:320px;max-height:min(720px,88vh);" +
         "overflow-x:hidden;overflow-y:auto;visibility:hidden;box-sizing:border-box;" +
         "box-shadow:0 12px 36px rgba(0,0,0,0.5);border:2px solid rgba(255,255,255,0.18);";
 
@@ -5089,29 +7725,44 @@ window.CustomBowl.make = function () {
         }
 
         let panel = document.getElementById("fruit-bowl-popup-pudding");
+        if (panel && !document.getElementById("fruit-bowl-tab-portal")) {
+            panel.remove();
+            panel = null;
+        }
         if (!panel) {
             panel = document.createElement("div");
             panel.id = "fruit-bowl-popup-pudding";
             panel.style.cssText = PANEL_STYLE;
             panel.innerHTML = `
-                <div style="color:white;font-family:Roboto,Arial,sans-serif;text-align:center;margin-bottom:14px;font-size:18px;font-weight:bold;letter-spacing:0.2px;">Fruit Bowl Settings</div>
+                <div style="color:white;font-family:Roboto,Arial,sans-serif;text-align:center;margin-bottom:10px;font-size:22px;font-weight:bold;letter-spacing:0.2px;">Fruit Bowl Settings</div>
+                <div style="display:flex;justify-content:center;gap:8px;margin:0 auto 12px;">
+                    <button type="button" class="btn" id="fruit-bowl-tab-general">General</button>
+                    <button type="button" class="btn" id="fruit-bowl-tab-portal">Portal</button>
+                </div>
                 <div style="display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;margin:0 auto 12px;width:100%;">
                     <div style="display:flex;align-items:center;gap:8px;">
                         <input class="form-check-input" type="checkbox" role="switch" id="fruit-bowl-enable" style="margin:0;float:none;position:static;">
-                        <label class="form-check-label" for="fruit-bowl-enable" style="margin:0;color:white;font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.2;">Enable custom fruit bowl</label>
+                        <label class="form-check-label" for="fruit-bowl-enable" style="margin:0;color:white;font-family:Roboto,Arial,sans-serif;font-size:16px;line-height:1.2;">Enable custom fruit bowl</label>
                     </div>
-                    <div style="display:flex;align-items:center;gap:8px;">
+                    <div id="fruit-bowl-unique-row" style="display:none;align-items:center;gap:8px;">
                         <input class="form-check-input" type="checkbox" role="switch" id="fruit-bowl-always-unique" style="margin:0;float:none;position:static;">
-                        <label class="form-check-label" for="fruit-bowl-always-unique" style="margin:0;color:white;font-family:Roboto,Arial,sans-serif;font-size:14px;line-height:1.2;">Always Unique Fruit</label>
+                        <label class="form-check-label" for="fruit-bowl-always-unique" style="margin:0;color:white;font-family:Roboto,Arial,sans-serif;font-size:16px;line-height:1.2;">Always Unique Fruit</label>
                     </div>
                 </div>
-                <div id="fruit-bowl-status" style="color:#dce8c8;font-family:Roboto,Arial,sans-serif;font-size:13px;margin:0 0 12px 0;text-align:center;"></div>
+                <div id="fruit-bowl-portal-note" style="display:none;color:#dce8c8;font-family:Roboto,Arial,sans-serif;font-size:14px;margin:0 0 10px 0;text-align:center;">Portal fruit bowl is always unique</div>
+                <div id="fruit-bowl-status" style="color:#dce8c8;font-family:Roboto,Arial,sans-serif;font-size:15px;margin:0 0 12px 0;text-align:center;"></div>
                 <div id="fruit-bowl-grid" style="padding:4px 0 8px;display:flex;flex-direction:column;align-items:center;"></div>
-                <button type="button" class="btn" style="margin-top:8px;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;width:100%;padding:8px 12px;font-size:14px;" id="fruit-bowl-close">Close</button>
+                <button type="button" class="btn" style="margin:8px auto 0;display:block;color:white;background-color:#1155CC;font-family:Roboto,Arial,sans-serif;" id="fruit-bowl-close">Close</button>
             `;
             host.appendChild(panel);
             applyPanelTheme(panel);
 
+            document.getElementById("fruit-bowl-tab-portal").addEventListener("click", function () {
+                setFruitBowlTab("portal");
+            });
+            document.getElementById("fruit-bowl-tab-general").addEventListener("click", function () {
+                setFruitBowlTab("general");
+            });
             document.getElementById("fruit-bowl-enable").addEventListener("change", function () {
                 window.pudding_settings.PortalPairs = !!this.checked;
                 ensurePoolMeetsMinimum();
@@ -5121,8 +7772,17 @@ window.CustomBowl.make = function () {
             });
             document.getElementById("fruit-bowl-always-unique").addEventListener("change", function () {
                 window.pudding_settings.AlwaysUniqueFruit = !!this.checked;
+                if (this.checked) {
+                    const store = ensureStore("general");
+                    for (const c of Object.keys(COUNT_MINIMA)) {
+                        const key = countKey(c);
+                        store[key] = normalizePool(store[key], countMinima(Number(c)));
+                    }
+                }
+                getPoolForKind("general");
                 if (typeof window.saveSettings === "function") window.saveSettings();
                 syncPanelEnabledState();
+                renderFruitGrid();
             });
             document.getElementById("fruit-bowl-close").addEventListener("click", function () {
                 window.PortalPairsPanelHide();
@@ -5227,12 +7887,12 @@ window.CustomBowl.alterCode = function (code) {
     // Portal init: clear + roll from (pool − showing) pair by pair.
     code = code.assertReplace(
         baf_regex,
-        `${baf_name}=function(a){` +
+        `${baf_name}=function(a){window.__bowlIsMode=${portal_check};` +
         `if(${portal_check}(a.settings,2)&&window.assignCustomPortalPairTypes&&window.assignCustomPortalPairTypes(a))return;` +
         `if(${portal_check}(a.settings,2)){var b=Math.floor(48/a.${apple_array}.length);`
     );
 
-    // Custom bowl pick: portal → showing-list uniqueness; other modes → random from pool.
+    // Custom bowl pick: portal → portal store + unique; other modes → general store + AlwaysUniqueFruit.
     code = code.assertReplace(
         aaf_regex,
         `${aaf_name}=function(a){` +
@@ -5241,18 +7901,44 @@ window.CustomBowl.alterCode = function (code) {
         `if(a.settings.${fruit_setting}===24){`
     );
 
-    // Before in-place portal retype, drop the eaten pair from "showing" (type=-1).
+    // v12: Ni&&(this.wa.ka[vd].type=aaF(this.wa),this.wa.ka[Ok].type=this.wa.ka[vd].type)
+    // v13: e&&(a.wa.ka[k].type=Q3E(a.wa),a.wa.ka[d].type=a.wa.ka[k].type)
     const inplace_regex = new RegExp(
-        `Ni&&\\(this\\.wa\\.ka\\[vd\\]\\.type=${aaf_name}\\(this\\.wa\\),this\\.wa\\.ka\\[Ok\\]\\.type=this\\.wa\\.ka\\[vd\\]\\.type\\)`
+        `([a-zA-Z0-9_$]{1,8})&&\\(([a-zA-Z0-9_$]{1,8}\\.)wa\\.ka\\[([a-zA-Z0-9_$]{1,8})\\]\\.type=${aaf_name}\\(\\2wa\\),\\2wa\\.ka\\[([a-zA-Z0-9_$]{1,8})\\]\\.type=\\2wa\\.ka\\[\\3\\]\\.type\\)`
     );
     catchError(inplace_regex, code);
+    const inplace_match = code.match(inplace_regex);
     code = code.assertReplace(
         inplace_regex,
-        `Ni&&(this.wa.ka[vd].type=-1,this.wa.ka[Ok].type=-1,this.wa.ka[vd].type=${aaf_name}(this.wa),this.wa.ka[Ok].type=this.wa.ka[vd].type)`
+        `${inplace_match[1]}&&(${inplace_match[2]}wa.ka[${inplace_match[3]}].type=-1,${inplace_match[2]}wa.ka[${inplace_match[4]}].type=-1,${inplace_match[2]}wa.ka[${inplace_match[3]}].type=${aaf_name}(${inplace_match[2]}wa),${inplace_match[2]}wa.ka[${inplace_match[4]}].type=${inplace_match[2]}wa.ka[${inplace_match[3]}].type)`
+    );
+
+    // Non-portal eat/respawn (3a/5a/10a): clear the reused slot first, same as
+    // tally's type:-1 new apple, so the eaten type leaves "showing" and can re-roll.
+    const eat_retype_regex = new RegExp(
+        `:([a-zA-Z0-9_$]{1,8})&&\\(([a-zA-Z0-9_$]{1,8})\\.type=${aaf_name}\\(([a-zA-Z0-9_$]{1,8})\\.wa\\)\\)`
+    );
+    catchError(eat_retype_regex, code);
+    code = code.assertReplace(
+        eat_retype_regex,
+        `:$1&&($2.type=-1,$2.type=${aaf_name}($3.wa))`
+    );
+
+    // Non-portal start-of-game fill: stage every slot as -1, then pick sequentially
+    // so typesOnBoard sees earlier apples in the same wave.
+    const classic_fill_regex = new RegExp(
+        `else for\\(var ([a-zA-Z0-9_$]{1,8}) of this\\.${apple_array}\\)\\1\\.type=${aaf_name}\\(this\\)`
+    );
+    catchError(classic_fill_regex, code);
+    code = code.assertReplace(
+        classic_fill_regex,
+        `else{for(var $1 of this.${apple_array})$1.type=-1;` +
+        `window.ensureCustomBowlDimensionOka&&window.ensureCustomBowlDimensionOka(this);` +
+        `for($1 of this.${apple_array})$1.type=${aaf_name}(this)}`
     );
 
     const refill_regex = new RegExp(
-        `if\\(([a-zA-Z0-9_$]{1,8})\\(a\\.settings,2\\)&&b\\.length>0\\)for\\(b\\[0\\]\\.type=${aaf_name}\\(a\\.([a-zA-Z0-9_$]{1,8})\\),b\\[1\\]\\.type=b\\[0\\]\\.type,a=2;a<b\\.length;a\\+=2\\)b\\[a\\]\\.type=\\(b\\[a-2\\]\\.type\\+1\\)%24,b\\[a\\+1\\]\\.type=b\\[a\\]\\.type`
+        `if\\(([a-zA-Z0-9_$]{1,8})\\(a\\.settings,2\\)&&b\\.length>0\\)for\\(b\\[0\\]\\.type=${aaf_name}\\(a\\.([a-zA-Z0-9_$]{1,8})\\),b\\[1\\]\\.type=b\\[0\\]\\.type,a=2;a<b\\.length;a\\+=2\\)b\\[a\\]\\.type=\\(b\\[a-2\\]\\.type\\+1\\)%\\n?24,b\\[a\\+1\\]\\.type=b\\[a\\]\\.type`
     );
     catchError(refill_regex, code);
     const refill_match = code.match(refill_regex);
@@ -5284,8 +7970,6 @@ window.CustomBowl.alterCode = function (code) {
 
     return code;
 };
-window.PuddingMod = {};
-
 ////////////////////////////////////////////////////////////////////
 //RUNCODEBEFORE
 ////////////////////////////////////////////////////////////////////
@@ -5363,14 +8047,17 @@ window.PuddingMod.runCodeBefore = function () {
     "Theme",
     "DistinctVisual",
     "Counter",
+    "ModeRegistry",
     "TimeKeeper",
     "Fruit",
+    "GraphicsMix",
     "TopBar",
     "SnakeColor",
     "SettingsSaver",
     "SpeedInfo",
     "InputDisplay",
     "Timer",
+    "SplitPanel",
     "BootstrapMenu",
     "ResetKey",
     "RenderDelayFix",
@@ -5381,7 +8068,14 @@ window.PuddingMod.runCodeBefore = function () {
   libUrlPrefix = window.NepDebug ? "http://127.0.0.1:5500/Libraries/" : "https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakePudding/main/Libraries/";
   window.Libraries.forEach(LibName => {
     console.log("Loading library: " + LibName)
-    eval("window." + LibName + ".make();")
+    try {
+      if (!window[LibName] && typeof window.loadCode === "function") {
+        window.loadCode(libUrlPrefix + LibName + ".js");
+      }
+      eval("window." + LibName + ".make();")
+    } catch (e) {
+      console.error("Library failed: " + LibName, e);
+    }
   });
 
 
@@ -5431,6 +8125,14 @@ window.PuddingMod.runCodeAfter = function () {
   let canvasNode = document.getElementsByClassName('jNB0Ic')[0];
   document.getElementsByClassName('EjCLSb')[0].insertBefore(modIndicator, canvasNode);
 
+  if (typeof window.appendPairGraphicsIcons === "function") {
+    window.appendPairGraphicsIcons();
+  }
+
+  // Belt-and-suspenders: menu may not exist until after alterCode's setTimeout(0)
+  if (typeof window.applySavedGameSettingsOnce === "function") {
+    setTimeout(window.applySavedGameSettingsOnce, 0);
+  }
 };
 
 window.moreMenu = {
@@ -5446,14 +8148,14 @@ window.moreMenu = {
 
   
     for(let src of [
-      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Micro.png?raw=true',
-      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Tiny.png?raw=true',
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAAXNSR0IArs4c6QAAA95JREFUeF7tnDFuE1EQhmcRkCYRkSiIqdyAYkhpahqugCyukAP4ED5AroAsrkBDjcuAI2hc4VAgOUqaAMqiGCxRJJF2Z8bZnflSZ97u/71P/z7biQvhJzWBInV6wgsCJJcAARAgOYHk8WkABEhOIHl8GgABkhNIHp8GQIDkBJLHpwEQIDmB5PFpAARITiB5fBoAAZITSB6fBkCA5ASSx6cBECA5geTxaQAESE4geXwaAAGSE0genwZAgOQEksenARAgOYHk8WkABEhOIHl8GgABkhNIHp8GQIDkBJLHpwEQIDmB5PFpAARITiB5fBoAAZpNYKe73X25/+StFOWelLLZ7Lv9d3eFnElZHH44+PrmeLaYNfmeG98Ag1H/o4j0mwzxhnubjIeTF02+9zYIUF4C7DzekO0Hd2uwLOROUS/mRXl56eXlK/0sTn7L/Nv5cmY8nNS7eKUr1v/lRt/cZazBqL/cgV5vUzqdjfpJ1zg5n5/LdHqGABbMEcCC4vVr0AAOfGkAQ6g0gCHMK5aiARz40gCGUGkAQ5g0gC/M1eo0gCFnGsAQJg3gC5MGcOBLAzhA/W9JXgU48OUMYAiVBjCEyRnAFyZnAAe+NIAD1DaeAZ4/25JHO/d9aRit/v34p3z6fLpcjY+DlVBXDYAASpDXjLfmVQACIACPAAcHaAAHqJwBDKFyBjCE2eb3ATgD+IjAI8CBK48AQ6g8Agxh8gjwhblanQYw5EwDGMKkAXxh0gAOfGkAB6h8GOQLlTOAIV8+DjaE2eYzAP8c6iNCa94IQgAE4N/DHRygARyg8lfBhlA5BBrC5BDoC3O1Og1gyJkGMIRJA/jCpAEc+NIADlDb+FYw7wP4iMDLQAeuHAINofIIMITJIdAXJodAB76rBvj7VbH3al1B91Wx1S+5OPnFV8VWx3b1xGDUn4rIrtV6a17naDyc9NZ8zUqXa/wh8GF3a/fV/tN3IsVepWS3/svl4fuDL69/zE6Pbv1WbriBxgvQZHgR7g0BIuyiIgMCKOBFGEWACLuoyIAACngRRhEgwi4qMiCAAl6EUQSIsIuKDAiggBdhFAEi7KIiAwIo4EUYRYAIu6jIgAAKeBFGESDCLioyIIACXoRRBIiwi4oMCKCAF2EUASLsoiIDAijgRRhFgAi7qMiAAAp4EUYRIMIuKjIggAJehFEEiLCLigwIoIAXYRQBIuyiIgMCKOBFGEWACLuoyIAACngRRhEgwi4qMiCAAl6EUQSIsIuKDAiggBdhFAEi7KIiAwIo4EUYRYAIu6jIgAAKeBFGESDCLioyIIACXoRRBIiwi4oMfwCz/uCQE2ccogAAAABJRU5ErkJggg==',
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAAXNSR0IArs4c6QAABAdJREFUeF7tnU1SU1EQhfuGlE5iGX8WABtQJNmHjsIQ3YETyJAwDEzcgTBMRrqPBNENwAL8iWUmWuFdC7AsoKCK5L6+9br6Y0q67+lzvur73iAQhB/XDgTX0zO8AIBzCAAAAJw74Hx8NgAAOHfA+fhsAABw7oDz8dkAAODcAefjswEAwLkDzsdnAwCAcwecj88GAIByHOj0WxshhNdRpBlEVsvpSpfLDkSRoyAyiTHuD7vjgzLcKWUDdPba2yFKrwxB9LibAzFIb7g52rnbp2//VDIA63vtlxLlQ6oQ6hdwIMirwebo4wKV/0vSAei3jiWE5RQR1C7oQIwng+54ZcHq87J0AHbb8bKAej1Io7GUomnu2lqoSa2WPMpc5xZFlCIWc9Wkfng6PZXZ7IrdMtgaJQ2eVHw20Po1AJrNuqytPUydlfobHDg8/CmTyezKbwDAESoA4Cjsm0YFAADgCvDMABvAc/oiAgAAwBXgmQE2gOf0uQKcpw8AAMAV4JwBAAAA3gI8M8AG8Jw+D4HO0wcAAOAKcM4AAAAAbwGeGWADeE6fh0Dn6QMAAHAFOGcAAACAtwDPDLABPKfPQ6Dz9K0A8PjRPVl98YC0FBw4+vRLvv/4U+3vBj59cl+ePW8ojE/LL5+n8vXbbwDwigIAeE3+39wAAABcAZ4ZYAN4Tl9EAAAAuAI8M8AG8Jw+V4Dz9AEAALgCnDMAAADAW4BnBtgAntPnIdB5+gAAAFwBzhkAAADgLcAzA2wAz+nzEOg8fQAAAK4A5wwAAADwFuCZATaA5/R5CHSevhUA+HKoHqgmvhzKfw7VA4A/EKHnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOJgCo14M0GktZDa2FmtRqIeuZRRGliEXWM6fTU5nN4pUzB1ujpMGTis+UrPdbxxLCclYnOOzCgRhPBt3xSoodyQB09trbIUovRQS1izkQg/SGm6OdxaovqpIBON8Cu633IuF1ihBq53Ug7g+2xm/mrbr++VIAOGva6bc2JMi7IKGZKor62x2IEicS5e2wOz4ow6fSAChDDD3yOwAA+T2v1IkAUKk48osBgPyeV+pEAKhUHPnFAEB+zyt1IgBUKo78YgAgv+eVOhEAKhVHfjEAkN/zSp0IAJWKI78YAMjveaVOBIBKxZFfDADk97xSJwJApeLILwYA8nteqRP/Apk8ua6B+meGAAAAAElFTkSuQmCC',
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAC8AAAAvCAYAAABzJ5OsAAABYElEQVRoQ+2Y2w7DIAxD1///6E2VRsUYJXZuFIm9AuHEMSzleC38OxZmf214oXrvZtxNMEugAtWL0QLX/JY9f3SwBGLgz31G81VHLwq+B1NXw7LvFdsSRKOkZs1tVTY8aNilbeNqmVOwTNssC+9umUzl3VXf8OC5WVb5EL9n2CYMPBPeciVPaw9CvF6ysSiCgIV9iFhtg7Q0oR8lFuUR+HrOKBGVEzLh3ROZBS99aUGWfhI8a0NTS0xv5r1ghvLIFQvl+SR4OikGvhec3XDU67CxKM+3wTVNF/JQBQsKT6xevMo1RislvJrR8Rj4E7r3L8nEmKZ8D54Br9ePHmfhmPDE792l8Xm59qS1qbbRJn63LhQ+w+9QT6NpQe9aWrQCroeVybL1q+TfUdfoclg18PXGjEelZJlYlzBoyaFGaTBJgpPGu6E3PFAWSVlp/NHKA/n/T8myjQpOWrThJYWixj+UTlgwJgIXFAAAAABJRU5ErkJggg==',
-      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Super%20Big.png?raw=true',
-      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Too%20Big.png?raw=true',
-      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Humongous.png?raw=true',
-      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Too%20Big.png?raw=true',
-      'https://github.com/carlgustavh/GoogleSnakeCustomMenuStuffImages/blob/main/Way%20Too%20Big.png?raw=true'
+      'data:image/png;base64,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',
+      'data:image/png;base64,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',
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAAXNSR0IArs4c6QAAIABJREFUeF7tfcm2HNeV3Y1MFMn6AQuApq5PKJEcsvfMIrSKaCTP7PoIi9TAVPkjanloAg/SKlAeeZEgxaGbX7CnbPQFFilkhNfZzTkn8uV7AEjFgCSwtETgvciMiHtPs88+zZ3Gsz8/6hWYftRv/+zlxzMB+JELwTMBeCYAP/IV+JG//jML8EwALl+Bd6//4p+nafmHMcbzY4y//ZGv1/fl9f/fGOPrZZl+/9sv/uUfL3voSy3Aez+98ccxxivfl7d+9pwnV+Cz9z9/8OpFa3OhALz30xv/NMb4j88W9QexAv/5/c8f/PrUm1wmAH8ZY1z5Qbz+s5d49P7nD/7maQVgebZuP5wVeP/zByeV/TILcE4Avr763hhjHsuyG7tpHot4pGVZxm5MY5nGiA9N+L9YPF4xj2nc2X2Cv8dP4vcnpQsfHGNZJn6cHxhnyytjjjtMy1jm+PFuLHHtNMZu4ffv8hsX/Zv3ur17OKaFzxaXxOf0aGOZ4j56krhnPP/RNXfn18e0489xf1zHL8N7T/Es8c68L75j5gLcnh7WveJ3sXa7MaY5/i8+r+fBesRn4h3xLePeeEPPO43dsvAeflq9S3z5cqCQTjs925jH81+F917/+asIwJ+vv4eHmWMRYlEOy9jtl3E47MZut4w5FlQLxRWfxzLz2tvTJyc3F1fFpuQ+1KZ44+4+eo0vuZ+0Eec1MzZyDsGEgMZaYlfG7fEpL9b3x0ZhE7B6+rHV4MQ1H8yvlUCHsEE4ZwjBQYKH24Ukxv94c9zwzvQJb4sNk/hPFMZp1s9CkUKQ4+e4hhp0trzB97ASTRQEqB3WmQoQ60vhoIDGGrzw1fvbCMDX198d0zyNEHBsuLRmlgXgmtIaHKAd8VJcrNvjk5XGda3EyuUiyYq0Tbk3YhOoI2EJ9rI01DP+nBsa30OB3MceTGPcGp9gYXKVYEG4R9wsWSVdQw3W+u3GuLe8jt0Kqwchm2MDuKsQXmy6JWwaO1mL+EkIALWzBBDPGrsfigFxnccUEhkCJCmN77y/ezNelu8WG6znirXm99HazGEB8PsQhFj7MZ7/ciMB+ObaeyMewApmS58WX+vGhdUDSgHuSBP9Qmut1P7INsM04vPcuBCA2BMoWeyxtJvKEgIZmyJ1niigNNPzuD3+yA1rPieejxrDhZylQV1tfM0H43UsamheuBk5u3FYxtjvlzH/JTaPm5y6r5e8Mx5KOHnz2PLYryYPsopUgHgXbOoY4/782phlPfFJvDzfjcK9jOUQ18fVtHb4/Rjjha9+u5EFuPouV5IqkH+4nPH/5dyXKTTGmhHmMCgF+b22ufbz+LyUmHrtDRrj3ggtBDgQhpDF4I+4uKEBMo/4MK5d4HrS2vhx+CTWYQOWtekJcz/N497y1tjt6Fam8PewDrQ08YZy9xI4bi4EcCzjZtxb++O0G13VBOuIX8rsQ63CEsgani2vF+6QyOyAGyiGZSD1XfG9sojPf7mlAAA48Y8NqLZAPwjAUqDM738nXIAcInzWkVbS3NFthA5AKwXe7o/X9crNZMdN8eXSHj2Pv9ZW6fYSrofaEYYjni0+N+/msQsNkzshKAs/O8Zht4zpMI2xX8a9+Q2KI9yZLRAFDCthROm/hxYeaJHu7D6FmyFIrHtZXRKApjjKVY1lnE1vcn1x64MsFcFjfBdeX8IfImF3HM/1wp+2EoDr71Eqac/Wf1Iz6hfNrY+b88fQGBrT/uH6e/hDXJObzwU5272xvle6SwqbhcmYwAIZ33xrephmYpl3Y9kd4HOhgPTq+m4CK0YbofHcpntTCEBzIZYwCI7+kcBXdhAYKYBv3FvvZzQogY2f2yvJ3qUZD0W4P94YMx6Nvp07LoHYHcay29ElViwmpQwQuJUAXKMLoH6XX7PJo4pxtbi4Cc/GO+PjsQPc9WLy0bvGFbjxt1Pa7i0hALQ8hbcKeZQIpT9IU30rzPAKAlDToUlhZkKpHP7JhHbpPotwDK8UwhZRhp+t20AJoZTAVgURiGPi+PzKe5bf5jZaILl295aIfCTSEjC4DkUbwER4MQXAMkYBUv92KwvwzbXfyHsyFGHYIwxyZBDSH8cn5tDEjxH/TuFP6bX5gtDGGSYMfhVAhivljT2bGBMX0Kfm2xGthC0sPJB+hHvTuL08lNUyepdWyXvw+WtnujCFlw9ffA73NAMmaCLXrefS3t6MCKSbd2CGRVGMvqSMiJEPLU+EgcA0FcEkjk2QW0gmwdCYxvNbhYHfwAXEQ0mNtXgkbvQm0Kbz19xcRMiccx+lyQ1YEA0LTCEkMr70yzc2aSVsMrU2sOF6qCrmF+yG6h3s4yuoTPGEAIQg0Qqft2yWH2AIiazlI0LQCj/K8yNqia/Dc/mPN5r/vQvBK7zNK32PWjOuta0L3/qFrUBghIG4taVWG2Q/bHxw6ppbUxAyoenGEHylcqkMsRj8yiZr4wIEWtsZHta69s3nw5kR40U3l48VtBRXeM7nBleBhyHIqqcKFtL4w1tAXuNSiwTAGJHPpw3IGahpo2067RIFNKhMYQEi8jltJcQpSrbW4DJeY1MeYIXfHJZhrQmoChlrjXQNtUGk7RyLCBVoWEL6tQsB2IlA4jVn0+uigGnWsUTSIrNgdkcwuQKGscYRBi5xv3hwkDSN/m3ooDTZG02RCzDm0OzYshVKtz+3mHLv+M7S3LxvWUqEOt0ipldbEPraqqbp18UmhfJdmxUJBdlOABwFhIRXDNK4fWIDgp31NbeXj1segDF6CUupdCD0RXx43CO+BxjAG6vVWGl+WlF9q/HJmMUE8lksBHYnBVO5C2QtQyX1JyjZQUo2LVWzPjbJF1mkW4sE4Ei7TZLF52kRzzNRYQG6g+jmkkIcFLIjJjsaLs5mPEBggIxdQuMjXhYyyyiHAi/Br2tgihuThrjam6I3FeaV2QyHsBuHZR73p7cSqJFIobcuYTN9K1QvtjIeJBjIHrH4OQkqygExvqaFyJWf6AKOLRtesQHNUxYphOZW4B5/We6mIxUkQYgrnKwiPAFBdG8X4WdYQvMcUizR3aLd4DTTH8maPPfFRlTw19fek/8jE0atod/1i1r7zcv7moiJ+S4d9MXfxaHi4Q90Ep0di5h4ektkShrUihJOCBs1nAt3ezAW51IXKePgvlyCNl7C4/cBC7kSNtOVcjWXWCQA0K7d8hkMpOMPaTJEo5FjMcmzCx4giCBFW9YnLPslEZBEYTMXcOP6S3aH2Ebw40hkcGOZKaNmAZkCGlDCw4xnjqBs7AoD0JhQQMr8TePW+JjfgzSqgR4XA3ghLJGwY35S4Aq+tDjmpxakWxAg8gBx+z20ldSwn9TvaD6eLkFsnjN3xvBHNLpRYlLn4rZBYIk0C1YymMt4+L2zhkjHW/m55nSsY/y3r/53uTH97a+SDr5x7aW1/mbSxyyEfDs2qXiC+GexeUn4J9e90hI7O5P8weZFUkVGB8wd5EDmEbeKLJ0cTAokGTSCONlGSQndQLdaTjyJE2iWLcw4VbTCNJJ5BLAQAmXnnONHSgYEVrguiiRDv7XbInAtZbGcxn8jbNZjppWN51h2s/gUWjjQ7kFt++IxjQ+//J8bCcD1lwpFi6BIk3/EZjF5WqwZGDWB5cagKvwSJ+R9apFY/PXW/DAtCQsfGHVgYXckj2jyKwQkUl6YVrUJtSgYc7SsJdXJsNChKv14CSiZL3ICOySLwnQjh+N7GOQvg368uYgktxLWMyHEtJIZa4aZgZmw4QDEhisWWoiSlpF5AiaXGEY/+PJ/bSUAL6+KFJKtQY4Sat82wWCHGs+MXjPtaUIbKXjEABqt31w+UuzPZHsWkIjP521jSfYUhHmWYOzH2V6VNbpN+RbtVALBqvrpFolATl5A93GCywLjt4JcSfDiaX4Xbu8Sa5NyYIMpmx4CcGv5SMombkSug5/pdDxD3LAkIlPHh19tZQGuvayEhWJ2wmYxf/sK1WIbQkPFsIZfvzd9ewEIOhfCsEcaj+Zb4SZF3c/BEBIKCWFTCPkUwuZNtPAlBtDmRxUQZL05Q26KxYBkV0Qw8c52+b1GwtZGUDVlklYs1m0aN+ePAhnCtk/TXiZJoBnrayDutLusyTLGh5tZgBCAZtYnVl5kTI9wJtg+4EIWJ7B0aRpn38EC3B4fjTHv4f+cO0gAJgFghCELZNrXlTXfWgCWJHOIvtfwtMRANmKmdUKd4NLdz3lrUw5e9Ypp1ElyQfAUJQDgpfuswsvEDHSG+oZpPPjyf2zkAn7ykmoWLG1i9pxLEU4KBpfhnBjCIFSCzPm2GCD8oU0guO+iYgtgdWBXwaYTSRl8ei8ucDdrC+CaQnHtdP2sc0y8oUjnIH+terUw0vfD6mVIunZ/jHiUlZQFCSLKJBHcXkb5rPzhr8vhVGbA7Ca/78EXG7mAt6+9SN2KVYqaqFjVfWS4DmMP9F04IKsnpLkFxp4uCiCdG9pQ/EGFP/LCEED5yqrzxbLeVybxvAAkZKF5vcBK3J4/zVrDJSxxxOt+FkUVxJQidSzl8zLO9m9dKACr5znW1yCRxJtQIFifYAsnyN9C4h40L+PBdlHAy7kYkXcODiBicFoqJWlyq4TWpVKxEd+GB4gXvz0FoXL0R6wZtIAmp+2o/h6boGISeqIuROuU82kBGOOd5SOWvMvLZ2m6aFgxIKQnUOQZ/yWh9bvJWcwnudf6GmRPBfdWyStTWipuZSmcwlcB2u0EIHgAWH/Vn6VZRnlCS16p7g3WQnXuAYgEdy5iCy9iFG8urOzNfoF4X+CjeYwrk/6+xuQQjGUa91MAWgGlFdYy5VCtC4mUKti8sC4VIB5UIVzl3S5xo0lm3R5zGHYBT2ZtepQUoa+TV37McmwURyanGgCVZ3zwxUYY4O1rL4nxY7LHD1ThDMuq2Hzh6iA+PphAK6nRE/77+JxCxMRMAxfjxbu7hIxuJRZ+IFKQb52isuaNZALz/jIEp5B55Q24afDF2mFWHzv+5nslV99q/gwVAXwNmx8bAq+F5J354UBcBUvT8xZrd+PagrCC3ofNBOAGQKCMYRIcXAhHRlgQlFm5PJuamzHxEa/+JFlFaGGSIQX2KAShtmxAQeQhyhiMWQsD04GkXNqoO/5vtOqKCfwkk1su7yveR5IUG6TULlPRfOesYygXXd/1GJcUmURaMa5l6pM+p+i/aifiAtHfm0UBP//JzyqvjvhUfIB5brW82C+xaCfKwJhWPVUzIDWShssiHNUV3EJSRWniKOwMt6IcrL16LzTtWhkuIF3OrFDuVCRg9VlZpDFuIhwT1wGoYxbORBfzEbxGiiBqGDzABdaGFHBRSskBSJ1uReSTZr6ni+0Km/DBJRoLjA3DwGsvJmKGaYvN2B+ijhqbzPDM0AU9L2zcACf/ZhZfmll70soi8+IXmVwYHWhJr7OnRiMKkAaSQpapzWCkkUoCltgDFQchHscuRk9AL2Sx5WsbEcKDLimabhSyNOyK9zY5BgXyP2xCdXFEASon42fWKWoKW7lgKqJr5rbkAa69pBX0i3ArQUPCH7OBk0GBkkEiKc5CABxvXVA3eLq2MGjRT05urt3CGi0LYCgsPFtYX19FG1mKkv75XM6+VTqRCZTIooahqov88+ZMqLUy3Sgpv8TaYGNVU0HhrDQ70tgIKUmmiSFo/lbvmWyr7zuNB19tBAKfrCpYQtG6dOLd+EIVb3dOvuCL6wLXJreqgrV5qVYUvCSGVlvK5whN4obESrkr19pTgKpvXIYzAK/q0LHxsPmqmqaTggT+IrQ4/f+R6QZ2cVFIswC6/gxl4WXWATMAf6ISyIGps4nqXdRnN6sHiIIQe30lQvkOKvS4rHoWOX2jFBeGsFVHZrJ5cYCHqgtEq7RQkLV5pVnd4sjGOkIJH56WJz/ciJ8ML3toVaiNfQFKvbZqZ1QEqRLYYLSnc+MjtFwy60LJx6Y7vvtUWVgvCaPnotQ7CkG+wfUTyB+4MWzDmsCvT3QGpUIcdQYlayXNQULHLBl85cWVuGuTW2QOMUBVxXBt0wYWXdzKte6gLq82Fx3LF2nlibKws2FN9Da3Kh1V5zjl65CPAHWgJ+Ey091Dm1VZWKSSoxwdVrSBiIq3MjT07xNOLhtWBX999V31/aU1T0zQkRYtASXWKB3mMF9AGyJf2d+y/SYLKKJLJsMefKncjMIj38tLxYJUak0Mpihg+nhAxU0p+4YOnQs6npI9jM84z+GIKFK68c7uHm01AxZkZi25TqDSWrtYdESTTYnsYgzk6IJwvj+h//a5rdrDv776a+UCXD9nQSACrdIrZ86qETrapGiB176QbFZ7OzdpWmujRl7FJFkk5KIMAE4a+OwOXq3TNNgaZqS+3tyuUO6scWjrglWkseVWLMzGsvlfWwJ8va+a0RfApA+poXRbfQ2MZPtzo5qoOpImtDr1IhA23vBeBkSCstMYGxaFRm8g25vof7ovdS5AvXcyX2kB0BhyPoY9VYkLaKdSqdBeakMqi9StQr7VRrZQC2Y47ivJMW2KIQ8mTtrCZxyfPn8wjQ2LQ/BlRbZPpktCVSc0lcwHN+X27lMVazQyT3jPvS8l+vLxElfWMvLhlHVnYsm+37ixwpvESc99+Z+O/cb4q9QEfo3m0AlTMmJGkOMrwjeZKwSD8ziggJHGLRYOAyJOAKFjk7vyElpIjGnJKuTgHCT4ApMxmoaNkgZrcjYxIgZzCfJXBLHJATRLdqSVrLKJ2QTEAOFTmAnlZ0Ipo18fDZuGsbq/ewvS7WUbW90vi2Zb7QKzw9x13tekMt5AzyEnKZ7CuBbiI2u6rQXwRI50SlVcGXToPB3GbhfmSeZW1OWd8UcKgEW+aSVSKKe0UtxGhEQeS+MCPNYb0hLNmFF0EJvYJ4SMEXMJqlawkicOuRMQ6rnKCtDksC/Ai8/iTgxqSLfDrD3KMWz+hYxvhQUwFkLIX2Gd8YO/C1vdKH+Xo0uUuWyqIUjM09dTOh9uYbPGkD9f45AoByU9u5eQr8pUJL9crDDFK19/pJXHvpJrSZcRAuAakJzfI8vCJVWNnLJjdNn0mZjTc8HmUnFNtrCwg7pWIDY2ggMvxjhE/SVMsCoC3EWEH6ohFmaagubBWC3sKNPcIhFvssp/8U9XUHUfD6HRM7oknsmChrbHNJ77YiMX8GePiFERos2Yre8u0D800rlt/jcW5JcCgTkf4AKTm1qgvYn/fDBzTg+NCjdpt6f4ER/VMComl0j6hHZFUyq/8/zmkog7r5V0N4w2IgqQMRv77AAmJsD/i9Ofpz2nh6FcPZ6JINCevW9ukUPNNXkR9csQgFPmPUGmGELmFJrL3xYE/lpkjtc45vYpTasRcfJQqZcWzjsxMw+4TU/7GK1MPz3FmBbNCJJ+5kSmJF5hjwUnJHxwHzGdLLj8DlZrc4+RkgF5Lw6Pe3P8WnkwYh6CUG5SNK3uygXIAtwcAQKN+gyHmxvsVvCEAHRBoYtv5XD4XnVmuS5A77ldGBhEkBo2pSICHqEJrSBEIMm963Et5uXAql9ucldaqR2yP7R/5oBHWoTeXZ1hYsN2BmKnNvdJtPLuIXgAW5nWPW5hPN4l0RRxv2ACLxQAy4Pk0WDY/gpt6SfMu8fudUyYQyQkbBuCwEYFr6kAomJYXoZDHmRoLUM4ZmVof7EG2eSe08ppjLvAACr6cGGFiy17G5mbdwyIkIPofPzFJvcis3xvfmXMcCeyIiIe18/pxeCu2iJzQsgTWgATSFKQYCBPmfeUG/sHkWl152VsZwGuvaugxbdTXK9BipknsH+KpIUQM6Z1qUzLK/REWhmhmEqrrPKZGDnXtMnSNE4Fo7lc8fGXmNwLBSAwQE7mVLSCymDNKxQ/4Rxjz5HkfIAj825AS7PeAiP0WpKqZi+lQ7umOa6DaFPKiDkqUtlQAN5zSCx/ZEGofB5T3Oqc7ZoYaDxZsifzg94UZMZcG5/fWT61IstKr7pA46kswAmzDCrYMw+a5YKFU4m4Kb7iF/iQmFLantebm6bQbkTaDJcJH8goIDfWsapZRYFeWJtGyDGgmcZmRNANdAaV8UvpPZLwU9eEGe9Fj72ekLjQVe5uPiqjFnTu09yr+9O7KEb1LjTC/tjX4BHq98QrbEw1bhHuMu0jGFR5+LyRbuiaQMf8lJ8GBvszVKsD3rVmK2vJvcYAPtUccm7iyTK2qwf4LgKQjJpemi5V1Tg5bpMvm4lNaR7GvNhUnhK2SwAV3McafZza+vYzw0tp8fIwzXLKkZB/8ggXYBtWBesdGcS3J2k1Cb5lM+98Z15DLW8SkteLlxAR5efbrjv4O1iAs/EqCxlcudS2xWvTzWUHU2EBpHYK6R4TUjVAFR26JNEfo/3nrAQ1m+lk1T/aLHSyKJVxTSvHZzxjkKa8kzWaaNJL/Y7MeybP7Cby4x19OyPhKIUB6oZ9AXIBjwlhVsyUwhwXSDqG7u1d3iBc2hbFC7cat6ZW8G6Wm42XoHDzwufe3YUFWGv1Y0xAXh/Pc8d1DHo274fRPazYBfwGqoIl1T2GJxfSCmBccqZ7xH052UReRsWhPpPhOKPKqzyBNeYDbFQSBhdgbWiS6ekUl/lK1OdLiquIQ5qlaoZ1lU+lTxFO9YTKZeGkw6MmeN9JAOaH6Dzq1HRCXtCeEqckJCrjmVNGGzdgocZjokq5jb1rViCGamUNhIo+vb5rv1+FpSFk8X1/2Kw1TAIQr5zxu9X2hJ71a9IcdtPfwyBWR8h4Z+IQV6NPzvz8JSZ3tdF6LmKA72IBGo8g98WqX/6D72g1t8byjuTzm70Rd8FqKYeA3kA9o37eGUxjjcwDpP0gPsj0tr5is/kAv7iuARHHvHrblE7hUlCYWIkKWQMi/NzvfVQeva6Pp6RlOGVNuIxSPkLLrCf8jhgg5UdmBf/2rEL5rPTxKo5BSlfjaVKzszQhk1vuAO9yEsKBWkZVNTEN3aqZ8Rj0w0ucWwJ84yGXy/jwy81mBLUw0GtxyaYgJyPF9kaYrk1z/5gGiaCe2R0s33OJyaWir9EyaeSyLk/q/31d8AjHBSq2UxWoVuYSo9tlcdwMk8689yKoYQbLqFa2HiGSwOLmopi2o2cVOFeaWhGFhPDB1hNCVj6o+UEfrtTz7944DF0+Moe0BBd3yGBc+jLGL3ee+X+5yfVC58YEjYyJm/rzuEjgBA/A8XYKxzieUXbNM/yqFSyBnVKaPOrGCaNm9aTBzml4b60scYt3xkOF+6aW47c5Cg1FtRQKTmaxl4uv/sNXG84Ist+70A/KOoGvaL4SEzfxoO2FsvhSqd7U7ji1oQTj9p6FnRwPe7HJRWHJ6hrVE67UvkiU/HF23sispcDY/RTRC1ZwVbxSoG/VwIq5SG4M4bu4zA0CpdoyRpaOClRhtFtGtIbNY89qI+fIU0DLyrkJBfS4rvvwTxsNiGAU8AR+sF3jM32OBcAVOZFBQmMnjmXpwTIXPRJMUVvH+h+xA1AV9uIRfIuNw4RxFoc4VAIZcxIEnjBHKRH1HIHG8/OsDKNFqeLAlXhxddjUeXd6k9VCosc95BFPqD2Ecwp5R6GJppViznA7bELrWUNg+OzMKUS4G/9lDiTWe7POoLevvZwt2ukHXccGxVwXc/Zr7s8scKBl4HUdyoRKpNWIBcxRLLEY0R2sMrO4z6qyuO2PNLkKLl1RfBRdnBOIE7/XTCASQUoyYZYw8US3FWW6oxzN/Q6aD6D5hU4AlWgV6sc4OJ0GRiEXFazq52h7x2kqmoFoF4uaRDk41ywEV7BZd3AMinR7hLcygUvblGqhkMYuY/zXw+vQcqsPTXX6CYhGHIG23x3GIerg3e++8Pg1Xku1cXjpIYs8b0hs21FGBtGHYy5hwSNDnxCx2EZtThtPE1aqLmw2JWk+hjbMfrJ62DP/s2SnvrbS5Zhqx9NIuk361fQwvCDnLIlu4HE6vbK6GbdcgA1HxMACyI/3Qc9eUBnio2u4cR88eg0CwBZSmUmFN9ComOuAI9ES2+p0LQ1qEtFiDel212nm6vhx9BFz99887wFWNVQGiE0srKboLQxTrF48nQnoc7t430LoKNbAc/IKuD0N0iCEo2rwRBPhAhwN57rqZTyap7HfzeP29Fk9d9tc4wyePCZt0KJ4bTakgqM7WKVJIY0+UlWalS1dugbLpo3z+Xuul5vn0HKZU41RrUofqwolHieOyWynluDldzC5bsfudQLWOmKPdZh0ot+qEvMqJXNZWLgfpnHr3MDaBKdvQ42JO2gl2Ml5b3pTBz9xL1nZPI9DvLtOG/VpqyEU+71mDMZBm5H/6Jat0FezFKUsfrq4/WZMYFgA1sfT3pbmWwKar0QEUEaNo1o8VLL5UDjs6nhN5bNJx5AozgomCK6C02yQ1EC1BIo+cyAmk+xfG49iczp7toJt/AffpRxcPPp+92i8M3/GukdUIUspAWYoFP6EM3YZ+cwRgsZMhIOOz3WX4DQOGHccw6d1CNUjWocrVzhTIZ4W7yxZ6utYCESnsxYazBkBf/jTRmFgdAfzobz1Hl3uGj01amXhR/0+28M7es/avl5HQ82mq+HG8NSwPlDB1cYKgWN3lexLFC4sEKNeT25cFpiUFjHEc/8/hbePmYuNuwIsMo953o9dbK47+FAhRBN+RSeT3I6+xOamKfbr01D8vLmx+ME0qo7BGT8h/9aWDqvoCENCHD97YbPeQHQGiW3LEmk2fZcWFf2bcbELJHXypadpJxj3iBWQYsvYYwAzg7twqmAR2RzP0C9jKFkOCaTPHOrzAt6JfL75iIN4exf4+V1iUWEiqiLHMh73DnC62x/G4bAf+x2PbgMmDPCGo9w4xDH8f7g2lKlPUQpPBjPFW7wHxEDCzcOfq1PaZyTfXd7g+dcdGdqVpVhVLyJJOIrTZo0h2R7emiErs3daK71xQW1ic5vmYXGg6MQKLmvT6qolL0auviWZLxtaAAAWo0lEQVQM4KAnFpobQSNcPEDPvaOyJkbNa3NlRo4cgJtKzod48bF7y6tZjALzDK6BAGx+xHG4V65wgoc5ibjmMBO7YGiVf+OKaKH6yAbmBstt7TQDKaIXuyW8ZwsnFVtVF3240LHXyJktm0OvtlPDLjC5kHcUflBbMSRqmjXynWuf5WA++An2O7dReNkIM8bMvlW1bwYJGuPCo2bp/bMe11qzLCNSyRlyikXMX2dFLfFzDl00qo55v9MbbAdLrUPDtoZHxknlEw+RhkAK6IVQ7+OdP8sj3WK0/P6w5xg7uCz5LbEjtATL2B14kjgKWbIrtGQWot6aQTwXAGsK5YoBERt1Bn1zjfMBDHZF/dQ8IBeEIgOIgCdz6TjAkVjYVBDBZO9sybagRih50LS3txdBuqRMhhaj6bwigaCDQ9h9xMV244qQVXIIGnDlaAWFFaZmlzixTOXZO/Yckq6K53OpF5tD3TMYCD9O9w5rgW6oPJiiGv9g7UDrc7zc6hphfExWVb+hOYIaAmF6uJvNGpyx2YgYCMAlJpeayM3HHE9EitS3m6MoVdf3OeyDL8W72Kyo7UuoOwcuKh7OYWCOrWI9Ap2F0MEvK+yalvGrsAAx41e5eAyTFJuE0fLzHqCOfptTRy0cBKCvj0Oc9hl+H6Erkz885oFWiniTLpDH5hD5xbTPUvRiMIwR6l5GinUNaij94SWG1HsWc4FCNumI87BtjebQrU4OxaFRCfjWJhf4w2FwUpQ8CyN+TDpXANKgyzSiQirP99vjkGcnVUMLFQXkqZPU7tCcML3Rsxd/4JtjolZo6p7MedTWMYGkPH10NwfATEGQC+lC4kmjMWhyvJJCbyKHXD79cvwsNN5bxxwHm0VvLX9MYViVxBs1JwY6JQAaEWPXky5PG6CNYNTis5QovJu5AJ4a5qKG9Xw9zu5lQqMnZ+DZl2W8g5m7sTicKVjhj9yFDnPGxoevBG3MZb2HE7TEr+CD/DyAmAkYqR3McWjq/gDhuBNI3BTyqoduBa/XQmI5xb2rT5+39r3ZkJqkkEApASKF4OZ0gQC0W19U7ZyziTL3LyYJ1qWsDNY8rF68AejzZTy/1bFxPjdwldaV1mfoXyZiZRpvHT5K/MDRbvEtex71IjuWCm5XIIDHcjJKHhYMqJhTwp0RDCOJ148TtkDikGP/1Z6bUCVcbX5R7w7uVLNBDqaTRBTA1rAsVwfRp5heoNZFnxRUkvi/jNLupsFprA1kV6yXzIFsrOsYEvQpN+JpYA6hk/6GJaAZ264zKA6OlLFzZLUq5Gwdws0fYJNvxdx9jJYvk4sVzRIhg6Qqe0ZcreNbTc2mf1YfvoMsnEou043YPPLvAcTMqXdzCy1yfTrvR/yZNFKSXZgPYHALRtDjYKiF9vcQhyx5Z5YuClmIT9fWRkrcrKDwS2ud45Sw1gOSK++VtQV2+C0Xhyhgo4Mj4/BoKqLDJubHGQIdNM1K5kir43XGKVgiW/uCI9sVQ2VcyNH8o5QeJ2/QVHZWjLSyPEKSL3BFyw6hWfwJDPBdJoTcnT1rWNO64o5yKWABIvYz+cCWxBwBi1pGk1Td2iSO0rV4VAqJjQLqGGDaGUbj7XNCu6yPxtYUtKISbQYC8/RwaRA5codE5sVNylACzPrTAihw9AAoxeX2q6fi+LiVR81TQXsCRIyCfHFx+UbmO46JW2n/U84IWl7RtpD0iQIszj8iGwCmI/Mi8odw02pMPbI2FxXNmvZ26TfPLBYbqvi+FKBZHghYp84DA/xWIlb/+esMibr6LrmJoENNZcbYlHhh9NA7EpBZkoLEBejuEVnRh+HQlbRYhqHCahhyjmttpdRIkAh6w3ooW1RawpePuQR2My7meKopYY5AHOLqoAqc5AXOoBeoWJEpGJHQIQiuqq5Uc75mcyHrBhNPCKH8qISaopzWIv8FdlIEW7iArUAgBkWKxKKfjVqmyIRqSpc5OdG7bg2PR4vqWj56Bkz8F4Yurad3VlqZzjmigF6DU+6gIc5V5bd+riPc854CLnJglJD8CsE1yFXV/dWsYM8klHA7Qe3WcW0S14V2yp3Jpru79vfCWoBgpX498YKTxtf9hKab+dz1OwuCN2ezMJAuwNuo1EvzeyzocELEpeq8nsegdS8nc2GJclybvt7uQ6VV+ZYVM4e2c2YvvzkRgoHBbodxrfasT2Jt6IQrO+kwsMK1ygk7B4osYll/KWlYgE8vnX7GcghT5q3BRARUWlRZPo0DblwMDcIOVLRtwzJe+OqftnEBN67qzCDct/w7pRHlj2W6V4Og2SXDcKwxV09Ypo3zc7TLXmdXH9kHr7pj0lBGHiFGzJGPJF6Jvx/GBPBmsUkJyjOOaJ3ChVzSF9DqIY/dVtwwBz6Xb1Q4u572FecuHI+Dcfqcnu7yMXrHFdobdgfzvACTHT0BY6WzklO/S0h8dnCJZg+Czwls+0GAKR/a0D7TGiqzFJwrYSCCxf4AM34UvgGw0ZTj0lZfmN3DR8MgkE3MYZA9DpFTEmY5dluoCsYpKdJMVwGbMMki0KCffX6weI4YcBnY5TKQ3BdcmuV12K4q+OrPuJgqm0rDK7dezaGcX89ZktTZs0lsXmcwKqt0sQQsOj7+6Irj4oocRZ9CR0G4G1O+hFsAFtMy9VRsC+jlTCC6gSEw6Mmiztj7GESugaBcZBwfj3m/hTN8Xcwb9Eg9Y/jINwBT6frbGKypMvEjkExLVodoiVmRDG9aFfxihrxUnzjONcIAneerzc3zA3R+b2zE/ThDL/88qfbzAzd9ejg2l9pCk2sULdLByYgkqwJARi3BnJipYKO+C9R0IfLaam4k2tJsVY5ODDk3naPho9jLD6Y3xt65CbCXOnkUbiiSZSoJWyYMobxyRUfSRU2gTgzhVDBx/UY6rVOJaIViZOHZ7NSwt8MCiDGDEQXlyXYl18Rl3Z4QLGR6t4zfTbERx3THZaa/fvcOSCTDfKZSHXOS4qW1qQyDXE9QuTi4qXHl2UyiWEBS5NQWMSm1PL6RE795ZjE3Ay+UolYRhvLxjt2jkml6DcxnbK6JqV7ig3OGddhTWCdmHFlXwAEROqq+lQUVBHeha8MHku7N+gL+7b96EVk2HOSMjJ5q+zsCN0Hq5I4yf7/fvfXtLUDkEfRpd7+o+jpRZYV2tAxkGyOCcD6/4wPRvw0tuNUu8gw5AHqaUFDiLABTv7HlFaF4MENy9skUcsRtfBcIJHU+FX2RhnvttJSwqhmDnrR2Of5BSZgs8GZnB9+4+rOBydzxkqplo/nnsWWMyZaQj7EL9yDzFNL9+/2/0RY6/BMB/zgjsEzjnThKnRheB1MJfWREFqYzNoXVNA414hPBIeT0WJzszXH3ZA2Luq15PCplV5/Cnd3HNdsHIS6tGCehKfEj4qr7+7jqbHlVNQJtsnhrXgZCYnZrFdrFcyN81VnMdQaBt7iVscEg+ewACuZ2fQFX/34smInr7EmYrChvHuPKI5Y7oZgzyCEUV+g49ThEMQ5StgPOlerB80WSMI1/OPx35bxtACkINJF8FjwTzvzLXcUm35uphXE16vZ3e5ahq4tH20n3ZMSuRzmM6ExmX0C8D/CZFRH0LJlAW5tm/PB9HDFXxWRuLFwPgPQXlkmPD/O8wnTrcp7uDqzRtWoQzJa1sEgPvtyoLPzn1382do+WcdCRMDDHqOB1ZEBWGr7twETG2HNzDAK/DQ9w81GMaXG1EfsNYrOm5YBn2eH0DJVzm1hRWxUOm3AhqkHIYUdLtleVMYyXhDoEWFVBwAD7KGWrU7oSecZ3RO0COnu8VSKQZBE/mF5TlT90nX0SJs4gTWrwPIqhQyS6ADiSItAj5sLfGvatAHW33Yygt3/yEl56/yhIEm8uX45/YlGE0QVOXZH7u52igJUV0CpY/XIdzRbxe9meRR9e5xL7WBr5UoVF1i78NLpzdq+zTlDNnjjEYlmQ0LkSXTqgbg3lGlEEQd6N21OcHax6X1HWAKEoIhUCEC0bX534NELfhQWlWTvV3h0VwcrxJ9WfBtFDMfxuLCL0dWxHcy/9+Ws2mw/w82svrY+K0WI6yaLtPEpXcOPO2rSuFYt4ZOjk3Vf+AM0dzcHmHOLERdTeLPS0r8GJH68W+waXJCsVtPXeB0A4pe2x8xTmcBM4bwDCF66uCKTM2woAq4qxkTfkPhj7lTE3WMz31FQN8/wsBJ7HnR15AHj7PDNQk1BR9MKCW9LWtIh4t3kaD/601ZSw6y+d95XQysOYAvmFVKrfz1SqTdN9Hfx0Xjq62HSvV/jg1nx0AKPxY0JqNWi4WSVDhujPixPHVLPviiKceyQixZocCx9H4VwpexbvgDH32H+p7zGFoWJTFjU5ZcXnQQhaQz0ycxihHpQGdlzpadQZEsyGT4kDs2GZTB4kaWYQbfAh8G0APMb4cCsMcOP6iwIjSnH2yFt8djXLtsOjgAFqYBKcX1YCrZR9/Q9tZA5dzt8yI0dtOmLx9BnqRVgADYjAhb2in3GFyaRDFJeiiCQaLKK6SCndyAVU2ZOZp7WhSg/om3OT2NLGsDLqBzgEAtkLTgxxPcEhshO0SAw1OeU8D5RsTKQDb4gj3IJp7mpN2WxG0NvXX6p6dg9sTFtolCw/neXV3CAWORr56K9eOL5NwxIrOp/n7x1trDNL2P9K0PFrNF0r6FbMKPZ9Fx1obdeVLSiiVuGtOIghBCj6/P7dlRCAwioMRst6pEWDpVfeXpYoogBPSEF3D37N/oL9FJvO6R74ZO+pkADkz9Oqtt4C10Dq8wGSnc948MVGUcCNqy+rrq/WFMCs1bJl/gKbUiVcOAdP1bJ5NHfzjeftQLmAm8snTpMrs1IxW5ZoZwcoGUFsGlq0Ixcg0ywB4EnjWnUzDNL4/BqUY43xK/hi3Q870oZCZS+bvk6fIagMC0AmEBFHLx3XzuIqPEpMADF49nlDUchiwRPnnc9M+E/hJ0CAZZCb2CwbGGcGscc9i7dKeps5RgCIHfDok2nEeQH9D97FQnIUf1Nha4jOuYGL+F5x5JUQIKmiMmprz+04s9ju0ouW578opyALscra6mFxZpA4A/T1awJItH0H48UK5IgqQqstnxQAnFgmy7Y23d60NtXEE8BgR6IaOQZNc4Pl7NbRhAVRA6sSomx6ZhAqguqBEMYc+LLuiyuEHv2BHgnDEzwvPKApi0roRo7demTVbOodMlM+dKWLSNx8aQEaCxJJPd7GJutQq8wnpACsq2yQTZQLcd8gj3KvimD3Bdj6szOI1ovt4QZtCtfkPuC7Hf6m98s353QRM5aqOy14WgrIpuk6fTW+YdOqYE+88rPL4NZJ2lkzz4XIg5StDadKsGE6iZDAumXSyPjBwx6bdJQ7bDVzWsnWvOIBU7Te7Ang9tRditmvknRvRYSRVf8gDJjfkamgPCoumkVDGeJUM1o9m58CiGm6JfjuWfDJ4PF0PjGEz6vpI8cRiL6doSLDzTi86vmtjo3rNYFIptoM6yVpHZj2BEmik7Tiue8s0SjZsIOBj1SePfJ0GwUNuHg2h/55w2QI3XqGzQGGzbkZtbXT4sphzKoOuay7tvuvLAC5Ano2FqGCDIu/tyISPjEjIBwb55Y0P7TK6o2PIHxy8dUauYz76oYiClCmUYOlIcJ6bfck4jqVhW1WFs6jYwVMGsBLkGpclfitDktgfb4VolX9KqHCFmwWYdjce8N5kPJxBBbarNCndRX7QroKFWZm7oKbm2cfh9Ap7qZZEPECpM+4nmFkt0kKbwMHzRz+6FlHfj0PavBBWdw/p3arZJ0FTCaK1FKvxpmzXTuxVGY+J4trYbISqmlGLMmGAsD5AGjAzImfKYoZm0NTurWOQU86NczPmtjNBhkVMcyKkU6tPniOmbUP9dsr6lIxBzdeoLOdqYMjX/Q7MnoyOebl42MZizU/LauGaeNJ5pSP7u8B2JbjbhwV8Z0rlnGYpiNuHSOp2MTX2VKFC1iDUr6bo6wkO91Q4/ffsjcQM4JMZtiX0/PQDALzRau3fa2SH1lYkaLr/aLTACjzKVzlK73ILJGW7RGCT79YK7e2TpoYGhjAnEHnCIxNiLOMVfrYV5qc+wCg6idEL6JTsmtXwZuXgMRVPLdYv+lxvkkw9DNEYqpG09i0h+CtNByug1VM+aUttew8QSzPZjOCvrmu+QDeI61ozctXxgvJl9jRR0gfh8WIg5RhYhMlVyzOPdC/5TNzKaO6VsWVWXTh7Fupl6SjtsALclNl4T5ckWGz6wErCQTLJgvSSSnM+22b2zUa2wH+XZGBU9ESRZbC06owhPffY9ODcIoLe7lX7W0eHZtFpbIsLv/uLXT4brwBLOdmB0d+E2Gg6vxMtnihQ/tZ26ASccQ4nJwUv7uzq6nbYoSYf9fGJ3njPn+RGiEYsQmJnNP2FuJvitdqFrmYQSJ1XSV+WodNNLUOKtdQ+wxgjNueJjn7I5kmNvDL0nWFbzwrkVbRNRSCyYK7ChibvwTTGPUTedgVN9dzhqrkjrnkZBAdMm7KA1wwIKKQr1eJuwTSSD4XR6lX5C6SqBU84k2IrFtwhe/JknJ8V9ug1c5Wj2aWeDuVzO2jeTAgYxEjf55fabq2vAln/ktAXJsngSFMLFiBu+TwzJgy2ngAAdFQBoI/PfyRdDqjSR7A9QICp+oRYEGu6Wi+mw/LjL9vxgN8fe031fMvLeLp3c3/aXGSvdKJIETEJeqkj5vAtBp9m39TTv3sHe+lIqEiDEGG8LgG+8gIEW/G6eFdbroAFLIoF24hwYSSnYTviLnzpregVVAi5Szuea4bqmcUu6E5xglhAXzQResnMEBc9dO4XzJB8obNod9c/41MpbJx0gyaIuWqlRvIbB95Qg58FrKv6h3x6hKMzCnYcCo+jpCIK8sfZAGF3QHkTwjeiqWzCG960PTaspvR0cY3baQh0ux9DYq0i9Cc/35/x+HuXM42sYnTSUBx2dAkEVIPzv7JwgkueuHh0QJ+ObdAmg+BlqsFanRylUrw3GZEUB8QAf+tkEBa7hfpgNgceE0Kbd2uDXQ5NUtaOXDDQZNDYk6PUsnOLRx32TSOgJqokGt3pIUZYPipCM9M3WbfWovb695yT6hFa9lsmXIgARBFukngj6hjQNmYZvm3/EYqQ3qbsntxA973eHMFR+sWTZLqr9uBQA+IgHb1cZd1uofyMUUNSxrQKQsz7yLOrskoomPJV0uKGFTlkCihXTNvtuwd5VVuiFoFEGg/mxA+O0qo7Z1k8uIGKIwzfDWmlhFMHwjdzE/unaIc4QCMxlPdXypFIpxVVmX101inrJ+wz8vMo6X4fM6EcGvZblJoDYioAscWeCXQsmuvOooY2MgzeEERy/V7pApxtAoeg0uPa6I4A/tkNs7ds8rIZ3VpJZ3t0rvPr1DsaMMgwMIuBpdmFOMLRNBhUofch/d5RUqJiCkgXEISINARRA8HeVd5dPVWpBvA0TiDJXR5QwNNRxOmsuXJjCG2FoDucp/9/fu1At9mQshfYgzu9+s1nz3tBSvw6P3PH/zNqd8dRdJ1ybvXf/HP07T8h2dL+oNYgc/e//xBlEef+3OhAMSV7/30xv8ZY/zrH8QS/Hhf4v++//mDv7vo9S8VgPiQLMG/b5zHj3cpv19vvizL9F9++8W//ONlj/1YAfh+vfOzp33aFXgmAE+7Yj+w658JwA9sQ5/2dZ4JwNOu2A/s+mcC8APb0Kd9nWcC8LQr9gO7/v8DC5OErGFJ/lUAAAAASUVORK5CYII=',
+      'data:image/png;base64,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',
+      'data:image/png;base64,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'
     ]) document.querySelector('#size').appendChild(uiImage(src))
   
     for(let src of [
@@ -5646,7 +8348,7 @@ window.moreMenu = {
       /this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?=\n?\(\n?d\n?\.\n?isMobile\n?\?\n?175\n?:\n?135\n?\)\n?\*\n?a\n?;/
     )[0]
     const selectedSpeed = code.match(
-      /switch\n?\(\n?d\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?{\n?case(\n? \n?|\n)1\n?:\n?a\n?=\n?\.66/
+      /switch\n?\(\n?d\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?{\n?case(\n? \n?|\n)?1\n?:\n?a\n?=\n?\.66/
     )[0].match(
       /d\n?\.\n?[a-zA-Z0-9_$]{1,8}/
     )[0].replace('d', 'this.settings')
@@ -5656,18 +8358,12 @@ window.moreMenu = {
     )[0]
     const replacePoint = tickFunction.match(
       /\.5\n?:\n?1\.25\n?\);\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\+\+;/
-    )[0]
+    )
   
     window.bunnyTurtleSpeed = 1.33
     window.lightningSnailSpeed = 1.85
-  
-    code = code.assertReplace(tickFunction,
-      tickFunction.replaceAll(
-        '&&', ' && '
-      ).replace(
-        replacePoint,
-        replacePoint
-         + `
+
+    const speedMultiplierBlock = `
           window.bunnyTurtleSpeed = Math.random() < .5 ? .66 : 1.33
           window.lightningSnailSpeed = Math.random() < .5 ? .45 : 1.85
           let speedMultiplier
@@ -5715,19 +8411,47 @@ window.moreMenu = {
               speedMultiplier = 1
               break
           }
-          ${tileLengthSetLine.replace(/\*\n?a/, '* speedMultiplier').replace('d.isMobile', 'this.settings.isMobile')}
+          ${tileLengthSetLine.replace(/\*\n?a/, '* speedMultiplier').replace(/d\.isMobile/g, 'this.settings.isMobile')}
         `
+  
+    if (replacePoint) {
+      code = code.assertReplace(tickFunction,
+        tickFunction.replaceAll(
+          '&&', ' && '
+        ).replace(
+          replacePoint[0],
+          replacePoint[0] + speedMultiplierBlock
+        )
       )
-    )
+    } else {
+      const tickAnchor = tickFunction.match(
+        /\}else if\(!window\.timeKeeper\.runStarted\)\{window\.timeKeeper\.start\(\);\}/
+      )
+      if (!tickAnchor) {
+        throw new Error('More Menu: could not find tick speed injection point')
+      }
+      code = code.assertReplace(
+        tickFunction,
+        tickFunction.assertReplace(tickAnchor[0], tickAnchor[0] + speedMultiplierBlock)
+      )
+    }
   
     const resetFunction1 = code.match(
       /reset\n?\(\n?\)\n?{\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?=\n?null[^]*?\.66[^]*?!0\n?\)\n?\)\n?}/
     )[0]
+
+    const speedSwitchRegex =
+      /a:switch\(d\.[a-zA-Z0-9_$]{1,8}\)\{case 1:a=\.66;break a;case 2:a=1\.33;break a;default:a=1\}/
+    const speedSwitchLegacyRegex =
+      /\{case 1:a=\.66[^}]*?1\}/
+    const resetSpeedField = resetFunction1.match(
+      /switch\(d\.([a-zA-Z0-9_$]{1,8})\)\{case 1:a=\.66/
+    )[1]
   
     code = code.assertReplace(resetFunction1,
       resetFunction1.assertReplace(
-        /{case 1:a=\.66[^}]*?1}/,
-        `{
+        speedSwitchRegex.test(resetFunction1) ? speedSwitchRegex : speedSwitchLegacyRegex,
+        `a:switch(d.${resetSpeedField}){
           case 1:
             a = .66
             break a
@@ -5916,18 +8640,18 @@ window.moreMenu = {
         '}}',
         `}
           const appleCountDisplay = document.body.getElementsByClassName('UJhXPd wSwbef EWyEF')[0]
-  
-          // [...appleCountDisplay.children].forEach((e, i) => i > 1 && (appleCountDisplay.removeChild(appleCountDisplay.children[i])))
-          for(let i = 2; i < appleCountDisplay.children.length; i++) {
-            appleCountDisplay.removeChild(appleCountDisplay.children[i])
-          }
+          if (appleCountDisplay) {
+            while (appleCountDisplay.children.length > 2) {
+              appleCountDisplay.removeChild(appleCountDisplay.children[2])
+            }
 
-          if(${selectedAppleCount1} > 3) {
-            const __src = document.querySelector('#count').children[${selectedAppleCount1}].src
-            const __img = window.uiImage(__src)
-            __img.style.position = 'relative'
-            __img.style.left = '50px'
-            appleCountDisplay.appendChild(__img)
+            if(${selectedAppleCount1} > 3) {
+              const __src = document.querySelector('#count').children[${selectedAppleCount1}].src
+              const __img = window.uiImage(__src)
+              __img.style.position = 'relative'
+              __img.style.left = '50px'
+              appleCountDisplay.appendChild(__img)
+            }
           }
         } 
         `
@@ -6855,13 +9579,13 @@ Same as replace, but throws an error if nothing is changed
     fruitRegex,
     deleteModDebug);
 
-  //Regular fruit vs poison fruit. `nla` marks the poisonous half of the fruit set in poison mode.
+  //Regular fruit vs poison fruit. `nla` was the v12 poison marker; `Oka` is the v13 one.
   funcWithFruit = assertReplace(funcWithFruit, fruitRegex,
-    '(window.visiFullPass || (b.nla ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit)) && $&');
+    '(window.visiFullPass || ((b.nla||b.Oka) ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit)) && $&');
 
   //Mirrored copy (in twin/infinity layouts), using the same poison marker.
   funcWithFruit = assertReplace(funcWithFruit, /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\([$a-zA-Z0-9_]{0,6},0,0,[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},-\([$a-zA-Z0-9_]{0,6}\/2\),-\([$a-zA-Z0-9_]{0,6}\/2\),[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/,
-    '(window.visiFullPass || (b.nla ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit)) && $&');
+    '(window.visiFullPass || ((b.nla||b.Oka) ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit)) && $&');
 
   //For compatitibilty, also change this code for animatedSnakeColours
   /*
@@ -6883,9 +9607,9 @@ Same as replace, but throws an error if nothing is changed
     wallInsideRegex,
     deleteModDebug);
 
-  //for walls / locks / hotdog walls (same renderer; distinguished by k.ez and k.XNa)
+  //for walls / locks / hotdog walls (same renderer; v12 uses ez/XNa, v13 uses ty/yNa)
   funcWithRenderWall = assertReplace(funcWithRenderWall, /this\.[$a-zA-Z0-9_]{0,6}\.fillRect\([$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/,
-    '(k.ez?window.checkboxes.checkboxStatuses.hotdogWalls:(k.XNa!==void 0&&k.XNa>=0?window.checkboxes.checkboxStatuses.locks:window.checkboxes.checkboxStatuses.walls))&&$&');
+    '((k.ez||k.ty)?window.checkboxes.checkboxStatuses.hotdogWalls:(((k.XNa!==void 0&&k.XNa>=0)||(k.yNa!==void 0&&k.yNa>=0))?window.checkboxes.checkboxStatuses.locks:window.checkboxes.checkboxStatuses.walls))&&$&');
 
   //lock icon on wall
   funcWithRenderWall = assertReplace(funcWithRenderWall, /this\.[$a-zA-Z0-9_]{0,6}\.drawImage\([$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6}\)\.[$a-zA-Z0-9_]{0,6}\.canvas,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}\*128,0,128,128,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6}-[$a-zA-Z0-9_]{0,6}\/2,[$a-zA-Z0-9_]{0,6},[$a-zA-Z0-9_]{0,6}\)/,
@@ -6982,18 +9706,19 @@ Same as replace, but throws an error if nothing is changed
   funcWithMiscRendering = assertReplace(funcWithMiscRendering, /[$a-zA-Z0-9_]{1,6}\.context\.fillRect\([$a-zA-Z0-9_]{1,6}\*[$a-zA-Z0-9_.]{1,24}-[$a-zA-Z0-9_]{1,6}\.x\+[$a-zA-Z0-9_]{1,6}\.x,[$a-zA-Z0-9_]{1,6}\*[$a-zA-Z0-9_.]{1,24}-[$a-zA-Z0-9_]{1,6}\.y\+[$a-zA-Z0-9_]{1,6}\.y,[$a-zA-Z0-9_.]{1,24},[$a-zA-Z0-9_.]{1,24}\)/,
     'window.checkboxes.checkboxStatuses.darkTiles && $&');
 
-  //Light mode: snake-head glow (TbF) vs apple glow (fruit list loop)
-  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /TbF\(/g,
-    'window.checkboxes.checkboxStatuses.lightSnake&&TbF(');
+  //Light mode: snake-head glow helper renamed between builds (TbF on v12, N5E-like on v13)
+  let lightSnakeCallRegex = /(?:TbF\(|[$a-zA-Z0-9_]{1,6}\([$a-zA-Z0-9_]{1,6},[$a-zA-Z0-9_.]{1,24},[$a-zA-Z0-9_.]{1,24},Math\.max\(2,)/g;
+  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, lightSnakeCallRegex,
+    'window.checkboxes.checkboxStatuses.lightSnake&&$&');
 
   funcWithMiscRendering = assertReplace(funcWithMiscRendering, /(for\(let [$a-zA-Z0-9_]{1,6} of [$a-zA-Z0-9_]{1,6}\.wb\.wa\.ka\)\{)/,
     'if(window.checkboxes.checkboxStatuses.lightFruit)$1');
 
   //Inline active bridges/gates drawn in the compositor (not only via helper functions)
-  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /f7\(this\.settings,20\)/g,
-    'f7(this.settings,20)&&window.checkboxes.checkboxStatuses.bridges');
-  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /f7\(this\.settings,19\)/g,
-    'f7(this.settings,19)&&window.checkboxes.checkboxStatuses.gates');
+  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /[ef]7\(this\.settings,20\)/g,
+    '$&&&window.checkboxes.checkboxStatuses.bridges');
+  funcWithMiscRendering = assertReplaceAll(funcWithMiscRendering, /[ef]7\(this\.settings,19\)/g,
+    '$&&&window.checkboxes.checkboxStatuses.gates');
 
   //Snake, fruit, keys and boxes are drawn into the sprite layer, and the shadow is taken straight
   //off that layer's silhouette. When Shadow Included is off and something is hidden, duplicating
@@ -7003,10 +9728,10 @@ Same as replace, but throws an error if nothing is changed
   let shadowFnName = funcWithShadow_Origin.match(/^([$a-zA-Z0-9_]{1,6})=function/)[1];
   let sceneRegionRegex = new RegExp(
     '(this\\.[$a-zA-Z0-9_]{1,6}\\.render\\(a,b,[$a-zA-Z0-9_]{1,6}\\(this\\)\\);[\\s\\S]*?)' +
-    '(f7\\(this\\.settings,4\\)\\|\\|' + shadowFnName.replace(/\$/g, '\\$') + '\\(this\\);)');
+    '([ef]7\\(this\\.settings,4\\)\\|\\|' + shadowFnName.replace(/\$/g, '\\$') + '\\(this\\);)');
 
   funcWithMiscRendering = assertReplace(funcWithMiscRendering, sceneRegionRegex,
-    'window.visiBeginShadowPass(this,f7(this.settings,4));$1$2if(window.visiEndShadowPass(this)){$1}');
+    'window.visiBeginShadowPass(this,this.ka.canvas.width!==this.context.canvas.width||this.ka.canvas.height!==this.context.canvas.height);$1$2if(window.visiEndShadowPass(this)){$1}');
 
   //eval(funcWithMiscRendering);
 
@@ -7099,21 +9824,9 @@ if(window.NepDebug){
   //eval(funcWithPortals);
 
   //For flashing snake body when we eat an apple
-  let eatInsideRegex = /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){(?:var|let|const) [$a-zA-Z0-9_]{0,6}=[$a-zA-Z0-9_]{0,6}\.[$a-zA-Z0-9_]{0,6};[$a-zA-Z0-9_]{0,6}\|\|\([$a-zA-Z0-9_]{0,6}=!0/;
-
-  let funcWithEat_Origin = findFunctionInCode(code, /tick\(\)$/,
-    eatInsideRegex,
-    deleteModDebug);
-
-  let funcWithEat = findFunctionInCode(code, /tick\(\)$/,
-    eatInsideRegex,
-    deleteModDebug);
-
-  funcWithEat = assertReplace(funcWithEat, /if\([$a-zA-Z0-9_]{0,6}\|\|[$a-zA-Z0-9_]{0,6}\){/,
-    '$& window.checkboxes.checkboxStatuses.flashSnake && window.brieflyShowSnake();');
-
-  //funcWithEat = swapInMainClassPrototype(mainClass, funcWithEat);
-  //eval(funcWithEat);
+  let eatInsideRegex = /[a-z]\&&\([a-z]\.[$a-zA-Z0-9_]{0,6}=!1,[a-z]\.[$a-zA-Z0-9_]{0,6}=!0,[a-z]\.[$a-zA-Z0-9_]{0,6}=10\)/;
+  code = assertReplace(code, eatInsideRegex,
+    '$&;window.checkboxes.checkboxStatuses.flashSnake&&window.brieflyShowSnake()');
 
   //Mine radius: the dashed red circle plus its fading blast preview. Both are helper calls
   //shaped `helper(renderer, centre, offsetX, offsetY, radius)`, once for the board and once per
@@ -7150,7 +9863,7 @@ if(window.NepDebug){
     shieldsFnName + '=function($1){if(!window.checkboxes.checkboxStatuses.shields)return;');
 
   //Gates (mode 19): BbF dashed rectangles
-  let gatesFnMatch = code.match(/([$a-zA-Z0-9_]{1,6})=function\(([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6})\)\{for\(let [$a-zA-Z0-9_]{1,6} of [$a-zA-Z0-9_.]{1,20}\.Yfa\)/);
+  let gatesFnMatch = code.match(/([$a-zA-Z0-9_]{1,6})=function\(([$a-zA-Z0-9_]{1,6}),([$a-zA-Z0-9_]{1,6})\)\{for\(let [$a-zA-Z0-9_]{1,6} of [$a-zA-Z0-9_.]{1,20}\.(?:Yfa|pfa)\)/);
   if (!gatesFnMatch) {
     throw new Error('Visibility mod: could not find gate drawer (BbF)');
   }
@@ -7169,8 +9882,8 @@ if(window.NepDebug){
 
   //Border chrome CSS background-color (same palette index as the canvas border fill)
   code = assertReplaceAll(code,
-    /_\.on\(([$a-zA-Z0-9_.()]{1,40}),"background-color",([$a-zA-Z0-9_]{1,6}\([$a-zA-Z0-9_.]{1,20},[$a-zA-Z0-9_.]{1,20},3\))\)/g,
-    '($1&&window.visiBorderEls.push($1),window.visiBorderColor=$2,_.on($1,"background-color",window.checkboxes.checkboxStatuses.border?$2:"transparent"))'
+    /_\.(?:on|pn)\(([$a-zA-Z0-9_.()]{1,40}),"background-color",([$a-zA-Z0-9_]{1,6}\([$a-zA-Z0-9_.]{1,30},[$a-zA-Z0-9_.]{1,30},3\))\)/g,
+    '($1&&window.visiBorderEls.push($1),window.visiBorderColor=$2,_.pn($1,"background-color",window.checkboxes.checkboxStatuses.border?$2:"transparent"))'
   );
 
     // Mines
@@ -7240,7 +9953,6 @@ if(window.NepDebug){
   code = code.assertReplace(funcWithKeyRendering_Origin, funcWithKeyRendering)
   code = code.assertReplace(funcWithBodyLines_Origin, funcWithBodyLines)
   code = code.assertReplace(funcWithPortals_Origin, funcWithPortals)
-  code = code.assertReplace(funcWithEat_Origin, funcWithEat)
 
   // Disables statue break animation
   if (!window.catchError(/[$a-zA-Z0-9_]{0,6}\(this\.[$a-zA-Z0-9_]{0,6},[a-z],new _\.[$a-zA-Z0-9_]{0,6}\([a-z],[a-z]\),[a-z],[a-z]\.[$a-zA-Z0-9_]{0,6}\)/g, code)) {
@@ -7310,10 +10022,14 @@ window.MorePudding.alterSnakeCode = function(code) {
 window.MorePudding.runCodeAfter = function() {
   //window.moreMenu.runCodeAfter();
   let modIndicator = document.createElement('div');
-  modIndicator.style='position:absolute;font-family:roboto;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;';
+  modIndicator.style='position:absolute;font-family:Arial,sans-serif;color:white;font-size:14px;padding-top:4px;padding-left:30px;user-select: none;';
   modIndicator.textContent = 'More Pudding Mod';
   let canvasNode = document.getElementsByClassName('jNB0Ic')[0];
   document.getElementsByClassName('EjCLSb')[0].insertBefore(modIndicator, canvasNode);
+
+  if (typeof window.applySavedGameSettingsOnce === "function") {
+    setTimeout(window.applySavedGameSettingsOnce, 0);
+  }
 };
 
 window.CandyMod = {};
@@ -7326,7 +10042,7 @@ window.CandyMod.runCodeBefore = function () {
   // MoreMenu intentionally omitted until it supports v12.
   // Future: window.moreMenu.runCodeBefore();
 
-  console.log("Adding Candy Mode (v12)");
+  console.log("Adding Candy Mode (v13)");
 
   window.CANDY_ICON = "https://i.postimg.cc/rsSFx6gg/candy.png";
 
@@ -7400,7 +10116,7 @@ window.CandyMod.alterSnakeCode = function (code) {
   // MoreMenu intentionally omitted until it supports v12.
   // Future: code = window.moreMenu.alterSnakeCode(code);
 
-  console.log("Coding Candy Mode into the game (v12)");
+  console.log("Coding Candy Mode into the game (v13)");
 
   window.updateCandyTrophySRC = function updateCandyTrophySRC() {
     if (window.trophy_src) {
@@ -7431,12 +10147,12 @@ window.CandyMod.alterSnakeCode = function (code) {
   // Blender's mode summary strip builds trophy_NN.png per selected mode; custom
   // modes have no such file, so point them at their own icons.
   let blender_mode_icons = new RegExp(
-    /m\$E\(d,`https:\/\/www\.google\.com\/logos\/fnbx\/\$\{`snake_arcade\/v22\/trophy_\$\{j\$E\(c\)\}\.png`\}`\)/
+    /b3E\(d,`https:\/\/www\.google\.com\/logos\/fnbx\/\$\{`snake_arcade\/v22\/trophy_\$\{Z2E\(c\)\}\.png`\}`\)/
   );
   if (code.match(blender_mode_icons)) {
     code = code.assertReplace(
       blender_mode_icons,
-      `m$E(d,(c===window.CANDY_MODE)?window.CANDY_ICON:(c===window.CHESS_MODE)?window.CHESS_ICON:\`https://www.google.com/logos/fnbx/\${\`snake_arcade/v22/trophy_\${j$E(c)}.png\`}\`)`
+      `b3E(d,(c===window.CANDY_MODE)?window.CANDY_ICON:(c===window.CHESS_MODE)?window.CHESS_ICON:\`https://www.google.com/logos/fnbx/\${\`snake_arcade/v22/trophy_\${Z2E(c)}.png\`}\`)`
     );
   }
 
@@ -7451,13 +10167,11 @@ window.CandyMod.alterSnakeCode = function (code) {
 
   // +1..+6 extra length on candy (and blender with candy toggle)
   let candy_logic = new RegExp(
-    /f7\(this\.settings,3\)\?this\.oa\.Ta\+=2:this\.oa\.Ta\+=1;/
+    /e7\(a\.settings,3\)\?a\.oa\.Ua\+=2:a\.oa\.Ua\+=1;/
   );
   let candy_match = code.match(candy_logic);
   if (candy_match) {
-    let snake_length = candy_match[0].split("+=")[0].split("?")[1] || "this.oa.Ta";
-    // Prefer the +=1 target: this.oa.Ta
-    snake_length = "this.oa.Ta";
+    let snake_length = "a.oa.Ua";
     let candy_logic_set = `${candy_match[0]}
     if(window.isCandyActive && window.isCandyActive()) {
         ${snake_length} += Math.floor(Math.random() * 6);
@@ -7470,12 +10184,12 @@ window.CandyMod.alterSnakeCode = function (code) {
 
   // Inject candy/chess into blender mode set builder
   let blender_foreach = new RegExp(
-    /a\.Ta\.forEach\(\(c,d\)=>\{_\.zm\(c,"lH9Ipd"\)&&b\.push\(d\)\}\)/
+    /a\.Ua\.forEach\(\(c,d\)=>\{_\.zm\(c,"lH9Ipd"\)&&b\.push\(d\)\}\)/
   );
   if (code.match(blender_foreach)) {
     code = code.assertReplace(
       blender_foreach,
-      `a.Ta.forEach((c,d)=>{_.zm(c,"lH9Ipd")&&b.push(d)});if(window.candy_blending&&window.CANDY_MODE!=null)b.push(window.CANDY_MODE);if(window.chess_blending&&window.CHESS_MODE!=null)b.push(window.CHESS_MODE)`
+      `a.Ua.forEach((c,d)=>{_.zm(c,"lH9Ipd")&&b.push(d)});if(window.candy_blending&&window.CANDY_MODE!=null)b.push(window.CANDY_MODE);if(window.chess_blending&&window.CHESS_MODE!=null)b.push(window.CHESS_MODE)`
     );
   } else {
     console.error("CandyMod: failed to find blender forEach regex");
@@ -7484,12 +10198,12 @@ window.CandyMod.alterSnakeCode = function (code) {
   // Map custom blender panel icons into Ta with correct mode ids.
   // Must stay an expression (ternary false-branch) — a bare {let ...} block is a SyntaxError.
   let ta_fallback = new RegExp(
-    /this\.Ta\.set\(22,e\),this\.kl\.set\(e,22\)/
+    /this\.Ua\.set\(22,e\),this\.Uk\.set\(e,22\)/
   );
   if (code.match(ta_fallback)) {
     code = code.assertReplace(
       ta_fallback,
-      `((function(el){var s=el.children[0]&&el.children[0].src||"",m=22;if(window.CANDY_MODE!=null&&s.indexOf("rsSFx6gg")>=0)m=window.CANDY_MODE;else if(window.CHESS_MODE!=null&&s.indexOf("ZqK0CB95")>=0)m=window.CHESS_MODE;this.Ta.set(m,el);this.kl.set(el,m);}).call(this,e))`
+      `((function(el){var s=el.children[0]&&el.children[0].src||"",m=22;if(window.CANDY_MODE!=null&&s.indexOf("rsSFx6gg")>=0)m=window.CANDY_MODE;else if(window.CHESS_MODE!=null&&s.indexOf("ZqK0CB95")>=0)m=window.CHESS_MODE;this.Ua.set(m,el);this.Uk.set(el,m);}).call(this,e))`
     );
   }
 
@@ -7511,7 +10225,7 @@ window.ChessMod = {};
 ////////////////////////////////////////////////////////////////////
 
 window.ChessMod.runCodeBefore = function () {
-  console.log("Adding Chess Mode (v12, independent mode)");
+  console.log("Adding Chess Mode (v13, independent mode)");
 
   window.CHESS_ICON = "https://i.postimg.cc/ZqK0CB95/bn.png";
 
@@ -7718,7 +10432,7 @@ window.ChessMod.runCodeBefore = function () {
 ////////////////////////////////////////////////////////////////////
 
 window.ChessMod.alterSnakeCode = function (code) {
-  console.log("Coding Chess Mode into the game (v12)");
+  console.log("Coding Chess Mode into the game (v13)");
 
   // Ensure fruits exist if alter runs in odd order
   if (window.new_fruit && !window._chessFruitsInjected) {
@@ -7729,11 +10443,11 @@ window.ChessMod.alterSnakeCode = function (code) {
   // poison. Split pieces out of that branch so the Chess Pieces row applies.
   // Both the normal and the twin/infinity mirrored draw carry the same guard.
   let fruitGate =
-    "(window.visiFullPass || (b.nla ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit))";
+    "(window.visiFullPass || (b.Oka ? window.checkboxes.checkboxStatuses.poison : window.checkboxes.checkboxStatuses.fruit))";
   if (code.includes(fruitGate)) {
     code = code.replaceAll(
       fruitGate,
-      "(window.visiFullPass || (b.nla ? window.checkboxes.checkboxStatuses.poison : (b.isPiece ? window.checkboxes.checkboxStatuses.chessPieces : window.checkboxes.checkboxStatuses.fruit)))"
+      "(window.visiFullPass || (b.Oka ? window.checkboxes.checkboxStatuses.poison : (b.isPiece ? window.checkboxes.checkboxStatuses.chessPieces : window.checkboxes.checkboxStatuses.fruit)))"
     );
   } else {
     console.error("ChessMod: failed to find Visibility fruit gate for chess pieces");
@@ -7782,7 +10496,7 @@ window.ChessMod.alterSnakeCode = function (code) {
   window.muted = false;
 
   // Shield field name on apple objects in v12
-  window.chess_shield_field = "Oba";
+  window.chess_shield_field = "nba";
 
   window.shield_all = function shield_all() {
     if (!window.appleArray) return;
@@ -7844,6 +10558,7 @@ window.ChessMod.alterSnakeCode = function (code) {
       let apple = window.appleArray[index];
       if (
         apple.isPiece &&
+        !apple.Oka &&
         apple.pos.x == x &&
         apple.pos.y == y &&
         window.head_color != apple.ChessColor
@@ -8150,8 +10865,8 @@ window.ChessMod.alterSnakeCode = function (code) {
     if (
       snake &&
       snake.settings &&
-      typeof f7 === "function" &&
-      f7(snake.settings, 7) &&
+      typeof e7 === "function" &&
+      e7(snake.settings, 7) &&
       typeof k7 === "function" &&
       board
     ) {
@@ -8169,6 +10884,9 @@ window.ChessMod.alterSnakeCode = function (code) {
   };
 
   window.chess_make_pos = function chess_make_pos(x, y) {
+    if (typeof _ !== "undefined" && _ && typeof _.Od === "function") {
+      return new _.Od(x, y);
+    }
     if (typeof _ !== "undefined" && _ && typeof _.Sd === "function") {
       return new _.Sd(x, y);
     }
@@ -8197,9 +10915,15 @@ window.ChessMod.alterSnakeCode = function (code) {
         if (ok(p)) return p;
       }
     }
-    if (game && typeof game.Tb === "function") {
+    const nativeFree =
+      game && typeof game.Rb === "function"
+        ? game.Rb.bind(game)
+        : game && typeof game.Tb === "function"
+          ? game.Tb.bind(game)
+          : null;
+    if (nativeFree) {
       for (let attempt = 0; attempt < 8; attempt++) {
-        const p = game.Tb(excludeRef || null, 2);
+        const p = nativeFree(excludeRef || null, 2);
         if (ok(p)) return p;
       }
     }
@@ -8222,7 +10946,7 @@ window.ChessMod.alterSnakeCode = function (code) {
     el.ChessColor = window.color_turn;
     el.isPiece = true;
     el.type = window[window.color_turn + el.ChessPiece];
-    el.Oba = undefined;
+    el.nba = undefined;
     window.SwitchTurn();
   };
 
@@ -8294,7 +11018,7 @@ window.ChessMod.alterSnakeCode = function (code) {
       }
       if (typeof pickType === "function") dup.type = pickType(mgr);
       // Cm is the game's spawn-in animation flag (cleared by manager refresh()).
-      dup.Cm = true;
+      dup.wm = true;
       dup.cM = 0;
       dup.nD = 0;
       window.chess_assign_piece(dup);
@@ -8336,7 +11060,11 @@ window.ChessMod.alterSnakeCode = function (code) {
     }
     // Prefer native freePos via game.Tb when sanitizing qaF results.
     const freePos =
-      window.__remixGame && typeof window.__remixGame.Tb === "function"
+      window.__remixGame && typeof window.__remixGame.Rb === "function"
+        ? function (board, excl, radius) {
+            return window.__remixGame.Rb(excl, radius);
+          }
+        : window.__remixGame && typeof window.__remixGame.Tb === "function"
         ? function (board, excl, radius) {
             return window.__remixGame.Tb(excl, radius);
           }
@@ -8351,32 +11079,32 @@ window.ChessMod.alterSnakeCode = function (code) {
     if (!window.isChessActive || !window.isChessActive()) return false;
     if (!window.head_pos || !window.appleArray) return false;
     let apple = window.findApple(window.head_pos[0], window.appleArray);
-    return !!(apple && apple.isPiece);
+    return !!(apple && apple.isPiece && !apple.Oka);
   };
 
-  // --- Code patches for v12 ---
+  // --- Code patches for v13 ---
 
-  // Make Chess activate Shield physics via f7(..., 15)
+  // Make Chess activate Shield physics via e7(..., 15)
   let f7_regex = new RegExp(
-    /f7=function\(a,b\)\{return a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b\}/
+    /e7=function\(a,b\)\{return a\.Qa\?a\.Lc\.has\(b\):a\.ub===22&&a\.rSa\.has\(b\)\?!0:a\.ub===b\}/
   );
   if (code.match(f7_regex)) {
     code = code.assertReplace(
       f7_regex,
-      `f7=function(a,b){var r=a.Qa?a.Jc.has(b):a.ub===22&&a.ZSa.has(b)?!0:a.ub===b;if(!r&&b===15&&window.CHESS_MODE!=null){if(a.ub===window.CHESS_MODE)return!0;if(a.ub===22&&a.ZSa&&a.ZSa.has(window.CHESS_MODE))return!0;}return r}`
+      `e7=function(a,b){var r=a.Qa?a.Lc.has(b):a.ub===22&&a.rSa.has(b)?!0:a.ub===b;if(!r&&b===15&&window.CHESS_MODE!=null){if(a.ub===window.CHESS_MODE)return!0;if(a.ub===22&&a.rSa&&a.rSa.has(window.CHESS_MODE))return!0;}return r}`
     );
   } else {
-    console.error("ChessMod: failed to patch f7");
+    console.error("ChessMod: failed to patch e7");
   }
 
   // Inject into game tick: track head + run chess unlock logic BEFORE other updates.
   // Visibility may have already patched this tick(); keep the matcher loose.
   // Also expose __remixGame for the Playwright harness.
   let tick_regex = /\}tick\(\)\{/;
-  if (code.match(/\}tick\(\)\{var a=this\.Aa,b=this\.lj;/)) {
+  if (code.match(/\}tick\(\)\{var a=this\.Aa,b=this\.nj;/)) {
     code = code.assertReplace(
-      /\}tick\(\)\{var a=this\.Aa,b=this\.lj;/,
-      `}tick(){window.__remixGame=this;if(window.isChessActive&&window.isChessActive()){try{window.head_pos=this.oa.ka;window.head_dir=this.oa.direction;window.appleArray=this.wa.ka;window.chess_tick_logic();}catch(_ce){console.error("ChessMod: tick failed",_ce);}}var a=this.Aa,b=this.lj;`
+      /\}tick\(\)\{var a=this\.Aa,b=this\.nj;/,
+      `}tick(){window.__remixGame=this;if(window.isChessActive&&window.isChessActive()){try{window.head_pos=this.oa.ka;window.head_dir=this.oa.direction;window.appleArray=this.wa.ka;window.chess_tick_logic();}catch(_ce){console.error("ChessMod: tick failed",_ce);}}var a=this.Aa,b=this.nj;`
     );
   } else if (code.match(tick_regex)) {
     code = code.assertReplace(
@@ -8387,32 +11115,31 @@ window.ChessMod.alterSnakeCode = function (code) {
     console.error("ChessMod: failed to find tick()");
   }
 
-  // On apple manager reset: chess state + Portal pair layout (iaF force).
+  // On apple manager reset: chess state + Portal pair layout (Y3E force).
   // Pudding prepends timer code to reset(){ so we must NOT match reset(){this.ka=[] —
-  // only the inner this.ka=[] / iaF line that still exists after Pudding.
-  if (code.match(/this\.ka=\[\];var a=iaF\(this\.settings\)/)) {
+  // only the inner this.ka=[] / Y3E line that still exists after Pudding.
+  if (code.match(/this\.ka=\s*\[\];var a=Y3E\(this\.settings\)/)) {
     code = code.assertReplace(
-      /this\.ka=\[\];var a=iaF\(this\.settings\)/,
-      `this.ka=[];window.appleArray=this.ka;window.head_dir="RIGHT";window.head_state="OPEN";window.head_color="NONE";window.color_turn="w";window.just_ate="fruit";var a=iaF(this.settings)||!!(window.isChessActive&&window.isChessActive())`
+      /this\.ka=\s*\[\];var a=Y3E\(this\.settings\)/,
+      `this.ka=[];window.appleArray=this.ka;window.head_dir="RIGHT";window.head_state="OPEN";window.head_color="NONE";window.color_turn="w";window.just_ate="fruit";var a=Y3E(this.settings)||!!(window.isChessActive&&window.isChessActive())`
     );
-  } else if (code.match(/var a=iaF\(this\.settings\)/)) {
+  } else if (code.match(/var a=Y3E\(this\.settings\)/)) {
     code = code.assertReplace(
-      /var a=iaF\(this\.settings\)/,
-      `var a=iaF(this.settings)||!!(window.isChessActive&&window.isChessActive())`
+      /var a=Y3E\(this\.settings\)/,
+      `var a=Y3E(this.settings)||!!(window.isChessActive&&window.isChessActive())`
     );
   } else {
-    console.error("ChessMod: failed to find iaF apple-layout flag");
+    console.error("ChessMod: failed to find Y3E apple-layout flag");
   }
 
-  // After shield Oba init on reset: turn the apples into alternating pieces, start OPEN
-  // Note: Pudding rewrites $$E -> doubleDE before this runs
+  // After shield nba init on reset: turn the apples into alternating pieces, start OPEN
   let after_shield_init = new RegExp(
-    /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);/
+    /if\(e7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.nba=\s*P3E\(this,q\.pos\);/
   );
   if (code.match(after_shield_init)) {
     code = code.assertReplace(
       after_shield_init,
-      `if(f7(this.settings,15))for(let q of this.ka)q.Oba=doubleDE(this,q.pos);if(window.isChessActive&&window.isChessActive()){try{window.appleArray=this.ka;window.randomize_pieces();window.shield_empty_all();}catch(_ce){console.error("ChessMod: reset failed",_ce);}}`
+      `if(e7(this.settings,15))for(let q of this.ka)q.nba=P3E(this,q.pos);if(window.isChessActive&&window.isChessActive()){try{window.appleArray=this.ka;window.randomize_pieces();window.shield_empty_all();}catch(_ce){console.error("ChessMod: reset failed",_ce);}}`
     );
   } else {
     console.error("ChessMod: failed to find shield init on reset");
@@ -8420,41 +11147,41 @@ window.ChessMod.alterSnakeCode = function (code) {
 
   // Collision cleanup: remove doomed apples in pairs while chess (keep even count)
   let pair_splice = new RegExp(
-    /f7\(this\.settings,2\)\?n%2===0\?\(this\.ka\.splice\(n,2\),n--\):\(this\.ka\.splice\(n-\s*1,2\),n-=2\)/
+    /e7\(this\.settings,2\)\?n%2===0\?\(this\.ka\.splice\(n,2\),n--\):\(this\.ka\.splice\(n-\s*1,2\),n-=2\)/
   );
   if (code.match(pair_splice)) {
     code = code.assertReplace(
       pair_splice,
-      `(f7(this.settings,2)||(window.isChessActive&&window.isChessActive()))?n%2===0?(this.ka.splice(n,2),n--):(this.ka.splice(n-1,2),n-=2)`
+      `(e7(this.settings,2)||(window.isChessActive&&window.isChessActive()))?n%2===0?(this.ka.splice(n,2),n--):(this.ka.splice(n-1,2),n-=2)`
     );
   } else {
     console.error("ChessMod: failed to find pair-splice on reset");
   }
 
-  // Portal pair-spawn in qaF: include chess so fruit eats / dice / bomb double via all-or-nothing pairs
+  // Portal pair-spawn in f4E: include chess so fruit eats / dice / bomb double via all-or-nothing pairs
   let qaf_pair = new RegExp(
-    /f7\(a\.settings,\s*2\)&&!f\?/
+    /e7\(a\.settings,\s*2\)&&!f\?/
   );
   if (code.match(qaf_pair)) {
     code = code.assertReplace(
       qaf_pair,
-      `(f7(a.settings,2)||(window.isChessActive&&window.isChessActive()))&&!f?`
+      `(e7(a.settings,2)||(window.isChessActive&&window.isChessActive()))&&!f?`
     );
   } else {
-    console.error("ChessMod: failed to find qaF portal pair condition");
+    console.error("ChessMod: failed to find f4E portal pair condition");
   }
 
-  // After qaF adds apples (+ optional shields), convert new ones to chess pieces
+  // After f4E adds apples (+ optional shields), convert new ones to chess pieces
   let qaf_after_oba = new RegExp(
-    /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(f7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.Oba=doubleDE\(a,c\.pos\);/
+    /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(e7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.nba=P3E\(a,c\.pos\);/
   );
   if (code.match(qaf_after_oba)) {
     code = code.assertReplace(
       qaf_after_oba,
-      `g=a.ka.length-g;if(e!==void 0)for(c=0;c<g;c++)a.ka[a.ka.length-1-c].sequenceNumber=e;if(f7(a.settings,15))for(e=0;e<g;e++)c=a.ka[a.ka.length-1-e],c.Oba=doubleDE(a,c.pos);if(window.isChessActive&&window.isChessActive()&&g>0){window.chess_convert_new_apples(a,g);}`
+      `g=a.ka.length-g;if(e!==void 0)for(c=0;c<g;c++)a.ka[a.ka.length-1-c].sequenceNumber=e;if(e7(a.settings,15))for(e=0;e<g;e++)c=a.ka[a.ka.length-1-e],c.nba=P3E(a,c.pos);if(window.isChessActive&&window.isChessActive()&&g>0){window.chess_convert_new_apples(a,g);}`
     );
   } else {
-    console.error("ChessMod: failed to find qaF trailing convert hook");
+    console.error("ChessMod: failed to find f4E trailing convert hook");
   }
 
   // Track selected fruit
@@ -8477,12 +11204,12 @@ window.ChessMod.alterSnakeCode = function (code) {
 
   // Do NOT multiply dice roll by 2 — Portal pairing already doubles (R apples -> 2R pieces).
 
-  // Score / eat: pieces never score; fruit scores; native qaF pairing handles respawn pieces
-  let score_regex = new RegExp(/this\.Oh\+\+;/);
+  // Score / eat: pieces never score; fruit scores. Eat helper uses a.Sh++.
+  let score_regex = new RegExp(/a\.Sh\+\+;/);
   if (code.match(score_regex)) {
     code = code.assertReplace(
       score_regex,
-      `if(window.isChessActive&&window.isChessActive()){let _ae=window.findApple(window.head_pos[0],window.appleArray);if(_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;}else if(_ae&&_ae.isPiece){window.just_ate='piece';window.head_state=_ae.ChessPiece;window.updateTrophySRC(_ae.type);window.head_color=_ae.ChessColor;window.shield_all();}else{window.just_ate='fruit';this.Oh++;}}else{this.Oh++;}`
+      `if(window.isChessActive&&window.isChessActive()){let _ae=window.findApple(window.head_pos[0],window.appleArray);if(_ae&&!_ae.isPiece){window.just_ate='fruit';a.Sh++;}else if(_ae&&_ae.isPiece){window.just_ate='piece';window.head_state=_ae.ChessPiece;window.updateTrophySRC(_ae.type);window.head_color=_ae.ChessColor;window.shield_all();}else{window.just_ate='fruit';a.Sh++;}}else{a.Sh++;}`
     );
   } else {
     console.error("ChessMod: failed to find score increment");
@@ -8491,67 +11218,62 @@ window.ChessMod.alterSnakeCode = function (code) {
   // Don't grow when eating a chess piece. This runs before the score hook, so the
   // piece is still in appleArray and can be detected live.
   let snakeLength = new RegExp(
-    /f7\(this\.settings,3\)\?this\.oa\.Ta\+=2:this\.oa\.Ta\+=1;/
+    /e7\(a\.settings,3\)\?a\.oa\.Ua\+=2:a\.oa\.Ua\+=1;/
   );
   if (code.match(snakeLength)) {
     code = code.assertReplace(
       snakeLength,
-      `f7(this.settings,3)?this.oa.Ta+=2:this.oa.Ta+=1;if(window.chess_eating_piece&&window.chess_eating_piece()){this.oa.Ta-=f7(this.settings,3)?2:1;}`
+      `e7(a.settings,3)?a.oa.Ua+=2:a.oa.Ua+=1;if(window.chess_eating_piece&&window.chess_eating_piece()){a.oa.Ua-=e7(a.settings,3)?2:1;}`
     );
   }
 
   // Also block Candy's random length bonus on chess piece pickup
   let candy_len_bonus = new RegExp(
-    /if\(window\.isCandyActive && window\.isCandyActive\(\)\) \{\s*this\.oa\.Ta \+= Math\.floor\(Math\.random\(\) \* 6\);\s*\}/
+    /if\(window\.isCandyActive && window\.isCandyActive\(\)\) \{\s*a\.oa\.Ua \+= Math\.floor\(Math\.random\(\) \* 6\);\s*\}/
   );
   if (code.match(candy_len_bonus)) {
     code = code.assertReplace(
       candy_len_bonus,
-      `if(window.isCandyActive && window.isCandyActive() && !(window.chess_eating_piece&&window.chess_eating_piece())) {this.oa.Ta += Math.floor(Math.random() * 6);}`
+      `if(window.isCandyActive && window.isCandyActive() && !(window.chess_eating_piece&&window.chess_eating_piece())) {a.oa.Ua += Math.floor(Math.random() * 6);}`
     );
   }
 
   // Prevent native shield clear from fighting chess shields:
-  // f7(this.settings,15)&&(maF(this.wa,Wd),...)
   let shield_clear = new RegExp(
-    /f7\(this\.settings,15\)&&\(maF\(this\.wa,([a-zA-Z0-9_$]+)\),/
+    /e7\(a\.settings,15\)&&\(b4E\(a\.wa,([a-zA-Z0-9_$]+)\),/
   );
   if (code.match(shield_clear)) {
     code = code.assertReplace(
       shield_clear,
-      `f7(this.settings,15)&&!(window.isChessActive&&window.isChessActive())&&(maF(this.wa,$1),`
+      `e7(a.settings,15)&&!(window.isChessActive&&window.isChessActive())&&(b4E(a.wa,$1),`
     );
   }
 
-  // Chess never uses the native reposition (Mn): Xh=!1 makes the game splice the
-  // eaten apple, so a piece eat removes only that piece and a fruit eat spawns
-  // exactly 2 fresh pieces through chess_fruit_respawn.
+  // Chess never uses native Vm reposition: e=!1 splices the eaten apple, so a
+  // piece eat removes only that piece and a fruit eat spawns exactly 2 fresh
+  // pieces through chess_fruit_respawn.
   // Dice (ka 4), Tally (ka 6) and pre-first-explosion Bomb (ka 5) keep their own
-  // refills, which the game fires when the board empties; Key/Soko spawn elsewhere.
+  // refills; Key/Soko spawn elsewhere.
   let spawn = new RegExp(
-    /else\{let Ni=e7\(this\.settings\)\|\|f7\(this\.settings,7\);Xh=this\.Mn\(vd,!Ni,null\)\}/
+    /e=!1;e7\(a\.settings,2\)\?e=!0:e7\(a\.settings,10\)&&d\.Oka\?e=!1:\(e=a\.settings\.ka!==6&&\(d7\(a\.settings\)\|\|e7\(a\.settings,7\)\),e=a\.Vm\(k,\s*!e,null\)\);/
   );
   if (code.match(spawn)) {
     code = code.assertReplace(
       spawn,
-      `else{if(window.isChessActive&&window.isChessActive()){Xh=!1;if(window.just_ate==='fruit'&&!(this.settings.ka===4||this.settings.ka===6||(this.settings.ka===5&&!this.hc)||f7(this.settings,8)||f7(this.settings,9))){window.chess_fruit_respawn(this.wa,h7,oaF,aaF);}}else{let Ni=e7(this.settings)||f7(this.settings,7);Xh=this.Mn(vd,!Ni,null);}}`
+      `e=!1;if(window.isChessActive&&window.isChessActive()){e=!1;if(window.just_ate==='fruit'&&!(a.settings.ka===4||a.settings.ka===6||(a.settings.ka===5&&!a.kc)||e7(a.settings,8)||e7(a.settings,9))){window.chess_fruit_respawn(a.wa,g7,d4E,Q3E);}}else e7(a.settings,2)?e=!0:e7(a.settings,10)&&d.Oka?e=!1:(e=a.settings.ka!==6&&(d7(a.settings)||e7(a.settings,7)),e=a.Vm(k,!e,null));`
     );
   } else {
-    console.error("ChessMod: failed to find Mn respawn path");
+    console.error("ChessMod: failed to find Vm respawn path");
   }
 
-  // Tally wave refill (sdF) spawns 5 slots; Chess needs 10 pieces per wave.
-  // Each slot gets its own tally index, so we raise the slot count instead of
-  // routing through iaF pairing — paired slots share one sequence number, and
-  // since every Chess eat advances the tally counter the twin would never
-  // become edible again. Fewer than 10 spawn when the board has no room.
+  // Tally wave refill spawns 5 slots; Chess needs 10 pieces per wave.
   let tally_wave = new RegExp(
-    /var b=f7\(a\.settings,11\)\?10:5;a\.wa\.wa=1;/
+    /var b=e7\(a\.settings,11\)\?10:5;/
   );
   if (code.match(tally_wave)) {
     code = code.assertReplace(
       tally_wave,
-      `var b=(f7(a.settings,11)||(window.isChessActive&&window.isChessActive()))?10:5;a.wa.wa=1;`
+      `var b=(e7(a.settings,11)||(window.isChessActive&&window.isChessActive()))?10:5;`
     );
   } else {
     console.error("ChessMod: failed to find tally wave size");
@@ -8591,7 +11313,7 @@ window.BurgerMod = {};
 ////////////////////////////////////////////////////////////////////
 
 window.BurgerMod.runCodeBefore = function () {
-  console.log("Adding Burger Mode (v12)");
+  console.log("Adding Burger Mode (v13)");
 
   window.BURGER_ICON = "https://i.postimg.cc/13m2Cr16/burger.png";
 
@@ -8662,7 +11384,7 @@ window.BurgerMod.runCodeBefore = function () {
 ////////////////////////////////////////////////////////////////////
 
 window.BurgerMod.alterSnakeCode = function (code) {
-  console.log("Coding Burger Mode into the game (v12)");
+  console.log("Coding Burger Mode into the game (v13)");
 
   window.isBurgerActive = function isBurgerActive() {
     return (
@@ -8712,7 +11434,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
   };
 
   window.burger_assign_timer = function burger_assign_timer(apple, game) {
-    if (!apple || apple.nla) return;
+    if (!apple || apple.Oka) return;
     const t = window.burger_timer_roll(game);
     apple.burgerTimer = t;
     apple.burgerTimerMax = t;
@@ -8732,7 +11454,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
   // Cache greyscale on the apple (updated from tick, every 3 ticks). Draw
   // reads apple.burgerGrey only — no per-frame math or canvas.filter.
   window.burger_update_grey = function burger_update_grey(apple) {
-    if (!apple || apple.nla || !(apple.burgerTimerMax > 0)) {
+    if (!apple || apple.Oka || !(apple.burgerTimerMax > 0)) {
       if (apple) apple.burgerGrey = 0;
       return;
     }
@@ -8751,7 +11473,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
     let n = 0;
     if (!apples) return 0;
     for (let i = 0; i < apples.length; i++) {
-      if (apples[i] && !apples[i].nla) n++;
+      if (apples[i] && !apples[i].Oka) n++;
     }
     return n;
   };
@@ -8766,7 +11488,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
     const limit = beforeIndex == null ? mgr.ka.length : beforeIndex;
     let removedBefore = 0;
     for (let i = mgr.ka.length - 1; i >= 0; i--) {
-      if (mgr.ka[i] && mgr.ka[i].nla) {
+      if (mgr.ka[i] && mgr.ka[i].Oka) {
         mgr.ka.splice(i, 1);
         if (i < limit) removedBefore++;
       }
@@ -8843,7 +11565,11 @@ window.BurgerMod.alterSnakeCode = function (code) {
         if (occupied.has(k)) continue;
         if (banned && banned.has(k)) continue;
         candidates.push(
-          typeof _ !== "undefined" && _.Sd ? new _.Sd(x, y) : { x: x, y: y }
+          typeof _ !== "undefined" && _.Od
+            ? new _.Od(x, y)
+            : typeof _ !== "undefined" && _.Sd
+              ? new _.Sd(x, y)
+              : { x: x, y: y }
         );
       }
     }
@@ -8884,8 +11610,12 @@ window.BurgerMod.alterSnakeCode = function (code) {
     if (!apple) return;
     // Poison keeps the fruit's original max as its lifetime — no grey indicator.
     const life = apple.burgerTimerMax | 0;
-    apple.nla = true;
+    apple.Oka = true;
     apple.burgerGrey = 0;
+    // Burger+Chess blender: expired pieces are plain poisons — not unlockable.
+    apple.isPiece = false;
+    apple.ChessPiece = undefined;
+    apple.ChessColor = undefined;
     if (life > 0) {
       apple.burgerTimer = life;
       apple.burgerTimerMax = life;
@@ -8913,7 +11643,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
       window.__qaF(mgr, pos, void 0, true, sequenceNumber, true);
       if (mgr.ka.length > before) {
         const last = mgr.ka[mgr.ka.length - 1];
-        last.nla = false;
+        last.Oka = false;
         if (sequenceNumber !== undefined) last.sequenceNumber = sequenceNumber;
         window.burger_assign_timer(last, game);
         return true;
@@ -8927,7 +11657,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
         apple.pos.y = pos.y;
       }
       apple.Cm = true;
-      apple.nla = false;
+      apple.Oka = false;
       apple.Gh = true;
       if (sequenceNumber !== undefined) apple.sequenceNumber = sequenceNumber;
       if (typeof window.__aaF === "function") apple.type = window.__aaF(mgr);
@@ -8962,7 +11692,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
   ) {
     if (!apple) return false;
     // Poisons always count down (no tally gate, no grey overlay).
-    if (apple.nla) return true;
+    if (apple.Oka) return true;
     // Tally: only the current index ages for fresh fruit.
     if (game.settings && game.settings.ka === 6) {
       const cur = game.wa ? game.wa.wa : 1;
@@ -8983,7 +11713,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
       const a = apples[i];
       if (!window.burger_apple_timer_eligible(game, a)) continue;
       if (a.burgerTimer == null) {
-        if (a.nla) {
+        if (a.Oka) {
           const t = window.burger_timer_roll(game);
           a.burgerTimer = t;
           a.burgerTimerMax = t;
@@ -9000,9 +11730,9 @@ window.BurgerMod.alterSnakeCode = function (code) {
       a.burgerTimer = (a.burgerTimer | 0) - 1;
       if (a.burgerTimer <= 0) {
         a.burgerTimer = 0;
-        if (!a.nla) a.burgerGrey = 100;
+        if (!a.Oka) a.burgerGrey = 100;
         toExpire.push(a);
-      } else if (!a.nla && (a.burgerTimerMax - a.burgerTimer) % 3 === 0) {
+      } else if (!a.Oka && (a.burgerTimerMax - a.burgerTimer) % 3 === 0) {
         // Only refresh the cached overlay every 3 ticks (fresh fruit only).
         window.burger_update_grey(a);
       }
@@ -9011,7 +11741,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
       if (game.lj) break;
       const a = toExpire[i];
       if (apples.indexOf(a) < 0) continue;
-      if (a.nla) window.burger_despawn_poison(game, a);
+      if (a.Oka) window.burger_despawn_poison(game, a);
       else window.burger_expire_apple(game, a);
     }
   };
@@ -9026,7 +11756,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
     window.just_ate = "fruit";
     window.burger_fruits_eaten = (window.burger_fruits_eaten | 0) + 1;
     const eaten = game.wa.ka[eatenIndex | 0];
-    if (eaten && !eaten.nla) {
+    if (eaten && !eaten.Oka) {
       eaten.burgerTimer = null;
       eaten.burgerTimerMax = null;
       eaten.burgerGrey = 0;
@@ -9040,7 +11770,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
     // new spawn) get a roll. Existing countdowns are left alone.
     for (let i = 0; i < game.wa.ka.length; i++) {
       const a = game.wa.ka[i];
-      if (a && !a.nla && a.burgerTimer == null) {
+      if (a && !a.Oka && a.burgerTimer == null) {
         window.burger_assign_timer(a, game);
       }
     }
@@ -9052,87 +11782,87 @@ window.BurgerMod.alterSnakeCode = function (code) {
   // it helps to see the exact text it was matched against.
   if (window.RemixDebug) window.__remixPreBurgerCode = code;
 
-  // Extend Chess-patched f7 (or raw) so Burger activates Poison mode (10).
+  // Extend Chess-patched e7 (or raw) so Burger activates Poison mode (10).
   if (
     code.match(
-      /f7=function\(a,b\)\{var r=a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b;if\(!r&&b===15&&window\.CHESS_MODE!=null\)/
+      /e7=function\(a,b\)\{var r=a\.Qa\?a\.Lc\.has\(b\):a\.ub===22&&a\.rSa\.has\(b\)\?!0:a\.ub===b;if\(!r&&b===15&&window\.CHESS_MODE!=null\)/
     )
   ) {
     code = code.assertReplace(
-      /f7=function\(a,b\)\{var r=a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b;if\(!r&&b===15&&window\.CHESS_MODE!=null\)\{if\(a\.ub===window\.CHESS_MODE\)return!0;if\(a\.ub===22&&a\.ZSa&&a\.ZSa\.has\(window\.CHESS_MODE\)\)return!0;\}return r\}/,
-      `f7=function(a,b){var r=a.Qa?a.Jc.has(b):a.ub===22&&a.ZSa.has(b)?!0:a.ub===b;if(!r&&b===15&&window.CHESS_MODE!=null){if(a.ub===window.CHESS_MODE)return!0;if(a.ub===22&&a.ZSa&&a.ZSa.has(window.CHESS_MODE))return!0;}if(!r&&b===10&&window.BURGER_MODE!=null){if(a.ub===window.BURGER_MODE)return!0;if(a.ub===22&&a.ZSa&&a.ZSa.has(window.BURGER_MODE))return!0;}return r}`
+      /e7=function\(a,b\)\{var r=a\.Qa\?a\.Lc\.has\(b\):a\.ub===22&&a\.rSa\.has\(b\)\?!0:a\.ub===b;if\(!r&&b===15&&window\.CHESS_MODE!=null\)\{if\(a\.ub===window\.CHESS_MODE\)return!0;if\(a\.ub===22&&a\.rSa&&a\.rSa\.has\(window\.CHESS_MODE\)\)return!0;\}return r\}/,
+      `e7=function(a,b){var r=a.Qa?a.Lc.has(b):a.ub===22&&a.rSa.has(b)?!0:a.ub===b;if(!r&&b===15&&window.CHESS_MODE!=null){if(a.ub===window.CHESS_MODE)return!0;if(a.ub===22&&a.rSa&&a.rSa.has(window.CHESS_MODE))return!0;}if(!r&&b===10&&window.BURGER_MODE!=null){if(a.ub===window.BURGER_MODE)return!0;if(a.ub===22&&a.rSa&&a.rSa.has(window.BURGER_MODE))return!0;}return r}`
     );
   } else if (
     code.match(
-      /f7=function\(a,b\)\{return a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b\}/
+      /e7=function\(a,b\)\{return a\.Qa\?a\.Lc\.has\(b\):a\.ub===22&&a\.rSa\.has\(b\)\?!0:a\.ub===b\}/
     )
   ) {
     code = code.assertReplace(
-      /f7=function\(a,b\)\{return a\.Qa\?a\.Jc\.has\(b\):a\.ub===22&&a\.ZSa\.has\(b\)\?!0:a\.ub===b\}/,
-      `f7=function(a,b){var r=a.Qa?a.Jc.has(b):a.ub===22&&a.ZSa.has(b)?!0:a.ub===b;if(!r&&b===10&&window.BURGER_MODE!=null){if(a.ub===window.BURGER_MODE)return!0;if(a.ub===22&&a.ZSa&&a.ZSa.has(window.BURGER_MODE))return!0;}return r}`
+      /e7=function\(a,b\)\{return a\.Qa\?a\.Lc\.has\(b\):a\.ub===22&&a\.rSa\.has\(b\)\?!0:a\.ub===b\}/,
+      `e7=function(a,b){var r=a.Qa?a.Lc.has(b):a.ub===22&&a.rSa.has(b)?!0:a.ub===b;if(!r&&b===10&&window.BURGER_MODE!=null){if(a.ub===window.BURGER_MODE)return!0;if(a.ub===22&&a.rSa&&a.rSa.has(window.BURGER_MODE))return!0;}return r}`
     );
   } else {
-    console.error("BurgerMod: failed to patch f7 for poison mode");
+    console.error("BurgerMod: failed to patch e7 for poison mode");
   }
 
-  // Classic layout: iaF must ignore Burger's f7(10).
-  if (code.match(/iaF=function\(a\)\{return f7\(a,2\)\|\|f7\(a,8\)\|\|f7\(a,9\)\|\|f7\(a,10\)\}/)) {
+  // Classic layout: Y3E must ignore Burger's e7(10).
+  if (code.match(/Y3E=function\(a\)\{return e7\(a,2\)\|\|e7\(a,8\)\|\|e7\(a,9\)\|\|e7\(a,10\)\}/)) {
     code = code.assertReplace(
-      /iaF=function\(a\)\{return f7\(a,2\)\|\|f7\(a,8\)\|\|f7\(a,9\)\|\|f7\(a,10\)\}/,
-      `iaF=function(a){return f7(a,2)||f7(a,8)||f7(a,9)||(f7(a,10)&&!(window.isBurgerActive&&window.isBurgerActive()))}`
+      /Y3E=function\(a\)\{return e7\(a,2\)\|\|e7\(a,8\)\|\|e7\(a,9\)\|\|e7\(a,10\)\}/,
+      `Y3E=function(a){return e7(a,2)||e7(a,8)||e7(a,9)||(e7(a,10)&&!(window.isBurgerActive&&window.isBurgerActive()))}`
     );
   } else {
-    console.error("BurgerMod: failed to patch iaF");
+    console.error("BurgerMod: failed to patch Y3E");
   }
 
-  // Suppress Poison's paF auto-poison twin spawn for Burger.
-  if (code.match(/f7\(a\.settings,10\)&&!f&&paF\(a\)/)) {
+  // Suppress Poison's e4E auto-poison twin spawn for Burger.
+  if (code.match(/e7\(a\.settings,10\)&&!f&&e4E\(a\)/)) {
     code = code.assertReplace(
-      /f7\(a\.settings,10\)&&!f&&paF\(a\)/,
-      `f7(a.settings,10)&&!f&&!(window.isBurgerActive&&window.isBurgerActive())&&paF(a)`
+      /e7\(a\.settings,10\)&&!f&&e4E\(a\)/,
+      `e7(a.settings,10)&&!f&&!(window.isBurgerActive&&window.isBurgerActive())&&e4E(a)`
     );
   } else {
-    console.error("BurgerMod: failed to patch paF gate");
+    console.error("BurgerMod: failed to patch e4E gate");
   }
 
   // Native Poison pairs every other apple as poison at game start / after some
-  // spawns (uaF). That is exactly the "5a starts with 2 poisons" bug. Gate every
+  // spawns (l4E). That is exactly the "5a starts with 2 poisons" bug. Gate every
   // call site and the function itself.
   {
-    const uaFCalls = code.match(
-      /f7\((?:this|a)\.settings,10\)\s*&&\s*uaF\((?:this|a)\.wa\)/g
+    const l4ECalls = code.match(
+      /e7\((?:this|a)\.settings,10\)\s*&&\s*l4E\((?:this|a)\.wa\)/g
     );
-    if (uaFCalls && uaFCalls.length) {
+    if (l4ECalls && l4ECalls.length) {
       code = code.replace(
-        /f7\((this|a)\.settings,10\)\s*&&\s*uaF\(\1\.wa\)/g,
-        `f7($1.settings,10)&&!(window.isBurgerActive&&window.isBurgerActive())&&uaF($1.wa)`
+        /e7\((this|a)\.settings,10\)\s*&&\s*l4E\(\1\.wa\)/g,
+        `e7($1.settings,10)&&!(window.isBurgerActive&&window.isBurgerActive())&&l4E($1.wa)`
       );
     } else {
-      console.error("BurgerMod: failed to patch uaF call sites");
+      console.error("BurgerMod: failed to patch l4E call sites");
     }
   }
   if (
     code.match(
-      /uaF=function\(a\)\{for\(let b=0;b\+1<a\.ka\.length;b\+=2\)\{let c=Math\.random\(\)<\.5;\s*a\.ka\[b\]\.nla=c;a\.ka\[b\+1\]\.nla=!c\}\}/
+      /l4E=function\(a\)\{for\(let b=0;b\+1<a\.ka\.length;b\+=2\)\{let c=Math\.random\(\)<\.5;\s*a\.ka\[b\]\.Oka=c;a\.ka\[b\+1\]\.Oka=!c\}\}/
     )
   ) {
     code = code.assertReplace(
-      /uaF=function\(a\)\{for\(let b=0;b\+1<a\.ka\.length;b\+=2\)\{let c=Math\.random\(\)<\.5;\s*a\.ka\[b\]\.nla=c;a\.ka\[b\+1\]\.nla=!c\}\}/,
-      `uaF=function(a){if(window.isBurgerActive&&window.isBurgerActive())return;for(let b=0;b+1<a.ka.length;b+=2){let c=Math.random()<.5;a.ka[b].nla=c;a.ka[b+1].nla=!c}};window.__uaF=uaF`
+      /l4E=function\(a\)\{for\(let b=0;b\+1<a\.ka\.length;b\+=2\)\{let c=Math\.random\(\)<\.5;\s*a\.ka\[b\]\.Oka=c;a\.ka\[b\+1\]\.Oka=!c\}\}/,
+      `l4E=function(a){if(window.isBurgerActive&&window.isBurgerActive())return;for(let b=0;b+1<a.ka.length;b+=2){let c=Math.random()<.5;a.ka[b].Oka=c;a.ka[b+1].Oka=!c}};window.__l4E=l4E`
     );
   } else {
-    console.error("BurgerMod: failed to patch uaF function");
+    console.error("BurgerMod: failed to patch l4E function");
   }
 
   // Portal-pair path inside qaF also flips nla on the new pair under Poison.
   if (
     code.match(
-      /f7\(a\.settings,10\)&&\(c=Math\.random\(\)<\.5,a\.ka\[a\.ka\.length-1\]\.nla=c,a\.ka\[a\.ka\.length-2\]\.nla=!c\)/
+      /e7\(a\.settings,10\)&&\(c=Math\.random\(\)<\.5,a\.ka\[a\.ka\.length-1\]\.Oka=c,a\.ka\[a\.ka\.length-2\]\.Oka=!c\)/
     )
   ) {
     code = code.assertReplace(
-      /f7\(a\.settings,10\)&&\(c=Math\.random\(\)<\.5,a\.ka\[a\.ka\.length-1\]\.nla=c,a\.ka\[a\.ka\.length-2\]\.nla=!c\)/,
-      `f7(a.settings,10)&&!(window.isBurgerActive&&window.isBurgerActive())&&(c=Math.random()<.5,a.ka[a.ka.length-1].nla=c,a.ka[a.ka.length-2].nla=!c)`
+      /e7\(a\.settings,10\)&&\(c=Math\.random\(\)<\.5,a\.ka\[a\.ka\.length-1\]\.Oka=c,a\.ka\[a\.ka\.length-2\]\.Oka=!c\)/,
+      `e7(a.settings,10)&&!(window.isBurgerActive&&window.isBurgerActive())&&(c=Math.random()<.5,a.ka[a.ka.length-1].Oka=c,a.ka[a.ka.length-2].Oka=!c)`
     );
   } else {
     console.error("BurgerMod: failed to patch qaF nla pair");
@@ -9140,28 +11870,28 @@ window.BurgerMod.alterSnakeCode = function (code) {
 
   // Native Poison also top-ups poisons after a fresh eat (keep ≥ half poisoned).
   // Burger piles poisons only via timers, so disable that refill.
-  // Only the paF call is rewritten: MoreMenu respaces the operators in this
+  // Only the e4E call is rewritten: MoreMenu respaces the operators in this
   // statement, so matching the whole `if` verbatim is too brittle.
   const poisonTopUp =
-    /(for\(let Ok of hd\.ka\)Ok\.nla\s*&&\s*Ni\+\+;Ni<hd\.ka\.length\/2\s*&&\s*)paF\(hd\)/;
+    /(for\(let c of a\.ka\)c\.Oka&&b\+\+;b<a\.ka\.length\/2&&\s*)e4E\(a\)/;
   if (code.match(poisonTopUp)) {
     code = code.assertReplace(
       poisonTopUp,
-      `$1!(window.isBurgerActive&&window.isBurgerActive())&&paF(hd)`
+      `$1!(window.isBurgerActive&&window.isBurgerActive())&&e4E(hd)`
     );
   } else {
-    console.error("BurgerMod: failed to patch poison top-up paF");
+    console.error("BurgerMod: failed to patch poison top-up e4E");
   }
 
   // Tick: run burger aging after chess hook (match Chess-injected tick).
   if (
     code.match(
-      /\}tick\(\)\{window\.__remixGame=this;if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.head_pos=this\.oa\.ka;window\.head_dir=this\.oa\.direction;window\.appleArray=this\.wa\.ka;window\.chess_tick_logic\(\);\}catch\(_ce\)\{console\.error\("ChessMod: tick failed",_ce\);\}\}var a=this\.Aa,b=this\.lj;/
+      /\}tick\(\)\{window\.__remixGame=this;if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.head_pos=this\.oa\.ka;window\.head_dir=this\.oa\.direction;window\.appleArray=this\.wa\.ka;window\.chess_tick_logic\(\);\}catch\(_ce\)\{console\.error\("ChessMod: tick failed",_ce\);\}\}var a=this\.Aa,b=this\.nj;/
     )
   ) {
     code = code.assertReplace(
-      /\}tick\(\)\{window\.__remixGame=this;if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.head_pos=this\.oa\.ka;window\.head_dir=this\.oa\.direction;window\.appleArray=this\.wa\.ka;window\.chess_tick_logic\(\);\}catch\(_ce\)\{console\.error\("ChessMod: tick failed",_ce\);\}\}var a=this\.Aa,b=this\.lj;/,
-      `}tick(){window.__remixGame=this;if(window.isChessActive&&window.isChessActive()){try{window.head_pos=this.oa.ka;window.head_dir=this.oa.direction;window.appleArray=this.wa.ka;window.chess_tick_logic();}catch(_ce){console.error("ChessMod: tick failed",_ce);}}if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_tick_logic();}catch(_be){console.error("BurgerMod: tick failed",_be);}}var a=this.Aa,b=this.lj;`
+      /\}tick\(\)\{window\.__remixGame=this;if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.head_pos=this\.oa\.ka;window\.head_dir=this\.oa\.direction;window\.appleArray=this\.wa\.ka;window\.chess_tick_logic\(\);\}catch\(_ce\)\{console\.error\("ChessMod: tick failed",_ce\);\}\}var a=this\.Aa,b=this\.nj;/,
+      `}tick(){window.__remixGame=this;if(window.isChessActive&&window.isChessActive()){try{window.head_pos=this.oa.ka;window.head_dir=this.oa.direction;window.appleArray=this.wa.ka;window.chess_tick_logic();}catch(_ce){console.error("ChessMod: tick failed",_ce);}}if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_tick_logic();}catch(_be){console.error("BurgerMod: tick failed",_be);}}var a=this.Aa,b=this.nj;`
     );
   } else if (code.match(/\}tick\(\)\{window\.__remixGame=this;/)) {
     code = code.assertReplace(
@@ -9176,21 +11906,21 @@ window.BurgerMod.alterSnakeCode = function (code) {
   // Hook the end of apple manager reset via shield init line (post-Pudding doubleDE).
   if (
     code.match(
-      /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);if\(window\.isChessActive&&window\.isChessActive\(\)\)/
+      /if\(e7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.nba=P3E\(this,q\.pos\);if\(window\.isChessActive&&window\.isChessActive\(\)\)/
     )
   ) {
     code = code.assertReplace(
-      /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.appleArray=this\.ka;window\.randomize_pieces\(\);window\.shield_empty_all\(\);\}catch\(_ce\)\{console\.error\("ChessMod: reset failed",_ce\);\}\}/,
-      `if(f7(this.settings,15))for(let q of this.ka)q.Oba=doubleDE(this,q.pos);if(window.isChessActive&&window.isChessActive()){try{window.appleArray=this.ka;window.randomize_pieces();window.shield_empty_all();}catch(_ce){console.error("ChessMod: reset failed",_ce);}}if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){console.error("BurgerMod: reset failed",_be);}}`
+      /if\(e7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.nba=P3E\(this,q\.pos\);if\(window\.isChessActive&&window\.isChessActive\(\)\)\{try\{window\.appleArray=this\.ka;window\.randomize_pieces\(\);window\.shield_empty_all\(\);\}catch\(_ce\)\{console\.error\("ChessMod: reset failed",_ce\);\}\}/,
+      `if(e7(this.settings,15))for(let q of this.ka)q.nba=P3E(this,q.pos);if(window.isChessActive&&window.isChessActive()){try{window.appleArray=this.ka;window.randomize_pieces();window.shield_empty_all();}catch(_ce){console.error("ChessMod: reset failed",_ce);}}if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){console.error("BurgerMod: reset failed",_be);}}`
     );
   } else if (
     code.match(
-      /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);/
+      /if\(e7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.nba=P3E\(this,q\.pos\);/
     )
   ) {
     code = code.assertReplace(
-      /if\(f7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.Oba=doubleDE\(this,q\.pos\);/,
-      `if(f7(this.settings,15))for(let q of this.ka)q.Oba=doubleDE(this,q.pos);if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){}}`
+      /if\(e7\(this\.settings,15\)\)for\(let q of this\.ka\)q\.nba=P3E\(this,q\.pos\);/,
+      `if(e7(this.settings,15))for(let q of this.ka)q.nba=P3E(this,q.pos);if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){}}`
     );
   } else {
     console.error("BurgerMod: failed to find reset timer hook");
@@ -9198,10 +11928,10 @@ window.BurgerMod.alterSnakeCode = function (code) {
 
   // Also assign timers when no shield mode (classic reset without Oba loop).
   // After settings.ka===6 tally init on reset:
-  if (code.match(/this\.settings\.ka===6&&\(kaF\(this\),this\.Ca=!1\)\}/)) {
+  if (code.match(/this\.settings\.ka===6&&\(\$3E\(this\),this\.Ca=!1\)\}/)) {
     code = code.assertReplace(
-      /this\.settings\.ka===6&&\(kaF\(this\),this\.Ca=!1\)\}/,
-      `this.settings.ka===6&&(kaF(this),this.Ca=!1);if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){}}}`
+      /this\.settings\.ka===6&&\(\$3E\(this\),this\.Ca=!1\)\}/,
+      `this.settings.ka===6&&($3E(this),this.Ca=!1);if(window.isBurgerActive&&window.isBurgerActive()){try{window.burger_fruits_eaten=0;window.burger_assign_timers_all(this.ka);}catch(_be){}}}`
     );
   }
 
@@ -9214,65 +11944,65 @@ window.BurgerMod.alterSnakeCode = function (code) {
   ) {
     code = code.assertReplace(
       /if\(window\.isChessActive&&window\.isChessActive\(\)&&g>0\)\{window\.chess_convert_new_apples\(a,g\);\}/,
-      `if(window.isChessActive&&window.isChessActive()&&g>0){window.chess_convert_new_apples(a,g);}if(window.isBurgerActive&&window.isBurgerActive()&&g>0){for(let _bi=a.ka.length-g;_bi<a.ka.length;_bi++){if(a.ka[_bi]&&!a.ka[_bi].nla)window.burger_assign_timer(a.ka[_bi]);}}`
+      `if(window.isChessActive&&window.isChessActive()&&g>0){window.chess_convert_new_apples(a,g);}if(window.isBurgerActive&&window.isBurgerActive()&&g>0){for(let _bi=a.ka.length-g;_bi<a.ka.length;_bi++){if(a.ka[_bi]&&!a.ka[_bi].Oka)window.burger_assign_timer(a.ka[_bi]);}}`
     );
   } else if (
     code.match(
-      /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(f7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.Oba=doubleDE\(a,c\.pos\);/
+      /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(e7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.nba=P3E\(a,c\.pos\);/
     )
   ) {
     code = code.assertReplace(
-      /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(f7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.Oba=doubleDE\(a,c\.pos\);/,
-      `g=a.ka.length-g;if(e!==void 0)for(c=0;c<g;c++)a.ka[a.ka.length-1-c].sequenceNumber=e;if(f7(a.settings,15))for(e=0;e<g;e++)c=a.ka[a.ka.length-1-e],c.Oba=doubleDE(a,c.pos);if(window.isBurgerActive&&window.isBurgerActive()&&g>0){for(let _bi=a.ka.length-g;_bi<a.ka.length;_bi++){if(a.ka[_bi]&&!a.ka[_bi].nla)window.burger_assign_timer(a.ka[_bi]);}}`
+      /g=a\.ka\.length-g;if\(e!==void 0\)for\(c=0;c<g;c\+\+\)a\.ka\[a\.ka\.length-1-c\]\.sequenceNumber=e;if\(e7\(a\.settings,15\)\)for\(e=0;e<g;e\+\+\)c=a\.ka\[a\.ka\.length-1-e\],c\.nba=P3E\(a,c\.pos\);/,
+      `g=a.ka.length-g;if(e!==void 0)for(c=0;c<g;c++)a.ka[a.ka.length-1-c].sequenceNumber=e;if(e7(a.settings,15))for(e=0;e<g;e++)c=a.ka[a.ka.length-1-e],c.nba=P3E(a,c.pos);if(window.isBurgerActive&&window.isBurgerActive()&&g>0){for(let _bi=a.ka.length-g;_bi<a.ka.length;_bi++){if(a.ka[_bi]&&!a.ka[_bi].Oka)window.burger_assign_timer(a.ka[_bi]);}}`
     );
   } else {
     console.error("BurgerMod: failed to find qaF trailing hook");
   }
 
   // Fresh eat: clear poisons + bump eat count BEFORE score side-effects finish / before Mn.
-  // Hook at this.Oh++ — Chess may have replaced it; handle both.
+  // Hook at a.Sh++ — Chess may have replaced it; handle both.
 
   // Clearing poisons splices game.wa.ka, so the eat loop's index has to be
-  // corrected in place. Its name is minified, so read it off the saF call that
+  // corrected in place. Its name is minified, so read it off the i4E call that
   // sits in the same statement (native Poison already decrements it there).
   const appleIndexMatch = code.match(
-    /f7\(this\.settings,10\)\s*&&\s*saF\(this\.wa,([a-zA-Z0-9_$]{1,6}),[a-zA-Z0-9_$]{1,6},this\.Jc\.bind\(this\)\)\s*&&\s*\1--/
+    /e7\(a\.settings,10\)\s*&&\s*i4E\(a\.wa,([a-zA-Z0-9_$]{1,6}),[a-zA-Z0-9_$]{1,6},a\.Lc\.bind\(a\)\)\s*&&\s*\1--/
   );
   const idx = appleIndexMatch && appleIndexMatch[1];
   if (!idx) {
     console.error("BurgerMod: failed to find eat-loop apple index variable");
   }
   const onFreshEaten = idx
-    ? `if(window.isBurgerActive&&window.isBurgerActive())${idx}=window.burger_on_fresh_eaten(this,${idx});`
-    : `if(window.isBurgerActive&&window.isBurgerActive())window.burger_on_fresh_eaten(this);`;
+    ? `if(window.isBurgerActive&&window.isBurgerActive())${idx}=window.burger_on_fresh_eaten(a,${idx});`
+    : `if(window.isBurgerActive&&window.isBurgerActive())window.burger_on_fresh_eaten(a);`;
 
   if (
     code.match(
-      /if\(window\.isChessActive&&window\.isChessActive\(\)\)\{let _ae=window\.findApple\(window\.head_pos\[0\],window\.appleArray\);if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';this\.Oh\+\+;\}else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';this\.Oh\+\+;\}\}else\{this\.Oh\+\+;\}/
+      /if\(window\.isChessActive&&window\.isChessActive\(\)\)\{let _ae=window\.findApple\(window\.head_pos\[0\],window\.appleArray\);if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';a\.Sh\+\+;\}else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';a\.Sh\+\+;\}\}else\{a\.Sh\+\+;\}/
     )
   ) {
     code = code.assertReplace(
-      /if\(window\.isChessActive&&window\.isChessActive\(\)\)\{let _ae=window\.findApple\(window\.head_pos\[0\],window\.appleArray\);if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';this\.Oh\+\+;\}else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';this\.Oh\+\+;\}\}else\{this\.Oh\+\+;\}/,
-      `if(window.isChessActive&&window.isChessActive()){let _ae=window.findApple(window.head_pos[0],window.appleArray);if(_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;${onFreshEaten}}else if(_ae&&_ae.isPiece){window.just_ate='piece';window.head_state=_ae.ChessPiece;window.updateTrophySRC(_ae.type);window.head_color=_ae.ChessColor;window.shield_all();}else{window.just_ate='fruit';this.Oh++;${onFreshEaten}}}else{this.Oh++;${onFreshEaten}}`
+      /if\(window\.isChessActive&&window\.isChessActive\(\)\)\{let _ae=window\.findApple\(window\.head_pos\[0\],window\.appleArray\);if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';a\.Sh\+\+;\}else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';a\.Sh\+\+;\}\}else\{a\.Sh\+\+;\}/,
+      `if(window.isChessActive&&window.isChessActive()){let _ae=window.findApple(window.head_pos[0],window.appleArray);if(_ae&&!_ae.isPiece){window.just_ate='fruit';a.Sh++;${onFreshEaten}}else if(_ae&&_ae.isPiece){window.just_ate='piece';window.head_state=_ae.ChessPiece;window.updateTrophySRC(_ae.type);window.head_color=_ae.ChessColor;window.shield_all();}else{window.just_ate='fruit';a.Sh++;${onFreshEaten}}}else{a.Sh++;${onFreshEaten}}`
     );
-  } else if (code.match(/this\.Oh\+\+;/)) {
+  } else if (code.match(/a\.Sh\+\+;/)) {
     code = code.assertReplace(
-      /this\.Oh\+\+;/,
-      `this.Oh++;${onFreshEaten}`
+      /a\.Sh\+\+;/,
+      `a.Sh++;${onFreshEaten}`
     );
   } else {
     console.error("BurgerMod: failed to find score hook");
   }
 
-  // After Mn / chess fruit respawn path, re-assign timers on new apples.
+  // After chess fruit respawn path, re-assign timers on new apples.
   if (
     code.match(
-      /else\{if\(window\.isChessActive&&window\.isChessActive\(\)\)\{Xh=!1;if\(window\.just_ate==='fruit'&&!\(this\.settings\.ka===4\|\|this\.settings\.ka===6\|\|\(this\.settings\.ka===5&&!this\.hc\)\|\|f7\(this\.settings,8\)\|\|f7\(this\.settings,9\)\)\)\{window\.chess_fruit_respawn\(this\.wa,h7,oaF,aaF\);\}\}else\{let Ni=e7\(this\.settings\)\|\|f7\(this\.settings,7\);Xh=this\.Mn\(vd,!Ni,null\);\}\}/
+      /window\.chess_fruit_respawn\(a\.wa,g7,d4E,Q3E\);/
     )
   ) {
     code = code.assertReplace(
-      /else\{if\(window\.isChessActive&&window\.isChessActive\(\)\)\{Xh=!1;if\(window\.just_ate==='fruit'&&!\(this\.settings\.ka===4\|\|this\.settings\.ka===6\|\|\(this\.settings\.ka===5&&!this\.hc\)\|\|f7\(this\.settings,8\)\|\|f7\(this\.settings,9\)\)\)\{window\.chess_fruit_respawn\(this\.wa,h7,oaF,aaF\);\}\}else\{let Ni=e7\(this\.settings\)\|\|f7\(this\.settings,7\);Xh=this\.Mn\(vd,!Ni,null\);\}\}/,
-      `else{if(window.isChessActive&&window.isChessActive()){Xh=!1;if(window.just_ate==='fruit'&&!(this.settings.ka===4||this.settings.ka===6||(this.settings.ka===5&&!this.hc)||f7(this.settings,8)||f7(this.settings,9))){window.chess_fruit_respawn(this.wa,h7,oaF,aaF);}}else{let Ni=e7(this.settings)||f7(this.settings,7);Xh=this.Mn(vd,!Ni,null);}if(window.isBurgerActive&&window.isBurgerActive()&&window.just_ate==='fruit'){window.burger_after_respawn(this);}}`
+      /window\.chess_fruit_respawn\(a\.wa,g7,d4E,Q3E\);/,
+      `window.chess_fruit_respawn(a.wa,g7,d4E,Q3E);if(window.isBurgerActive&&window.isBurgerActive()&&window.just_ate==='fruit'){window.burger_after_respawn(a);}`
     );
   }
 
@@ -9283,7 +12013,7 @@ window.BurgerMod.alterSnakeCode = function (code) {
   if (code.match(/this\.ka\.drawImage\(f,0,0,g,g,-d\/2,-d\/2,d,d\);/)) {
     code = code.assertReplace(
       /this\.ka\.drawImage\(f,0,0,g,g,-d\/2,-d\/2,d,d\);/,
-      `(this.ka.drawImage(f,0,0,g,g,-d/2,-d/2,d,d),b&&!b.nla&&b.burgerGrey>0&&(this.ka.globalAlpha=Math.min(.85,b.burgerGrey/110),this.ka.fillStyle="#1a1a1a",this.ka.beginPath(),this.ka.arc(0,0,d*.32,0,6.283185307179586),this.ka.fill(),this.ka.globalAlpha=1));`
+      `(this.ka.drawImage(f,0,0,g,g,-d/2,-d/2,d,d),b&&!b.Oka&&b.burgerGrey>0&&(this.ka.globalAlpha=Math.min(.85,b.burgerGrey/110),this.ka.fillStyle="#1a1a1a",this.ka.beginPath(),this.ka.arc(0,0,d*.32,0,6.283185307179586),this.ka.fill(),this.ka.globalAlpha=1));`
     );
   } else {
     console.error("BurgerMod: failed to find fruit drawImage for greyscale");
@@ -9342,13 +12072,13 @@ window.BurgerMod.alterSnakeCode = function (code) {
   }
 
   // Expose apple helpers after their definitions complete (assignment form).
-  if (code.match(/h7=function\(a,b,c\)\{b=new _\.Sd/)) {
+  if (code.match(/g7=function\(a,b,c\)\{b=new _\.Od/)) {
     code = code.assertReplace(
-      /h7=function\(a,b,c\)\{b=new _\.Sd/,
-      `h7=function(a,b,c){window.__h7=h7;window.__aaF=aaF;window.__qaF=qaF;b=new _.Sd`
+      /g7=function\(a,b,c\)\{b=new _\.Od/,
+      `g7=function(a,b,c){window.__h7=g7;window.__aaF=d4E;window.__qaF=f4E;b=new _.Od`
     );
   } else {
-    console.error("BurgerMod: failed to expose h7/qaF");
+    console.error("BurgerMod: failed to expose g7/f4E");
   }
 
   return code;
@@ -9370,8 +12100,39 @@ window.CatSpeed = {};
 
 window.CatSpeed.runCodeBefore = function () {
   window.CAT_SPEED_MULT = 0.85;
+  // Data URI: Google Snake CSP blocks raw.githubusercontent.com, and a
+  // broken <img> in #speed makes the HUD drawImage throw InvalidStateError
+  // which freezes the whole menu.
   window.CAT_SPEED_ICON =
-    "https://raw.githubusercontent.com/DarkSnakeGang/GoogleSnakeIcons/main/Speeds/Cat.png";
+    "data:image/png;base64,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";
+
+  window.remixDrawMenuIcon = function remixDrawMenuIcon(ctx, sel, idx, x, y, w, h) {
+    try {
+      const root = document.querySelector(sel);
+      const im = root && root.children[idx];
+      if (!im || !im.complete || !im.naturalWidth) return;
+      ctx.drawImage(im, x, y, w, h);
+    } catch (_e) {}
+  };
+
+  window.remixDrawSpeedIcon = function remixDrawSpeedIcon(ctx, speedIdx, x, y, w, h) {
+    window.remixDrawMenuIcon(ctx, "#speed", speedIdx, x, y, w, h);
+  };
+
+  // Extra sizes (Micro+) live in #size but vanilla only sprites 0-2.
+  window.remixDrawSizeIcon = function remixDrawSizeIcon(ctx, x, y, w, h) {
+    const root = document.querySelector("#size");
+    if (!root) return;
+    let idx = -1;
+    for (let i = 0; i < root.children.length; i++) {
+      if (((root.children[i].className || "") + "").indexOf("tuJOWd") >= 0) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 3) return;
+    window.remixDrawMenuIcon(ctx, "#size", idx, x, y, w, h);
+  };
 
   window.uiImage =
     window.uiImage ||
@@ -9426,63 +12187,79 @@ window.CatSpeed.alterSnakeCode = function (code) {
   const catIdx =
     typeof window.CAT_SPEED_INDEX === "number" ? window.CAT_SPEED_INDEX : 14;
 
-  // MoreMenu owns cases 3..13. Append Cat as the next case only — no shifting.
-  const tickSwitch = code.match(
-    /let speedMultiplier\s*;?\s*switch\([^)]+\)\s*\{[\s\S]*?default:\s*speedMultiplier\s*=\s*1\s*;?\s*break\s*;?\s*\}/
-  );
-  if (!tickSwitch) {
-    console.error("CatSpeed: failed to find speedMultiplier switch");
-    return code;
-  }
-
-  let body = tickSwitch[0];
   const catCaseTick = new RegExp(
     "case\\s+" + catIdx + ":\\s*speedMultiplier\\s*=\\s*window\\.CAT_SPEED_MULT"
   );
-  if (!catCaseTick.test(body)) {
-    body = body.replace(
-      /default:\s*speedMultiplier\s*=\s*1\s*;?\s*break\s*;?/,
-      `case ${catIdx}:
+  const catCaseReset = new RegExp(
+    "case\\s+" + catIdx + ":\\s*a\\s*=\\s*window\\.CAT_SPEED_MULT"
+  );
+  const tickDefault =
+    /default:\s*speedMultiplier\s*=\s*1\s*;?\s*break\s*;?/;
+  const tickCase = `case ${catIdx}:
               speedMultiplier = window.CAT_SPEED_MULT || .85
               break
             default:
               speedMultiplier = 1
-              break`
-    );
-  }
-  if (!catCaseTick.test(body)) {
-    console.error("CatSpeed: failed to inject case " + catIdx + " into tick switch");
-  } else {
-    code = code.assertReplace(tickSwitch[0], body);
-  }
-
-  // Reset-path speed switch (MoreMenu uses `break a`).
-  const resetSwitch = code.match(
-    /case 1:\s*a\s*=\s*\.66[\s\S]*?default:\s*a\s*=\s*1[\s\S]*?break a\s*\}/
-  );
-  if (resetSwitch) {
-    let rb = resetSwitch[0];
-    const catCaseReset = new RegExp(
-      "case\\s+" + catIdx + ":\\s*a\\s*=\\s*window\\.CAT_SPEED_MULT"
-    );
-    if (!catCaseReset.test(rb)) {
-      rb = rb.replace(
-        /default:\s*a\s*=\s*1[\s\S]*?break a/,
-        `case ${catIdx}:
+              break`;
+  const resetDefault = /default:\s*a\s*=\s*1[\s\S]*?break a/;
+  const resetCase = `case ${catIdx}:
             a = window.CAT_SPEED_MULT || .85
             break a
           default:
             a = 1
-            break a`
+            break a`;
+
+  // MoreMenu owns cases 3..13. Append Cat as the next case only — no shifting.
+  if (!catCaseTick.test(code)) {
+    const tickSwitch = code.match(
+      /let speedMultiplier\s*;?\s*switch\([\s\S]{0,80}?\)\s*\{[\s\S]*?default:\s*speedMultiplier\s*=\s*1\s*;?\s*break\s*;?\s*\}/
+    );
+    if (tickSwitch) {
+      let body = tickSwitch[0].replace(tickDefault, tickCase);
+      if (catCaseTick.test(body)) {
+        code = code.assertReplace(tickSwitch[0], body);
+      }
+    }
+    if (!catCaseTick.test(code) && tickDefault.test(code)) {
+      code = code.replace(tickDefault, tickCase);
+    }
+    if (!catCaseTick.test(code)) {
+      console.error("CatSpeed: failed to inject case " + catIdx + " into tick switch");
+    }
+  }
+
+  // Reset-path speed switch (MoreMenu uses `break a`).
+  if (!catCaseReset.test(code)) {
+    const resetSwitch = code.match(
+      /case 1:\s*a\s*=\s*\.66[\s\S]*?default:\s*a\s*=\s*1[\s\S]*?break a\s*\}/
+    );
+    if (resetSwitch) {
+      let rb = resetSwitch[0].replace(resetDefault, resetCase);
+      if (catCaseReset.test(rb)) {
+        code = code.assertReplace(resetSwitch[0], rb);
+      }
+    }
+    if (!catCaseReset.test(code) && resetDefault.test(code)) {
+      code = code.replace(resetDefault, resetCase);
+    }
+    if (!catCaseReset.test(code)) {
+      console.error("CatSpeed: failed to inject case " + catIdx + " into reset switch");
+    }
+  }
+
+  // MoreMenu draws the selected speed sprite from #speed children. A broken
+  // GitHub/CSP image throws InvalidStateError and freezes the HUD. Extra
+  // sizes have the same problem, so draw those from #size when selected.
+  // Comma-operator: this sits inside `&& ( ... )` so a semicolon is a SyntaxError.
+  if (code.indexOf("window.remixDrawSpeedIcon") < 0) {
+    const drawRe =
+      /([a-zA-Z0-9_$.]+)\.context\.drawImage\(document\.querySelector\('#speed'\)\.children\[([^\]]+)\],\s*([^,]+),\s*([^,]+),\s*80,\s*80\)/;
+    if (drawRe.test(code)) {
+      code = code.replace(
+        drawRe,
+        "(window.remixDrawSpeedIcon($1.context,$2,$3,$4,80,80),window.remixDrawSizeIcon($1.context,$3-80,$4,80,80))"
       );
     }
-    if (!catCaseReset.test(rb)) {
-      console.error("CatSpeed: failed to inject case " + catIdx + " into reset switch");
-    } else {
-      code = code.assertReplace(resetSwitch[0], rb);
-    }
-  } else {
-    console.error("CatSpeed: failed to find reset speed switch");
   }
 
   return code;
@@ -9989,8 +12766,13 @@ window.DiceCounts.alterSnakeCode = function (code) {
       diceRefill[0],
       `(this.settings.ka===4||(window.remixIsColoredDice&&window.remixIsColoredDice(this.settings.ka)))?odF(this)!==0||ecF(this.settings) && rdF(this)<=0||(tdF(this,this.settings.ka===4?Math.ceil(Math.random()*6):(window.remixColoredDiceRoll(this.settings.ka)||1)),odF(this)>0 && ${sound}.play())`
     );
+  } else if (code.match(/a\.settings\.ka===4\?r7E\(a\)===0&&s7E\(a\)/)) {
+    code = code.assertReplace(
+      /a\.settings\.ka===4\?r7E\(a\)===0&&s7E\(a\)/,
+      `(a.settings.ka===4||(window.remixIsColoredDice&&window.remixIsColoredDice(a.settings.ka)))?r7E(a)===0&&(a.settings.ka===4?s7E(a):u7E(a,window.remixColoredDiceRoll(a.settings.ka)||1))`
+    );
   } else {
-    console.error("DiceCounts: failed to find native dice tdF refill path");
+    console.error("DiceCounts: failed to find native dice tdF/s7E refill path");
   }
 
   // Mn still early-returns for dice-like; keep spawn-count wrap for safety on
@@ -10007,6 +12789,11 @@ window.DiceCounts.alterSnakeCode = function (code) {
     code = code.assertReplace(
       /this\.settings\.ka===4\|\|this\.settings\.ka===6/g,
       `(window.remixIsDiceLike?window.remixIsDiceLike(this.settings.ka):this.settings.ka===4)||this.settings.ka===6`
+    );
+  } else if (code.match(/a\.settings\.ka===4\|\|a\.settings\.ka===6/)) {
+    code = code.assertReplace(
+      /a\.settings\.ka===4\|\|a\.settings\.ka===6/g,
+      `(window.remixIsDiceLike?window.remixIsDiceLike(a.settings.ka):a.settings.ka===4)||a.settings.ka===6`
     );
   }
 
@@ -10047,25 +12834,77 @@ window.RemixSpeedInfo = {};
 //RUNCODEBEFORE
 ////////////////////////////////////////////////////////////////////
 
-// Pudding's BootstrapMenu disables SpeedInfo unless snakeChosenMod is
-// "PuddingMod". Remix keeps the toggle usable, but only Chess / Burger show
-// real SpeedInfo data — every other mode shows a switch prompt.
+// Pudding now keys TimeKeeper / SpeedInfo through ModeRegistry (stable
+// modeKeys like "chess", "wall+burger"). Remix still gates SpeedInfo panel
+// data to Chess / Burger; other modes show a switch prompt.
 //
-// TimeKeeper's mode bit → name switch only knows Wall…Peaceful, so Remix
-// trophies rendered as "Unknown". We also fix getCurrentMode: Pudding treated
-// the last trophy as Blender, but Remix appends Candy/Chess/Burger after it.
+// Chess/Burger TimeKeeper only tracks official apple counts 0..Tally (6),
+// plus Normal/Fast/Slow and Standard/Small/Large — not MoreMenu / colored dice.
 //
 // Timer settings (#edit-mode) is hardcoded Classic…Peaceful; we add only
 // Candy/Chess/Burger (index-aligned; gaps stay hidden so PB keys match).
 window.RemixSpeedInfo.runCodeBefore = function () {
   window.remixNativeBlenderMode = 22;
+  // Last vanilla count index (1 / 3 / 5 / 10 / Dice / Bomb / Tally).
+  window.REMIX_OFFICIAL_COUNT_MAX = 6;
+
+  window.remixChessBurgerTimeKeeperActive =
+    function remixChessBurgerTimeKeeperActive() {
+      return !!(
+        (window.isChessActive && window.isChessActive()) ||
+        (window.isBurgerActive && window.isBurgerActive())
+      );
+    };
+
+  window.remixTimeKeeperOfficialSettings =
+    function remixTimeKeeperOfficialSettings(ctx) {
+      const c =
+        ctx ||
+        (window.timeKeeper &&
+        typeof window.timeKeeper.resolveRunContext === "function"
+          ? window.timeKeeper.resolveRunContext()
+          : null);
+      if (!c) return false;
+      const maxCount =
+        typeof window.REMIX_OFFICIAL_COUNT_MAX === "number"
+          ? window.REMIX_OFFICIAL_COUNT_MAX
+          : 6;
+      return (
+        typeof c.count === "number" &&
+        c.count >= 0 &&
+        c.count <= maxCount &&
+        typeof c.speed === "number" &&
+        c.speed >= 0 &&
+        c.speed <= 2 &&
+        typeof c.size === "number" &&
+        c.size >= 0 &&
+        c.size <= 2
+      );
+    };
 
   window.remixSpeedInfoAllowed = function remixSpeedInfoAllowed() {
-    return !!(
-      (window.isChessActive && window.isChessActive()) ||
-      (window.isBurgerActive && window.isBurgerActive())
+    return (
+      window.remixChessBurgerTimeKeeperActive() &&
+      window.remixTimeKeeperOfficialSettings()
     );
   };
+
+  // Chess/Burger: never record PBs outside official count/speed/size.
+  if (
+    window.timeKeeper &&
+    typeof window.timeKeeper.shouldTrack === "function" &&
+    !window.timeKeeper.shouldTrack.__remixOfficial
+  ) {
+    const origShouldTrack = window.timeKeeper.shouldTrack;
+    window.timeKeeper.shouldTrack = function remixShouldTrack(ctx) {
+      if (!origShouldTrack.call(this, ctx)) return false;
+      if (window.remixChessBurgerTimeKeeperActive()) {
+        return window.remixTimeKeeperOfficialSettings(ctx);
+      }
+      return true;
+    };
+    window.timeKeeper.shouldTrack.__remixOfficial = true;
+  }
 
   window.remixSpeedInfoEnsureModeLabels = function remixSpeedInfoEnsureModeLabels() {
     if (!window.modeToTxt) window.modeToTxt = {};
@@ -10080,106 +12919,165 @@ window.RemixSpeedInfo.runCodeBefore = function () {
     }
   };
 
-  const VANILLA_BRIDGE = [
-    "Wall",
-    "Portal",
-    "Cheese",
-    "Borderless",
-    "Twin",
-    "Winged",
-    "YinYang",
-    "Key",
-    "Sokoban",
-    "Poison",
-    "Dimension",
-    "Minesweeper",
-    "Statue",
-    "Light",
-    "Shield",
-    "Arrow",
-    "Hotdog",
-    "Magnet",
-    "Gate",
-    "Bridge",
-    "Peaceful",
-  ];
-  const VANILLA_SKIP = VANILLA_BRIDGE.slice();
-  VANILLA_SKIP[19] = "Skip";
+  // Teach ModeRegistry about trophies Remix appends after Blender.
+  // Upstream assumes last trophy = Blender and second-last = Peaceful.
+  window.remixInstallModeRegistry = function remixInstallModeRegistry() {
+    if (!window.ModeRegistry) return;
 
-  window.remixTimeKeeperNameForBit = function remixTimeKeeperNameForBit(
-    bitIndex
-  ) {
-    const trophyId = bitIndex + 1;
-    if (window.CANDY_MODE != null && trophyId === window.CANDY_MODE) {
-      return "Candy";
+    window.ModeRegistry.LABELS.candy = "Candy";
+    window.ModeRegistry.LABELS.chess = "Chess";
+    window.ModeRegistry.LABELS.burger = "Burger";
+
+    if (window.ModeRegistry.listActiveModes.__remix) return;
+
+    window.ModeRegistry.listActiveModes = function remixListActiveModes() {
+      const root = document.getElementById("trophy");
+      if (!root || !root.children || root.children.length === 0) {
+        return [{ id: "classic", label: "Classic", index: 0 }];
+      }
+      const children = [...root.children];
+      let blenderIndex = -1;
+      let peacefulIndex = -1;
+      for (let i = 0; i < children.length; i++) {
+        const src = window.ModeRegistry._trophySrc(children[i]) || "";
+        if (src.includes("random.png")) blenderIndex = i;
+        if (/trophy_21(?:\.png)?/i.test(src)) peacefulIndex = i;
+      }
+      if (blenderIndex < 0 && typeof window.remixNativeBlenderMode === "number") {
+        blenderIndex = window.remixNativeBlenderMode;
+      }
+
+      const used = new Set();
+      const list = [];
+      for (let i = 0; i < children.length; i++) {
+        const src = window.ModeRegistry._trophySrc(children[i]) || "";
+        let id;
+        if (i === 0) {
+          id = "classic";
+        } else if (i === blenderIndex || src.includes("random.png")) {
+          id = "blender";
+        } else if (i === peacefulIndex || /trophy_21(?:\.png)?/i.test(src)) {
+          id = "peaceful";
+        } else if (window.CANDY_MODE != null && i === window.CANDY_MODE) {
+          id = "candy";
+        } else if (window.CHESS_MODE != null && i === window.CHESS_MODE) {
+          id = "chess";
+        } else if (window.BURGER_MODE != null && i === window.BURGER_MODE) {
+          id = "burger";
+        } else {
+          id = window.ModeRegistry._matchMiddleId(src);
+          if (!id) {
+            const middleSlot = i - 1;
+            if (
+              middleSlot >= 0 &&
+              middleSlot < window.ModeRegistry.MIDDLE.length
+            ) {
+              id = window.ModeRegistry.MIDDLE[middleSlot].id;
+            } else {
+              id = window.ModeRegistry._provisionalId(src, i);
+            }
+          }
+          if (used.has(id)) id = window.ModeRegistry._provisionalId(src, i);
+        }
+        used.add(id);
+        list.push({
+          id: id,
+          label: window.ModeRegistry.LABELS[id] || id,
+          index: i,
+        });
+      }
+      return list;
+    };
+    window.ModeRegistry.listActiveModes.__remix = true;
+
+    // Prefer live blend flags so Candy/Chess/Burger toggles stay in the key
+    // even if blender-panel DOM order drifts from trophy order.
+    if (!window.ModeRegistry.getCurrentModeKey.__remix) {
+      const origKey = window.ModeRegistry.getCurrentModeKey.bind(
+        window.ModeRegistry
+      );
+      window.ModeRegistry.getCurrentModeKey = function remixGetCurrentModeKey() {
+        const modes = window.ModeRegistry.listActiveModes();
+        let selectedIndex = 0;
+        if (
+          window.timeKeeper &&
+          typeof window.timeKeeper.getCurrentSetting === "function"
+        ) {
+          selectedIndex = window.timeKeeper.getCurrentSetting("trophy");
+        }
+        if (
+          typeof window.CurrentModeNum === "number" &&
+          window.CurrentModeNum >= 0 &&
+          window.CurrentModeNum < modes.length
+        ) {
+          selectedIndex = window.CurrentModeNum;
+        }
+        if (selectedIndex < 0 || selectedIndex >= modes.length) selectedIndex = 0;
+        const selected = modes[selectedIndex];
+        if (!selected || selected.id === "classic") return "classic";
+        if (selected.id !== "blender") return selected.id;
+
+        const ids = [];
+        // DOM-selected blender modes (vanilla + remix slots)
+        const fromDom = window.ModeRegistry._blenderSelectedIds(modes) || [];
+        for (let i = 0; i < fromDom.length; i++) {
+          if (ids.indexOf(fromDom[i]) < 0) ids.push(fromDom[i]);
+        }
+        if (window.candy_blending && ids.indexOf("candy") < 0) ids.push("candy");
+        if (window.chess_blending && ids.indexOf("chess") < 0) ids.push("chess");
+        if (window.burger_blending && ids.indexOf("burger") < 0) {
+          ids.push("burger");
+        }
+        if (!ids.length) return "blender";
+        return ids.slice().sort().join("+");
+      };
+      window.ModeRegistry.getCurrentModeKey.__remix = true;
     }
-    if (window.CHESS_MODE != null && trophyId === window.CHESS_MODE) {
-      return "Chess";
-    }
-    if (window.BURGER_MODE != null && trophyId === window.BURGER_MODE) {
-      return "Burger";
-    }
-    if (trophyId === window.remixNativeBlenderMode) return "Blender";
-    const names = window.isBridge ? VANILLA_BRIDGE : VANILLA_SKIP;
-    if (bitIndex >= 0 && bitIndex < names.length) return names[bitIndex];
-    return "Unknown";
   };
+  window.remixInstallModeRegistry();
 
-  // Build "Wall, Chess, " style label (trailing comma+space, matching Pudding).
+  // Display helper used by tests / dialogs. Accepts modeKey (preferred) or a
+  // legacy 01-bitstring from older Pudding builds.
   window.remixTimeKeeperFormatGamemode = function remixTimeKeeperFormatGamemode(
     modeStr
   ) {
-    modeStr = modeStr || "";
-    const trophyMode =
-      typeof window.CurrentModeNum === "number"
-        ? window.CurrentModeNum
-        : typeof window.timeKeeper.getCurrentSetting === "function"
-          ? window.timeKeeper.getCurrentSetting("trophy")
-          : 0;
-
-    if (trophyMode === window.remixNativeBlenderMode) {
-      let gamemode = "";
-      const vanillaLen = Math.min(modeStr.length, 21);
-      for (let i = 0; i < vanillaLen; i++) {
-        if (modeStr.charAt(i) === "1") {
-          gamemode += window.remixTimeKeeperNameForBit(i) + ", ";
-        }
+    if (window.ModeRegistry) {
+      let key = modeStr;
+      if (key == null || key === "") {
+        key = window.ModeRegistry.getCurrentModeKey();
+      } else if (/^[01]+$/.test(String(key))) {
+        key = window.ModeRegistry.bitstringV3ToModeKey(String(key));
+        // Legacy bitstrings never encoded Remix trophies; prefer live key when
+        // the selection is a Remix mode / blender mix.
+        const live = window.ModeRegistry.getCurrentModeKey();
+        if (live && live !== "classic") key = live;
       }
-      if (window.candy_blending) gamemode += "Candy, ";
-      if (window.chess_blending) gamemode += "Chess, ";
-      if (window.burger_blending) gamemode += "Burger, ";
-      if (!gamemode) gamemode = "Classic, ";
-      return gamemode;
+      const label = window.ModeRegistry.labelModeKey(key);
+      return label ? label + ", " : "Classic, ";
     }
-
-    let gamemode = "";
-    for (let i = 0; i < modeStr.length; i++) {
-      if (modeStr.charAt(i) === "1") {
-        gamemode += window.remixTimeKeeperNameForBit(i) + ", ";
-      }
-    }
-    if (!gamemode) gamemode = "Classic, ";
-    return gamemode;
+    return modeStr ? String(modeStr) + ", " : "Classic, ";
   };
 
   window.remixSpeedInfoApplyModeLabel = function remixSpeedInfoApplyModeLabel() {
     const modeLabel = document.getElementById("mode-selected");
     if (!modeLabel || typeof window.HandleCount !== "function") return;
+    if (!window.timeKeeper || typeof window.timeKeeper.getCurrentSetting !== "function") {
+      return;
+    }
     const count = window.timeKeeper.getCurrentSetting("count");
-    const modeStr = window.timeKeeper.getCurrentMode();
-    const gamemode = window.remixTimeKeeperFormatGamemode(modeStr);
+    const modeKey =
+      typeof window.timeKeeper.getCurrentMode === "function"
+        ? window.timeKeeper.getCurrentMode()
+        : window.ModeRegistry && window.ModeRegistry.getCurrentModeKey();
+    const gamemode = window.ModeRegistry
+      ? window.ModeRegistry.labelModeKey(modeKey)
+      : window.remixTimeKeeperFormatGamemode(modeKey).replace(/,\s*$/, "");
     const countTxt = window.HandleCount(count);
     modeLabel.innerHTML =
-      gamemode + countTxt.substring(0, countTxt.lastIndexOf(","));
+      gamemode + ", " + countTxt.substring(0, countTxt.lastIndexOf(","));
   };
 
-  window.remixSpeedInfoShowSwitchMessage = function remixSpeedInfoShowSwitchMessage() {
-    const set = function (id, html) {
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = html;
-    };
-    set("mode-selected", "Switch to PuddingMod");
-    set("mode-selected2", "");
+  window.remixSpeedInfoClearRows = function remixSpeedInfoClearRows() {
     for (const id of [
       "25",
       "50",
@@ -10192,10 +13090,35 @@ window.RemixSpeedInfo.runCodeBefore = function () {
       "100src",
       "Allsrc",
       "Hsrc",
+      "25track",
+      "50track",
+      "100track",
+      "Alltrack",
+      "Htrack",
     ]) {
-      set(id, "");
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = "";
     }
   };
+
+  window.remixSpeedInfoShowSwitchMessage = function remixSpeedInfoShowSwitchMessage() {
+    const modeLabel = document.getElementById("mode-selected");
+    if (modeLabel) modeLabel.innerHTML = "Switch to PuddingMod";
+    const modeLabel2 = document.getElementById("mode-selected2");
+    if (modeLabel2) modeLabel2.innerHTML = "";
+    window.remixSpeedInfoClearRows();
+  };
+
+  window.remixSpeedInfoShowOfficialOnlyMessage =
+    function remixSpeedInfoShowOfficialOnlyMessage() {
+      const modeLabel = document.getElementById("mode-selected");
+      if (modeLabel) {
+        modeLabel.innerHTML = "Official counts only (1–Tally)";
+      }
+      const modeLabel2 = document.getElementById("mode-selected2");
+      if (modeLabel2) modeLabel2.innerHTML = "";
+      window.remixSpeedInfoClearRows();
+    };
 
   window.remixSpeedInfoEnableCheckbox = function remixSpeedInfoEnableCheckbox() {
     if (window.isSnakeMobileVersion) return;
@@ -10206,7 +13129,10 @@ window.RemixSpeedInfo.runCodeBefore = function () {
 
     let want = !!(window.pudding_settings && window.pudding_settings.SpeedInfo);
     try {
-      const raw = JSON.parse(localStorage.getItem("PuddingSettings") || "null");
+      const raw = JSON.parse(
+        localStorage.getItem(window.REMIX_SETTINGS_KEY || "RemixSettings") ||
+          "null"
+      );
       if (raw && raw.SpeedInfo) want = true;
     } catch (_e) {}
 
@@ -10221,71 +13147,9 @@ window.RemixSpeedInfo.runCodeBefore = function () {
     }
   };
 
-  // Fix mode bitstring: Blender is always trophy 22, not "last child".
-  if (
-    window.timeKeeper &&
-    typeof window.timeKeeper.getCurrentMode === "function" &&
-    !window.timeKeeper.getCurrentMode.__remixPatched
-  ) {
-    window.timeKeeper.getCurrentMode = function remixGetCurrentMode() {
-      const blenderId = window.remixNativeBlenderMode;
-      // CurrentModeNum is updated on trophy change (and by the harness); prefer it
-      // over the DOM trophy index so labels stay correct during play.
-      const mode =
-        typeof window.CurrentModeNum === "number"
-          ? window.CurrentModeNum
-          : window.timeKeeper.getCurrentSetting("trophy");
-      const trophyRoot = document.getElementById("trophy");
-      const trophyCount = trophyRoot ? trophyRoot.children.length : 0;
-
-      if (mode === blenderId) {
-        let element = null;
-        for (const img of document.querySelectorAll("img")) {
-          if (img.src && img.src.includes("random.png")) {
-            element = img;
-            break;
-          }
-        }
-        let modeStr = "";
-        if (
-          element &&
-          element.parentElement &&
-          element.parentElement.parentElement &&
-          element.parentElement.parentElement.parentElement
-        ) {
-          let counter = -1;
-          for (const child of element.parentElement.parentElement.parentElement
-            .children) {
-            counter++;
-            if (counter === 0) continue;
-            const inner = child.firstElementChild;
-            if (
-              inner &&
-              inner.classList.length > 1 &&
-              inner.children.length > 0
-            ) {
-              modeStr += "1";
-            } else {
-              modeStr += "0";
-            }
-          }
-        }
-        modeStr += window.candy_blending ? "1" : "0";
-        modeStr += window.chess_blending ? "1" : "0";
-        modeStr += window.burger_blending ? "1" : "0";
-        return modeStr;
-      }
-
-      // One bit per trophy after Classic (includes Blender + Remix modes).
-      let modeStr = "";
-      for (let t = 1; t < trophyCount; t++) {
-        modeStr += t === mode ? "1" : "0";
-      }
-      return modeStr;
-    };
-    window.timeKeeper.getCurrentMode.__remixPatched = true;
-  }
-
+  // Do NOT replace getCurrentMode — Pudding now returns ModeRegistry modeKeys
+  // used for PB storage. Keep a light CurrentModeNum preference on the key path
+  // (installed above). Refresh dialog labels after show.
   if (
     window.timeKeeper &&
     typeof window.timeKeeper.showDialog === "function" &&
@@ -10295,10 +13159,10 @@ window.RemixSpeedInfo.runCodeBefore = function () {
     window.timeKeeper.showDialog = function remixShowDialog() {
       origShow.apply(this, arguments);
       const dialog = document.getElementById("timeKeeperDialog");
-      if (!dialog) return;
-      const nice = window
-        .remixTimeKeeperFormatGamemode(window.timeKeeper.getCurrentMode())
-        .replace(/,\s*$/, "");
+      if (!dialog || !window.ModeRegistry) return;
+      const nice = window.ModeRegistry.labelModeKey(
+        window.ModeRegistry.getCurrentModeKey()
+      );
       for (let i = 0; i < dialog.childNodes.length; i++) {
         const node = dialog.childNodes[i];
         if (
@@ -10323,10 +13187,15 @@ window.RemixSpeedInfo.runCodeBefore = function () {
       if (!window.pudding_settings || !window.pudding_settings.SpeedInfo) {
         return;
       }
-      if (!window.remixSpeedInfoAllowed()) {
+      if (!window.remixChessBurgerTimeKeeperActive()) {
         window.remixSpeedInfoShowSwitchMessage();
         return;
       }
+      if (!window.remixTimeKeeperOfficialSettings()) {
+        window.remixSpeedInfoShowOfficialOnlyMessage();
+        return;
+      }
+      window.remixInstallModeRegistry();
       window.remixSpeedInfoEnsureModeLabels();
       const result = await origUpdate.apply(this, arguments);
       window.remixSpeedInfoApplyModeLabel();
@@ -10341,8 +13210,12 @@ window.RemixSpeedInfo.runCodeBefore = function () {
       if (!window.pudding_settings || !window.pudding_settings.SpeedInfo) {
         return;
       }
-      if (!window.remixSpeedInfoAllowed()) {
+      if (!window.remixChessBurgerTimeKeeperActive()) {
         window.remixSpeedInfoShowSwitchMessage();
+        return;
+      }
+      if (!window.remixTimeKeeperOfficialSettings()) {
+        window.remixSpeedInfoShowOfficialOnlyMessage();
         return;
       }
       window.remixSpeedInfoEnsureModeLabels();
@@ -10360,8 +13233,12 @@ window.RemixSpeedInfo.runCodeBefore = function () {
       if (!window.pudding_settings || !window.pudding_settings.SpeedInfo) {
         return;
       }
-      if (!window.remixSpeedInfoAllowed()) {
+      if (!window.remixChessBurgerTimeKeeperActive()) {
         window.remixSpeedInfoShowSwitchMessage();
+        return;
+      }
+      if (!window.remixTimeKeeperOfficialSettings()) {
+        window.remixSpeedInfoShowOfficialOnlyMessage();
         return;
       }
       window.remixSpeedInfoEnsureModeLabels();
@@ -10484,7 +13361,6 @@ window.RemixSpeedInfo.runCodeBefore = function () {
     for (let i = editMode.children.length; i <= maxId; i++) {
       ensureSlot(i);
     }
-    // Re-apply for slots that already existed from a prior open / old mirror.
     for (const m of remixModes) ensureSlot(m.id);
     if (typeof window.remixNativeBlenderMode === "number") {
       ensureSlot(window.remixNativeBlenderMode);
@@ -10548,6 +13424,16 @@ window.RemixSpeedInfo.runCodeBefore = function () {
 ////////////////////////////////////////////////////////////////////
 
 window.RemixSpeedInfo.alterSnakeCode = function (code) {
+  // Pudding refreshes SpeedInfo + SRC on trophy change via queueMicrotask.
+  // Both window.SpeedInfoUpdate / getAllSrc are Remix-gated already.
+  if (
+    code.match(
+      /case "trophy":queueMicrotask\(function\(\)\{window\.(?:SpeedInfoUpdate|getAllSrc)\(\)/
+    )
+  ) {
+    return code;
+  }
+  // Legacy Pudding builds only assigned CurrentModeNum.
   if (code.match(/case "trophy":window\.CurrentModeNum = /)) {
     code = code.assertReplace(
       /case "trophy":window\.CurrentModeNum = /,
@@ -10564,6 +13450,7 @@ window.RemixSpeedInfo.alterSnakeCode = function (code) {
 ////////////////////////////////////////////////////////////////////
 
 window.RemixSpeedInfo.runCodeAfter = function () {
+  window.remixInstallModeRegistry && window.remixInstallModeRegistry();
   window.remixBindTimerSettingsButton && window.remixBindTimerSettingsButton();
   window.remixSpeedInfoEnableCheckbox && window.remixSpeedInfoEnableCheckbox();
   if (
@@ -10575,15 +13462,118 @@ window.RemixSpeedInfo.runCodeAfter = function () {
   }
 };
 
+window.REMIX_SIZE_ICONS = {"Micro.png":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAAXNSR0IArs4c6QAAA95JREFUeF7tnDFuE1EQhmcRkCYRkSiIqdyAYkhpahqugCyukAP4ED5AroAsrkBDjcuAI2hc4VAgOUqaAMqiGCxRJJF2Z8bZnflSZ97u/71P/z7biQvhJzWBInV6wgsCJJcAARAgOYHk8WkABEhOIHl8GgABkhNIHp8GQIDkBJLHpwEQIDmB5PFpAARITiB5fBoAAZITSB6fBkCA5ASSx6cBECA5geTxaQAESE4geXwaAAGSE0genwZAgOQEksenARAgOYHk8WkABEhOIHl8GgABkhNIHp8GQIDkBJLHpwEQIDmB5PFpAARITiB5fBoAAZpNYKe73X25/+StFOWelLLZ7Lv9d3eFnElZHH44+PrmeLaYNfmeG98Ag1H/o4j0mwzxhnubjIeTF02+9zYIUF4C7DzekO0Hd2uwLOROUS/mRXl56eXlK/0sTn7L/Nv5cmY8nNS7eKUr1v/lRt/cZazBqL/cgV5vUzqdjfpJ1zg5n5/LdHqGABbMEcCC4vVr0AAOfGkAQ6g0gCHMK5aiARz40gCGUGkAQ5g0gC/M1eo0gCFnGsAQJg3gC5MGcOBLAzhA/W9JXgU48OUMYAiVBjCEyRnAFyZnAAe+NIAD1DaeAZ4/25JHO/d9aRit/v34p3z6fLpcjY+DlVBXDYAASpDXjLfmVQACIACPAAcHaAAHqJwBDKFyBjCE2eb3ATgD+IjAI8CBK48AQ6g8Agxh8gjwhblanQYw5EwDGMKkAXxh0gAOfGkAB6h8GOQLlTOAIV8+DjaE2eYzAP8c6iNCa94IQgAE4N/DHRygARyg8lfBhlA5BBrC5BDoC3O1Og1gyJkGMIRJA/jCpAEc+NIADlDb+FYw7wP4iMDLQAeuHAINofIIMITJIdAXJodAB76rBvj7VbH3al1B91Wx1S+5OPnFV8VWx3b1xGDUn4rIrtV6a17naDyc9NZ8zUqXa/wh8GF3a/fV/tN3IsVepWS3/svl4fuDL69/zE6Pbv1WbriBxgvQZHgR7g0BIuyiIgMCKOBFGEWACLuoyIAACngRRhEgwi4qMiCAAl6EUQSIsIuKDAiggBdhFAEi7KIiAwIo4EUYRYAIu6jIgAAKeBFGESDCLioyIIACXoRRBIiwi4oMCKCAF2EUASLsoiIDAijgRRhFgAi7qMiAAAp4EUYRIMIuKjIggAJehFEEiLCLigwIoIAXYRQBIuyiIgMCKOBFGEWACLuoyIAACngRRhEgwi4qMiCAAl6EUQSIsIuKDAiggBdhFAEi7KIiAwIo4EUYRYAIu6jIgAAKeBFGESDCLioyIIACXoRRBIiwi4oMfwCz/uCQE2ccogAAAABJRU5ErkJggg==","Tiny.png":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAAXNSR0IArs4c6QAABAdJREFUeF7tnU1SU1EQhfuGlE5iGX8WABtQJNmHjsIQ3YETyJAwDEzcgTBMRrqPBNENwAL8iWUmWuFdC7AsoKCK5L6+9br6Y0q67+lzvur73iAQhB/XDgTX0zO8AIBzCAAAAJw74Hx8NgAAOHfA+fhsAABw7oDz8dkAAODcAefjswEAwLkDzsdnAwCAcwecj88GAIByHOj0WxshhNdRpBlEVsvpSpfLDkSRoyAyiTHuD7vjgzLcKWUDdPba2yFKrwxB9LibAzFIb7g52rnbp2//VDIA63vtlxLlQ6oQ6hdwIMirwebo4wKV/0vSAei3jiWE5RQR1C7oQIwng+54ZcHq87J0AHbb8bKAej1Io7GUomnu2lqoSa2WPMpc5xZFlCIWc9Wkfng6PZXZ7IrdMtgaJQ2eVHw20Po1AJrNuqytPUydlfobHDg8/CmTyezKbwDAESoA4Cjsm0YFAADgCvDMABvAc/oiAgAAwBXgmQE2gOf0uQKcpw8AAMAV4JwBAAAA3gI8M8AG8Jw+D4HO0wcAAOAKcM4AAAAAbwGeGWADeE6fh0Dn6QMAAHAFOGcAAACAtwDPDLABPKfPQ6Dz9K0A8PjRPVl98YC0FBw4+vRLvv/4U+3vBj59cl+ePW8ojE/LL5+n8vXbbwDwigIAeE3+39wAAABcAZ4ZYAN4Tl9EAAAAuAI8M8AG8Jw+V4Dz9AEAALgCnDMAAADAW4BnBtgAntPnIdB5+gAAAFwBzhkAAADgLcAzA2wAz+nzEOg8fQAAAK4A5wwAAADwFuCZATaA5/R5CHSevhUA+HKoHqgmvhzKfw7VA4A/EKHnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOAGAiJj2RAKDnrYnOJgCo14M0GktZDa2FmtRqIeuZRRGliEXWM6fTU5nN4pUzB1ujpMGTis+UrPdbxxLCclYnOOzCgRhPBt3xSoodyQB09trbIUovRQS1izkQg/SGm6OdxaovqpIBON8Cu633IuF1ihBq53Ug7g+2xm/mrbr++VIAOGva6bc2JMi7IKGZKor62x2IEicS5e2wOz4ow6fSAChDDD3yOwAA+T2v1IkAUKk48osBgPyeV+pEAKhUHPnFAEB+zyt1IgBUKo78YgAgv+eVOhEAKhVHfjEAkN/zSp0IAJWKI78YAMjveaVOBIBKxZFfDADk97xSJwJApeLILwYA8nteqRP/Apk8ua6B+meGAAAAAElFTkSuQmCC","Super Big.png":"data:image/png;base64,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","Too Big.png":"data:image/png;base64,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","Humongous.png":"data:image/png;base64,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","Way Too Big.png":"data:image/png;base64,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"};
+
+window.remixInlineCspMenuIcons = function remixInlineCspMenuIcons() {
+  const map = window.REMIX_SIZE_ICONS || {};
+  const root = document.querySelector("#size");
+  if (!root) return;
+  for (let i = 0; i < root.children.length; i++) {
+    const img = root.children[i];
+    const src = (img.getAttribute && img.getAttribute("src")) || img.src || "";
+    if (src.indexOf("github.com") < 0 && src.indexOf("raw.githubusercontent.com") < 0) continue;
+    let name = src.split("/").pop().split("?")[0];
+    try { name = decodeURIComponent(name); } catch (_e) {}
+    if (map[name]) img.src = map[name];
+  }
+};
+
+window.PauseMod = {};
+window.PauseGameMod = window.PauseMod;
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEBEFORE
+////////////////////////////////////////////////////////////////////
+
+window.PauseMod.runCodeBefore = function () {
+  window.pauseGame = false;
+};
+
+////////////////////////////////////////////////////////////////////
+//ALTERSNAKECODE
+////////////////////////////////////////////////////////////////////
+
+window.PauseMod.alterSnakeCode = function (code) {
+  // MoreMenu already gates the tick with && !window.pauseGame. Skip if so —
+  // this stays idempotent if both run.
+  if (code.indexOf("!window.pauseGame") >= 0) return code;
+
+  const pauseRe =
+    /\(\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\.\n?direction\n?!==\n?"NONE"\n?\|\|\n?[a-zA-Z0-9_$]{1,8}\n?\(\n?this\n?\.\n?[a-zA-Z0-9_$]{1,8}\n?\)\n?\)/;
+  const pauseCondition = code.match(pauseRe);
+  if (!pauseCondition) {
+    console.error("PauseMod: failed to find tick pause condition");
+    return code;
+  }
+  if (typeof code.assertReplace === "function") {
+    return code.assertReplace(
+      pauseCondition[0],
+      `(${pauseCondition[0]} && !window.pauseGame)`
+    );
+  }
+  return code.replace(
+    pauseCondition[0],
+    `(${pauseCondition[0]} && !window.pauseGame)`
+  );
+};
+
+////////////////////////////////////////////////////////////////////
+//RUNCODEAFTER
+////////////////////////////////////////////////////////////////////
+
+window.PauseMod.runCodeAfter = function () {
+  if (window.__remixPauseBound) return;
+  window.__remixPauseBound = true;
+
+  document.addEventListener("keydown", function (evt) {
+    if (evt.code !== "KeyQ") return;
+    window.pauseGame = !window.pauseGame;
+    const overlay = document.getElementsByClassName("wjOYOd")[0];
+    if (!overlay) return;
+    const menuDiv = overlay.children[0];
+    if (window.pauseGame) {
+      overlay.style.visibility = "visible";
+      overlay.style.opacity = 1;
+      if (menuDiv) menuDiv.style.visibility = "hidden";
+    } else {
+      setTimeout(function () {
+        if (!window.pauseGame && menuDiv) menuDiv.style.visibility = "visible";
+      }, 500);
+      overlay.style.visibility = "hidden";
+      overlay.style.opacity = 0;
+    }
+  });
+};
+
 window.RemixMod = {};
 
 ////////////////////////////////////////////////////////////////////
 //RUNCODEBEFORE
 ////////////////////////////////////////////////////////////////////
 
+// Remix has extra trophies / counts / speeds and its own settings (Black Dice,
+// etc.). Keep those on Remix-only localStorage keys so PuddingMod's
+// PuddingSettings + snake_timeKeeper stay untouched.
+window.REMIX_SETTINGS_KEY = "RemixSettings";
+window.REMIX_TIMEKEEPER_KEY = "snake_timeKeeper_remix";
+
+window.remixSeedIsolatedStorage = function remixSeedIsolatedStorage() {
+  try {
+    if (!localStorage.getItem(window.REMIX_SETTINGS_KEY)) {
+      const pud = localStorage.getItem("PuddingSettings");
+      if (pud) localStorage.setItem(window.REMIX_SETTINGS_KEY, pud);
+    }
+    if (!localStorage.getItem(window.REMIX_TIMEKEEPER_KEY)) {
+      const tk = localStorage.getItem("snake_timeKeeper");
+      if (tk) localStorage.setItem(window.REMIX_TIMEKEEPER_KEY, tk);
+    }
+  } catch (_e) {}
+};
+
 // MorePudding bundles Pudding + Visibility + MoreMenu and runs them in that
 // order. Fall back to the individual mods if a build ever ships without it.
 window.remixBaseRunCodeBefore = function remixBaseRunCodeBefore() {
+  window.remixSeedIsolatedStorage();
   if (window.MorePudding) {
     window.MorePudding.runCodeBefore();
     return;
@@ -10596,6 +13586,206 @@ window.remixBaseAlterSnakeCode = function remixBaseAlterSnakeCode(code) {
   if (window.MorePudding) return window.MorePudding.alterSnakeCode(code);
   code = window.PuddingMod.alterSnakeCode(code);
   return window.VisibilityModCode.alterSnakeCode(code);
+};
+
+window.remixInjectSettingsCss = function remixInjectSettingsCss() {
+  if (document.getElementById("remix-settings-css")) return;
+  const style = document.createElement("style");
+  style.id = "remix-settings-css";
+  style.textContent = `
+#ultra-settings-pager {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  margin: 6px 0 8px;
+}
+.ultra-settings-tab {
+  flex: 1;
+  min-width: 0;
+  font-family: Roboto, Arial, sans-serif !important;
+  font-size: 11px !important;
+  padding: 5px 2px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  cursor: pointer;
+  line-height: 1.2;
+  background: rgba(0,0,0,0.22);
+  color: #fff;
+}
+.ultra-settings-tab.ultra-tab-on {
+  background: #1155CC;
+  color: #fff;
+}
+.ultra-settings-page {
+  display: none;
+  overflow: hidden;
+  min-height: 0;
+}
+.ultra-settings-page.ultra-page-on {
+  display: block;
+}
+#settings-popup-pudding .form-check,
+#settings-popup-pudding .form-check-inline {
+  display: flex !important;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 4px 0 !important;
+  margin-right: 0 !important;
+  padding: 0 !important;
+  gap: 4px;
+}
+#ultra-settings-hidden,
+#ultra-settings-hidden .form-check,
+#ultra-settings-hidden .form-check-inline,
+#settings-popup-pudding .form-check.ultra-hide,
+#settings-popup-pudding .form-check-inline.ultra-hide,
+#settings-popup-pudding .ultra-hide,
+#AlwaysOnTimeKeeper,
+label[for="AlwaysOnTimeKeeper"],
+#ShowSplitPanel,
+label[for="ShowSplitPanel"],
+#RemoveScrollbar,
+label[for="RemoveScrollbar"] {
+  display: none !important;
+}
+#settings-popup-pudding .form-check-input {
+  float: none !important;
+  position: static !important;
+  margin: 0 !important;
+  flex-shrink: 0;
+}
+#stat-chooser {
+  width: 100% !important;
+  box-sizing: border-box;
+  display: block !important;
+  margin: 4px 0 8px !important;
+}
+#black-dice-settings {
+  margin: 8px 0 0 !important;
+  padding: 6px 8px !important;
+  border-radius: 8px !important;
+}
+`;
+  document.head.appendChild(style);
+};
+
+window.remixSettingsWrap = function remixSettingsWrap(id) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  return el.closest(".form-check") || el;
+};
+
+window.remixHideSettingsNode = function remixHideSettingsNode(el, bin) {
+  if (!el) return;
+  el.classList.add("ultra-hide");
+  el.style.display = "none";
+  if (bin && el.parentElement !== bin) bin.appendChild(el);
+};
+
+window.remixShowSettingsPage = function remixShowSettingsPage(id) {
+  window.__remixSettingsPage = id;
+  window.__ultraSettingsPage = id;
+  ["play", "stats", "setup"].forEach(function (pageId) {
+    const page = document.getElementById("ultra-settings-page-" + pageId);
+    const tab = document.getElementById("ultra-settings-tab-" + pageId);
+    if (page) page.classList.toggle("ultra-page-on", pageId === id);
+    if (tab) tab.classList.toggle("ultra-tab-on", pageId === id);
+  });
+};
+
+window.remixOrganizeSettings = function remixOrganizeSettings() {
+  const root = document.getElementById("settings-popup-pudding");
+  if (!root) return;
+
+  window.remixInjectSettingsCss();
+
+  if (typeof window.remixInjectBlackDiceSettingsUi === "function") {
+    window.remixInjectBlackDiceSettingsUi();
+  }
+
+  let bin = document.getElementById("ultra-settings-hidden");
+  if (!bin) {
+    bin = document.createElement("div");
+    bin.id = "ultra-settings-hidden";
+    bin.className = "ultra-hide";
+    root.appendChild(bin);
+  }
+
+  window.remixHideSettingsNode(window.remixSettingsWrap("AlwaysOnTimeKeeper"), bin);
+  window.remixHideSettingsNode(window.remixSettingsWrap("ShowSplitPanel"), bin);
+  window.remixHideSettingsNode(window.remixSettingsWrap("RemoveScrollbar"), bin);
+  window.remixHideSettingsNode(document.getElementById("ScrollLeftBtn"), bin);
+  window.remixHideSettingsNode(document.getElementById("settings-close"), bin);
+  window.remixHideSettingsNode(document.getElementById("snakePride"), bin);
+  Array.from(root.querySelectorAll(":scope > br")).forEach(function (el) {
+    window.remixHideSettingsNode(el, bin);
+  });
+
+  let pager = document.getElementById("ultra-settings-pager");
+  if (!pager) {
+    pager = document.createElement("div");
+    pager.id = "ultra-settings-pager";
+    const title = root.querySelector(":scope > span");
+    if (title && title.nextSibling) root.insertBefore(pager, title.nextSibling);
+    else root.insertBefore(pager, root.firstChild);
+
+    [
+      ["play", "Play"],
+      ["stats", "Stats"],
+      ["setup", "Setup"],
+    ].forEach(function (pair) {
+      const page = document.createElement("div");
+      page.id = "ultra-settings-page-" + pair[0];
+      page.className = "ultra-settings-page";
+      root.appendChild(page);
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.id = "ultra-settings-tab-" + pair[0];
+      btn.className = "ultra-settings-tab";
+      btn.textContent = pair[1];
+      btn.addEventListener("click", function () {
+        window.remixShowSettingsPage(pair[0]);
+      });
+      pager.appendChild(btn);
+    });
+  }
+
+  const play = document.getElementById("ultra-settings-page-play");
+  const stats = document.getElementById("ultra-settings-page-stats");
+  const setup = document.getElementById("ultra-settings-page-setup");
+  if (!play || !stats || !setup) return;
+
+  [
+    "SkullPoisonFruit",
+    "DistinctSokoGoals",
+    "InputDisplay",
+    "TopBarIcons",
+    "EatThemeRandomizer",
+    "DisableRandom",
+  ].forEach(function (id) {
+    const el = window.remixSettingsWrap(id);
+    if (el && el.parentElement !== play) play.appendChild(el);
+  });
+  ["stat-chooser", "edit-stat", "reset-stats"].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el && el.parentElement !== stats) stats.appendChild(el);
+  });
+  [
+    "SaveGameSettings",
+    "TimerSettings",
+    "ResetKeybind",
+    "CustomBowlFruits",
+    "black-dice-settings",
+  ].forEach(function (id) {
+    const el = window.remixSettingsWrap(id) || document.getElementById(id);
+    if (el && el.parentElement !== setup) setup.appendChild(el);
+  });
+
+  window.remixShowSettingsPage(
+    window.__remixSettingsPage || window.__ultraSettingsPage || "play"
+  );
 };
 
 window.RemixMod.runCodeBefore = function () {
@@ -10663,6 +13853,9 @@ window.RemixMod.runCodeBefore = function () {
   };
 
   window.remixBaseRunCodeBefore();
+  if (typeof window.remixInlineCspMenuIcons === "function") {
+    window.remixInlineCspMenuIcons();
+  }
   // Modes claim their trophy slots after MorePudding (incl. MoreMenu) has
   // finished adding its own, so their ids land at the end.
   window.CandyMod.runCodeBefore();
@@ -10672,6 +13865,7 @@ window.RemixMod.runCodeBefore = function () {
   window.DiceCounts.runCodeBefore();
   // After Chess/Burger helpers exist: re-enable SpeedInfo and gate its data.
   window.RemixSpeedInfo.runCodeBefore();
+  window.PauseMod.runCodeBefore();
 };
 
 ////////////////////////////////////////////////////////////////////
@@ -10687,6 +13881,8 @@ window.RemixMod.alterSnakeCode = function (code) {
   code = window.CatSpeed.alterSnakeCode(code);
   code = window.DiceCounts.alterSnakeCode(code);
   code = window.RemixSpeedInfo.alterSnakeCode(code);
+  // After MoreMenu: skip if the tick is already gated.
+  code = window.PauseMod.alterSnakeCode(code);
   return code;
 };
 
@@ -10700,6 +13896,11 @@ window.RemixMod.runCodeAfter = function () {
   window.ChessMod.runCodeAfter && window.ChessMod.runCodeAfter();
   window.BurgerMod.runCodeAfter && window.BurgerMod.runCodeAfter();
   window.RemixSpeedInfo.runCodeAfter && window.RemixSpeedInfo.runCodeAfter();
+  window.PauseMod.runCodeAfter && window.PauseMod.runCodeAfter();
+  window.remixOrganizeSettings();
+  setTimeout(function () {
+    window.remixOrganizeSettings();
+  }, 0);
 
   let modIndicator = document.createElement("div");
   modIndicator.style =
@@ -10756,7 +13957,7 @@ window.mouseMode.runCodeBefore = function () {
         return true;
       }
       const game = window.__remixGame || window.megaWholeSnakeObject;
-      if (game && typeof f7 === "function" && f7(game.settings, 24)) {
+      if (game && typeof e7 === "function" && e7(game.settings, 24)) {
         return true;
       }
     } catch (_e) {}
@@ -10818,6 +14019,8 @@ window.mouseMode.runCodeBefore = function () {
           const s = g && g.settings;
           if (!s || window.CHESS_MODE == null) return false;
           if (s.ub === window.CHESS_MODE) return true;
+          if (s.rSa && s.rSa.has(window.CHESS_MODE)) return true;
+          if (s.Lc && s.Lc.has(window.CHESS_MODE)) return true;
           if (s.ZSa && s.ZSa.has(window.CHESS_MODE)) return true;
           if (s.Jc && s.Jc.has(window.CHESS_MODE)) return true;
         } catch (_e) {}
@@ -11066,7 +14269,7 @@ window.mouseMode.runCodeBefore = function () {
     }
 
     // Arrow mode (idea 1): stamp a turn-trail on tiles you leave; lock to that dir on arrows.
-    // BaF/f7 are module-scoped — use window.mouseBaF / mouseF7 from alterSnakeCode.
+    // s4E/e7 are module-scoped — use window.mouseBaF / mouseSettingsHas from alterSnakeCode.
     // Rail: once an arrow engages, force that direction until the head has traveled
     // a full tile from the engage point (survives leaving the painted cell + double
     // updateFaceCoords calls from tick/render).
@@ -11085,12 +14288,16 @@ window.mouseMode.runCodeBefore = function () {
             : !!(
                 settings &&
                 (settings.ub === 16 ||
+                  (settings.rSa && settings.rSa.has(16)) ||
+                  (settings.Lc && settings.Lc.has(16)) ||
                   (settings.ZSa && settings.ZSa.has(16)) ||
                   (settings.Jc && settings.Jc.has(16)))
               );
       const arrowBoard =
-        (snakeForArrow && snakeForArrow.Tb) ||
         (game && game.Ka) ||
+        (game && game.wb && game.wb.Ka) ||
+        (snakeForArrow && snakeForArrow.Ka) ||
+        (snakeForArrow && snakeForArrow.Tb) ||
         (game && game.oa && game.oa.Tb);
       const placeArrow =
         typeof window.mouseBaF === "function"
@@ -11359,7 +14566,7 @@ window.mouseMode.alterSnakeCode = function (code) {
     )[1]
   );
 
-  // snakeDetails e.g. "wb" ; blockyHeadCoord e.g. "oa.Ec"
+  // snakeDetails e.g. "wb" ; blockyHeadCoord e.g. "oa.Dc"
   step("blockyHead", () => {
     [, window.snakeDetails, window.blockyHeadCoord] = code.assertMatch(
       /this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8})=\n?[$a-zA-Z0-9_]{0,8}\.clone\(\),/
@@ -11379,21 +14586,21 @@ window.mouseMode.alterSnakeCode = function (code) {
 
   // Soft fractional OOB (do NOT round here — rounding near edges false-kills Borderless).
   // Grid indexers below round separately.
-  code = step("n7bounds", () =>
+  code = step("m7bounds", () =>
     code.assertReplace(
-      /n7=function\([a-z],[a-z]\)\{return [a-z]\.x>=0&&[a-z]\.x<[a-z]\.[$a-zA-Z0-9_]{0,8}\.width&&[a-z]\.y>=0&&[a-z]\.y<[a-z]\.[$a-zA-Z0-9_]{0,8}\.height\}/,
-      "n7=function(a,b){return b.x>-0.5&&b.x<a.oa.width-0.5&&b.y>-0.5&&b.y<a.oa.height-0.5}"
+      /m7=function\([a-z],[a-z]\)\{return [a-z]\.x>=0&&[a-z]\.x<[a-z]\.[$a-zA-Z0-9_]{0,8}\.width&&[a-z]\.y>=0&&[a-z]\.y<[a-z]\.[$a-zA-Z0-9_]{0,8}\.height\}/,
+      "m7=function(a,b){return b.x>-0.5&&b.x<a.oa.width-0.5&&b.y>-0.5&&b.y<a.oa.height-0.5}"
     )
   );
 
-  // Borderless: never die to OOB (wrap handles it). Tc(a){n7(...)||this.Na()}
+  // Borderless: never die to OOB (wrap handles it). Sc(a){m7(...)||this.Oa()}
   {
     const next = step(
-      "oobTc",
+      "oobSc",
       () =>
         code.assertReplace(
-          /Tc\(a\)\{n7\(this\.ka,a\)\|\|this\.Na\(\)/,
-          "Tc(a){o7(this.settings)||n7(this.ka,a)||this.Na()"
+          /Sc\(a\)\{m7\(this\.ka,a\)\|\|this\.Oa\(\)/,
+          "Sc(a){n7(this.settings)||m7(this.ka,a)||this.Oa()"
         ),
       true
     );
@@ -11401,69 +14608,69 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
 
   // Tile Map keys must be integers (walls / statue / mines / gates).
-  code = step("Z6", () =>
+  code = step("Y6", () =>
     code.assertReplace(
-      /Z6=function\(a\)\{return a\.x<<16\|a\.y\}/,
-      "Z6=function(a){return Math.round(a.x)<<16|Math.round(a.y)}"
+      /Y6=function\(a\)\{return a\.x<<16\|a\.y\}/,
+      "Y6=function(a){return Math.round(a.x)<<16|Math.round(a.y)}"
     )
   );
 
   // Statue flood-fill board indexing.
-  code = step("jdF", () =>
+  code = step("j7E", () =>
     code.assertReplace(
-      /jdF=function\(a,b,c\)\{if\(n7\(a\.ka,c\)&&!a\.oa\.get\(Z6\(c\)\)\)\{var d=b\[c\.y\]\[c\.x\];/,
-      "jdF=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(n7(a.ka,c)&&!a.oa.get(Z6(c))){var d=b[c.y][c.x];"
+      /j7E=function\(a,b,c\)\{if\(m7\(a\.ka,c\)&&!a\.oa\.get\(Y6\(c\)\)\)\{var d=b\[c\.y\]\[c\.x\];/,
+      "j7E=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(m7(a.ka,c)&&!a.oa.get(Y6(c))){var d=b[c.y][c.x];"
     )
   );
 
   // Arrow / gate / sokoban / bridge: round before 2D board indexing.
-  code = step("eaF", () =>
+  code = step("U3E", () =>
     code.assertReplace(
-      /eaF=function\(a,b\)\{return n7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.direction:"NONE"\}/,
-      'eaF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return n7(a.oa,b)?a.ka[b.y][b.x].direction:"NONE"}'
+      /U3E=function\(a,b\)\{return m7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.direction:"NONE"\}/,
+      'U3E=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return m7(a.oa,b)?a.ka[b.y][b.x].direction:"NONE"}'
     )
   );
-  code = step("daF", () =>
+  code = step("T3E", () =>
     code.assertReplace(
-      /daF=function\(a,b\)\{return n7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.Gh:!1\}/,
-      'daF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return n7(a.oa,b)?a.ka[b.y][b.x].Gh:!1}'
+      /T3E=function\(a,b\)\{return m7\(a\.oa,b\)\?a\.ka\[b\.y\]\[b\.x\]\.Lh:!1\}/,
+      'T3E=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};return m7(a.oa,b)?a.ka[b.y][b.x].Lh:!1}'
     )
   );
-  code = step("BaF", () =>
+  code = step("s4E", () =>
     code.assertReplace(
-      /BaF=function\(a,b,c\)\{var d=a\.ka\[c\.y\]\[c\.x\];/,
-      "BaF=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(!a.ka[c.y]||a.ka[c.y][c.x]==null)return;var d=a.ka[c.y][c.x];"
+      /s4E=function\(a,b,c\)\{var d=a\.ka\[c\.y\]\[c\.x\];/,
+      "s4E=function(a,b,c){c={x:Math.round(c.x),y:Math.round(c.y)};if(!a.ka[c.y]||a.ka[c.y][c.x]==null)return;var d=a.ka[c.y][c.x];"
     )
   );
-  // Expose arrow helpers to window (module-scoped BaF/f7 are invisible to runCodeBefore).
+  // Expose arrow helpers to window (module-scoped s4E/e7 are invisible to runCodeBefore).
   code = step("exposeArrowApi", () =>
     code.assertReplace(
-      /c\.color=a\)\},CaF=class\{constructor\(a,b,c\)\{this\.settings=a;this\.oa=b;this\.wa=c;this\.ka=\[\]\}/,
-      "c.color=a)};window.mouseBaF=BaF;window.mouseEaF=eaF;window.mouseF7=f7;window.mouseSettingsHas=f7;var CaF=class{constructor(a,b,c){this.settings=a;this.oa=b;this.wa=c;this.ka=[]}"
+      /c\.color=a\)\},t4E=class\{constructor\(a,b,c\)\{this\.settings=a;this\.oa=b;this\.wa=c;this\.ka=\[\]\}/,
+      "c.color=a)};window.mouseBaF=s4E;window.mouseEaF=U3E;window.mouseF7=e7;window.mouseSettingsHas=e7;var t4E=class{constructor(a,b,c){this.settings=a;this.oa=b;this.wa=c;this.ka=[]}"
     )
   );
-  code = step("i7", () =>
+  code = step("h7", () =>
     code.assertReplace(
-      /i7=function\(a,b,c\)\{var d=a\.ka\[b\.y\]\[b\.x\];/,
-      "i7=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};if(!n7(a.oa,b))return;var d=a.ka[b.y][b.x];"
+      /h7=function\(a,b,c\)\{var d=a\.ka\[b\.y\]\[b\.x\];/,
+      "h7=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};if(!m7(a.oa,b))return;var d=a.ka[b.y][b.x];"
     )
   );
-  code = step("cbF", () =>
+  code = step("U4E", () =>
     code.assertReplace(
-      /cbF=function\(a,b,c\)\{b=a\.ka\[b\.y\]\[b\.x\];/,
+      /U4E=function\(a,b,c\)\{b=a\.ka\[b\.y\]\[b\.x\];/,
       // Only enter gates when nearly on-tile — fractional heads were snapping/teleporting early.
-      "cbF=function(a,b,c){if(Math.abs(b.x-Math.round(b.x))>0.35||Math.abs(b.y-Math.round(b.y))>0.35)return;b={x:Math.round(b.x),y:Math.round(b.y)};if(!a.ka[b.y]||a.ka[b.y][b.x]==null)return;b=a.ka[b.y][b.x];"
+      "U4E=function(a,b,c){if(Math.abs(b.x-Math.round(b.x))>0.35||Math.abs(b.y-Math.round(b.y))>0.35)return;b={x:Math.round(b.x),y:Math.round(b.y)};if(!a.ka[b.y]||a.ka[b.y][b.x]==null)return;b=a.ka[b.y][b.x];"
     )
   );
 
-  // Gate setActive: round tile before Yfa grid lookup (float head crashed here).
+  // Gate setActive: round tile before pfa grid lookup (float head crashed here).
   {
     const next = step(
       "gateSetActive",
       () =>
         code.assertReplace(
-          /setActive\(a,b,c\)\{var d=this\.ka\[a\.y\]\[a\.x\]\.Yfa\.get\(b\);/,
-          "setActive(a,b,c){a={x:Math.round(a.x),y:Math.round(a.y)};var d=this.ka[a.y]&&this.ka[a.y][a.x];if(!d)return;d=d.Yfa.get(b);"
+          /setActive\(a,b,c\)\{var d=this\.ka\[a\.y\]\[a\.x\]\.pfa\.get\(b\);/,
+          "setActive(a,b,c){a={x:Math.round(a.x),y:Math.round(a.y)};var d=this.ka[a.y]&&this.ka[a.y][a.x];if(!d)return;d=d.pfa.get(b);"
         ),
       true
     );
@@ -11476,8 +14683,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "bridgeOa",
       () =>
         code.assertReplace(
-          /\(\(ce=this\.wb\.Fa\.oa\[yc\.y\]\)==null\?0:ce\[yc\.x\]\)/,
-          "((ce=this.wb.Fa.oa[Math.round(yc.y)])==null?0:ce[Math.round(yc.x)])"
+          /\(\(be=this\.wb\.Ga\.oa\[yc\.y\]\)==null\?0:be\[yc\.x\]\)/,
+          "((be=this.wb.Ga.oa[Math.round(yc.y)])==null?0:be[Math.round(yc.x)])"
         ),
       true
     );
@@ -11485,11 +14692,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "HaF",
+      "y4E",
       () =>
         code.assertReplace(
-          /HaF=function\(a,b\)\{return GaF\(a,b\.x,b\.y,!1\)\}/,
-          "HaF=function(a,b){return GaF(a,Math.round(b.x),Math.round(b.y),!1)}"
+          /y4E=function\(a,b\)\{return x4E\(a,b\.x,b\.y,!1\)\}/,
+          "y4E=function(a,b){return x4E(a,Math.round(b.x),Math.round(b.y),!1)}"
         ),
       true
     );
@@ -11497,11 +14704,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "GaF",
+      "x4E",
       () =>
         code.assertReplace(
-          /GaF=function\(a,b,c,d=!1\)\{a=a\.wa\[c\]\[b\];/,
-          "GaF=function(a,b,c,d=!1){b=Math.round(b);c=Math.round(c);if(!a.wa[c])return!1;a=a.wa[c][b];"
+          /x4E=function\(a,b,c,d=!1\)\{a=a\.wa\[c\]\[b\];/,
+          "x4E=function(a,b,c,d=!1){b=Math.round(b);c=Math.round(c);if(!a.wa[c])return!1;a=a.wa[c][b];"
         ),
       true
     );
@@ -11509,11 +14716,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "dbF",
+      "V4E",
       () =>
         code.assertReplace(
-          /dbF=function\(a,b,c\)\{b=b\.clone\(\);/,
-          "dbF=function(a,b,c){b=b.clone();b.x=Math.round(b.x);b.y=Math.round(b.y);"
+          /V4E=function\(a,b,c\)\{b=b\.clone\(\);/,
+          "V4E=function(a,b,c){b=b.clone();b.x=Math.round(b.x);b.y=Math.round(b.y);"
         ),
       true
     );
@@ -11521,11 +14728,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "rbF",
+      "k5E",
       () =>
         code.assertReplace(
-          /rbF=function\(a,b,c\)\{for\(var d;n7\(a\.ka,b\)&&\(\(d=a\.oa\[b\.y\]\[b\.x\]\)==null\?0:d\.Gh\);\)/,
-          "rbF=function(a,b,c){b.x=Math.round(b.x);b.y=Math.round(b.y);for(var d;n7(a.ka,b)&&((d=a.oa[b.y]&&a.oa[b.y][b.x])==null?0:d.Gh);)"
+          /k5E=function\(a,b,c\)\{for\(var d;m7\(a\.ka,b\)&&\(\(d=a\.oa\[b\.y\]\[b\.x\]\)==null\?0:d\.Lh\);\)/,
+          "k5E=function(a,b,c){b.x=Math.round(b.x);b.y=Math.round(b.y);for(var d;m7(a.ka,b)&&((d=a.oa[b.y]&&a.oa[b.y][b.x])==null?0:d.Lh);)"
         ),
       true
     );
@@ -11533,11 +14740,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "scF",
+      "n6E",
       () =>
         code.assertReplace(
-          /scF=function\(a,b,c\)\{a\.Aa\.set\(Z6\(b\),c\);a\.wa\[b\.y\]\[b\.x\]\+\+\}/,
-          "scF=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.set(Z6(b),c);a.wa[b.y][b.x]++}"
+          /n6E=function\(a,b,c\)\{a\.Aa\.set\(Y6\(b\),c\);a\.wa\[b\.y\]\[b\.x\]\+\+\}/,
+          "n6E=function(a,b,c){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.set(Y6(b),c);a.wa[b.y][b.x]++}"
         ),
       true
     );
@@ -11545,11 +14752,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   }
   {
     const next = step(
-      "pcF",
+      "k6E",
       () =>
         code.assertReplace(
-          /pcF=function\(a,b\)\{a\.Aa\.delete\(Z6\(b\)\);a\.wa\[b\.y\]\[b\.x\]--\}/,
-          "pcF=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.delete(Z6(b));a.wa[b.y][b.x]--}"
+          /k6E=function\(a,b\)\{a\.Aa\.delete\(Y6\(b\)\);a\.wa\[b\.y\]\[b\.x\]--\}/,
+          "k6E=function(a,b){b={x:Math.round(b.x),y:Math.round(b.y)};a.Aa.delete(Y6(b));a.wa[b.y][b.x]--}"
         ),
       true
     );
@@ -11562,8 +14769,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "mdFbody",
       () =>
         code.assertReplace(
-          /d=b\.ka\[c\],f7\(b\.settings,3\)&&\(d\.x\+d\.y\)%2===0\|\|f7\(b\.settings,11\)&&!b\.wa\[c\]\|\|d\.x%1!==0\|\|d\.y%1!==0\|\|/,
-          "d=b.ka[c],d={x:Math.round(d.x),y:Math.round(d.y)},f7(b.settings,3)&&(d.x+d.y)%2===0||f7(b.settings,11)&&!b.wa[c]||"
+          /d=b\.ka\[c\],e7\(b\.settings,3\)&&\(d\.x\+d\.y\)%2===0\|\|e7\(b\.settings,11\)&&!b\.wa\[c\]\|\|d\.x%1!==0\|\|d\.y%1!==0\|\|/,
+          "d=b.ka[c],d={x:Math.round(d.x),y:Math.round(d.y)},e7(b.settings,3)&&(d.x+d.y)%2===0||e7(b.settings,11)&&!b.wa[c]||"
         ),
       true
     );
@@ -11574,11 +14781,11 @@ window.mouseMode.alterSnakeCode = function (code) {
   // (Vanilla unlock lives at the end of gbF — mouse never calls gbF because head.equals fails.)
   {
     const next = step(
-      "jbF",
+      "b5E",
       () =>
         code.assertReplace(
-          /jbF=function\(a,b,c,d\)\{b=c\?k7\(a\.ka,b\):b;c=c\?\$6\(a\.Aa\.direction\):a\.Aa\.direction;for\(let h of a\.oa\)if\(h\.Gh&&h\.pos\.equals\(b\)\)\{if\(n\$E\(a\.settings\.ka,h\.sequenceNumber,a\.wa\.wa\)\)\{d\(\);break\}var e=h\.pos\.clone\(\),f=!1;if\(bbF\(a\.settings\)\)\{let k;var g=\(k=cbF\(a\.Fa,h\.pos,c\)\)!=null\?k:f7\(a\.settings,20\)\?dbF\(a\.Ja,\s*h\.pos,c\):void 0;g&&\(e\.x=g\.x,e\.y=g\.y,f=!0\)\}if\(!f\)switch\(c\)\{case "RIGHT":e\.x\+=1;break;case "LEFT":--e\.x;break;case "DOWN":e\.y\+=1;break;case "UP":--e\.y\}f7\(a\.settings,4\)&&j7\(a\.ka,e\);g=n7\(a\.ka,e\)&&a\.ka\.wa\[e\.y\]\[e\.x\]!==10&&HaF\(a\.ka,e\);f=!n7\(a\.ka,e\)&&!f7\(a\.settings,4\)&&f;if\(g\|\|f\)\{f=f7\(a\.settings,7\)&&PaF\(a\.ka\)&&h\.pos\.x===Math\.floor\(a\.ka\.oa\.width\/2\)&&h\.pos\.y===Math\.floor\(a\.ka\.oa\.height\/2\);if\(a\.ka\.wa\[e\.y\]\[e\.x\]!==5&&a\.ka\.wa\[e\.y\]\[e\.x\]!==11&&a\.ka\.wa\[e\.y\]\[e\.x\]!==7&&!f\)switch\(h\.prev=h\.pos\.clone\(\),e=1\/3,a\.Aa\.direction\)\{case "RIGHT":h\.pos\.x\+=\s*e;break;case "LEFT":h\.pos\.x-=e;break;case "DOWN":h\.pos\.y\+=e;break;case "UP":h\.pos\.y-=e\}d\(\)\}else f7\(a\.settings,16\)&&eaF\(a\.Ba,e\)===\$6\(c\)&&daF\(a\.Ba,e\)&&d\(\)\}\}/,
-          `jbF=function(a,b,c,d){b=c?k7(a.ka,b):b;b={x:Math.round(b.x),y:Math.round(b.y)};c=(typeof faceAngle==="number"?window.mouseCardinalFromAngle(faceAngle):a.Aa.direction);var __sokoGoal=function(box){for(let g of a.B_){if(Math.round(box.pos.x)===Math.round(g.x)&&Math.round(box.pos.y)===Math.round(g.y)){fbF(a,box);a.B_.delete(g);if(f7(a.settings,7)){var m=k7(a.ka,g);for(let t of a.B_)if(Math.round(t.x)===Math.round(m.x)&&Math.round(t.y)===Math.round(m.y)){a.B_.delete(t);break}}return!0}}return!1};for(let h of a.oa){if(!h.Gh)continue;h.pos.x=Math.round(h.pos.x);h.pos.y=Math.round(h.pos.y);if(__sokoGoal(h))continue;if(Math.hypot(h.pos.x-b.x,h.pos.y-b.y)>=1.75)continue;if(n$E(a.settings.ka,h.sequenceNumber,a.wa.wa))continue;var e=h.pos.clone();switch(c){case "RIGHT":e.x+=1;break;case "LEFT":--e.x;break;case "DOWN":e.y+=1;break;case "UP":--e.y;break;default:continue}f7(a.settings,4)&&j7(a.ka,e);e.x=Math.round(e.x);e.y=Math.round(e.y);var other=false;for(let o of a.oa)if(o!==h&&o.Gh&&Math.round(o.pos.x)===e.x&&Math.round(o.pos.y)===e.y){other=true;break}var cell=a.ka.wa[e.y]&&a.ka.wa[e.y][e.x],destOk=n7(a.ka,e)&&!other&&cell!==10&&!HaF(a.ka,e);if(destOk){h.prev=h.pos.clone();h.pos.x=e.x;h.pos.y=e.y;__sokoGoal(h);}}}`
+          /b5E=function\(a,b,c,d\)\{b=c\?j7\(a\.ka,b\):b;c=c\?Z6\(a\.Aa\.direction\):a\.Aa\.direction;for\(let h of a\.oa\)if\(h\.Lh&&h\.pos\.equals\(b\)\)\{if\(c3E\(a\.settings\.ka,h\.sequenceNumber,a\.wa\.wa\)\)\{d\(\);break\}var e=h\.pos\.clone\(\),f=!1;if\(T4E\(a\.settings\)\)\{let k;var g=\(k=U4E\(a\.Ga,h\.pos,c\)\)!=null\?k:e7\(a\.settings,20\)\?V4E\(a\.Ja,h\.pos,c\):void 0;g&&\(e\.x=g\.x,e\.y=g\.y,f=!0\)\}if\(!f\)switch\(c\)\{case "RIGHT":e\.x\+=1;break;case "LEFT":--e\.x;break;case "DOWN":e\.y\+=1;break;case "UP":--e\.y\}e7\(a\.settings,4\)&&i7\(a\.ka,e\);g=m7\(a\.ka,e\)&&a\.ka\.wa\[e\.y\]\[e\.x\]!==10&&y4E\(a\.ka,e\);f=!m7\(a\.ka,e\)&&!e7\(a\.settings,4\)&&f;if\(g\|\|f\)\{f=e7\(a\.settings,7\)&&G4E\(a\.ka\)&&h\.pos\.x===Math\.floor\(a\.ka\.oa\.width\/2\)&&h\.pos\.y===Math\.floor\(a\.ka\.oa\.height\/2\);if\(!a5E\(a\.ka\.wa\[e\.y\]\[e\.x\]\)&&!f\)switch\(h\.prev=h\.pos\.clone\(\),e=1\/3,a\.Aa\.direction\)\{case "RIGHT":h\.pos\.x\+=e;break;case "LEFT":h\.pos\.x-=e;break;case "DOWN":h\.pos\.y\+=e;break;case "UP":h\.pos\.y-=e\}d\(\)\}else e7\(a\.settings,16\)&&U3E\(a\.Ba,e\)===Z6\(c\)&&T3E\(a\.Ba,e\)&&d\(\)\}\}/,
+          `b5E=function(a,b,c,d){b=c?j7(a.ka,b):b;b={x:Math.round(b.x),y:Math.round(b.y)};c=(typeof faceAngle==="number"?window.mouseCardinalFromAngle(faceAngle):a.Aa.direction);var __sokoGoal=function(box){for(let g of a.d_){if(Math.round(box.pos.x)===Math.round(g.x)&&Math.round(box.pos.y)===Math.round(g.y)){X4E(a,box);a.d_.delete(g);if(e7(a.settings,7)){var m=j7(a.ka,g);for(let t of a.d_)if(Math.round(t.x)===Math.round(m.x)&&Math.round(t.y)===Math.round(m.y)){a.d_.delete(t);break}}return!0}}return!1};for(let h of a.oa){if(!h.Lh)continue;h.pos.x=Math.round(h.pos.x);h.pos.y=Math.round(h.pos.y);if(__sokoGoal(h))continue;if(Math.hypot(h.pos.x-b.x,h.pos.y-b.y)>=1.75)continue;if(c3E(a.settings.ka,h.sequenceNumber,a.wa.wa))continue;var e=h.pos.clone();switch(c){case "RIGHT":e.x+=1;break;case "LEFT":--e.x;break;case "DOWN":e.y+=1;break;case "UP":--e.y;break;default:continue}e7(a.settings,4)&&i7(a.ka,e);e.x=Math.round(e.x);e.y=Math.round(e.y);var other=false;for(let o of a.oa)if(o!==h&&o.Lh&&Math.round(o.pos.x)===e.x&&Math.round(o.pos.y)===e.y){other=true;break}var cell=a.ka.wa[e.y]&&a.ka.wa[e.y][e.x],destOk=m7(a.ka,e)&&!other&&cell!==10&&!y4E(a.ka,e);if(destOk){h.prev=h.pos.clone();h.pos.x=e.x;h.pos.y=e.y;__sokoGoal(h);}}}`
         ),
       true
     );
@@ -11591,8 +14798,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "gbFgoal",
       () =>
         code.assertReplace(
-          /for\(let g of a\.B_\)if\(b\.pos\.equals\(g\)\)\{fbF\(a,b\);a\.B_\.delete\(g\);/,
-          "for(let g of a.B_)if(Math.round(b.pos.x)===Math.round(g.x)&&Math.round(b.pos.y)===Math.round(g.y)){fbF(a,b);a.B_.delete(g);"
+          /for\(let g of a\.d_\)if\(b\.pos\.equals\(g\)\)\{X4E\(a,b\);a\.d_\.delete\(g\);/,
+          "for(let g of a.d_)if(Math.round(b.pos.x)===Math.round(g.x)&&Math.round(b.pos.y)===Math.round(g.y)){X4E(a,b);a.d_.delete(g);"
         ),
       true
     );
@@ -11605,19 +14812,19 @@ window.mouseMode.alterSnakeCode = function (code) {
       "sokoNoKill",
       () =>
         code.assertReplace(
-          /n7\(this\.wb\.ka,ce\)&&\s*this\.wb\.ka\.wa\[ae\.y\]\[ae\.x\]===7&&HaF\(this\.wb\.ka,ce\)&&\(Xc=!0\)/,
-          "false&&(Xc=!0)"
+          /m7\(this\.wb\.ka,be\)&&\s*this\.wb\.ka\.wa\[ge\.y\]\[ge\.x\]===7&&y4E\(this\.wb\.ka,be\)&&\(dd=!0\)/,
+          "false&&(dd=!0)"
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Borderless: always use fixed camera (same as Borderless+Tally via bcF).
-  code = step("bcF", () =>
+  // Borderless: always use fixed camera (same as Borderless+Tally via W5E).
+  code = step("W5E", () =>
     code.assertReplace(
-      /bcF=function\(a\)\{return f7\(a,4\)&&\(f7\(a,2\)\|\|f7\(a,5\)\|\|f7\(a,\s*19\)\|\|f7\(a,20\)\|\|a\.ka===6\)\}/,
-      "bcF=function(a){return f7(a,4)}"
+      /W5E=function\(a\)\{return e7\(a,4\)&&\(e7\(a,2\)\|\|e7\(a,5\)\|\|e7\(a,\s*19\)\|\|e7\(a,20\)\|\|a\.ka===6\)\}/,
+      "W5E=function(a){return e7(a,4)}"
     )
   );
 
@@ -11632,23 +14839,23 @@ window.mouseMode.alterSnakeCode = function (code) {
       "hotdogFront",
       () =>
         code.assertReplace(
-          /IcF=function\(a,b\)\{scF\(a,b,\{pos:b,Cm:!0,T0:!1,Gh:!f7\(a\.settings,11\)\}\);var c=\[new _\.Sd\(b\.x-1,b\.y-1\),new _\.Sd\(b\.x,b\.y-1\),new _\.Sd\(b\.x\+1,b\.y-1\),new _\.Sd\(b\.x-1,b\.y\),new _\.Sd\(b\.x\+1,b\.y\),new _\.Sd\(b\.x-1,b\.y\+1\),new _\.Sd\(b\.x,b\.y\+1\),new _\.Sd\(b\.x\+1,b\.y\+1\)\];if\(f7\(a\.settings,4\)\)for\(var d of c\)j7\(a\.ka,d\);for\(let e of c\)n7\(a\.ka,\s*e\)&&a\.wa\[e\.y\]\[e\.x\]\+\+;/,
-          `IcF=function(a,b){scF(a,b,{pos:b,Cm:!0,T0:!1,Gh:!f7(a.settings,11)});var c=[new _.Sd(b.x-1,b.y-1),new _.Sd(b.x,b.y-1),new _.Sd(b.x+1,b.y-1),new _.Sd(b.x-1,b.y),new _.Sd(b.x+1,b.y),new _.Sd(b.x-1,b.y+1),new _.Sd(b.x,b.y+1),new _.Sd(b.x+1,b.y+1)];if(f7(a.settings,4))for(var d of c)j7(a.ka,d);{let __s=window.mouseSnakeRef&&window.mouseSnakeRef(),__dir=__s&&__s.direction,fx=__dir==="RIGHT"?1:__dir==="LEFT"?-1:0,fy=__dir==="DOWN"?1:__dir==="UP"?-1:0;if(fx||fy)c=c.filter(p=>{const dx=p.x-b.x,dy=p.y-b.y;return !(dx&&dy&&dx*fx+dy*fy>0);});}for(let e of c)n7(a.ka,e)&&a.wa[e.y][e.x]++;`
+          /E6E=function\(a,b\)\{n6E\(a,b,\{pos:b,wm:!0,m0:!1,Lh:!e7\(a\.settings,11\)\}\);var c=\[new _\.Od\(b\.x-1,b\.y-1\),new _\.Od\(b\.x,b\.y-1\),new _\.Od\(b\.x\+1,b\.y-1\),new _\.Od\(b\.x-1,b\.y\),new _\.Od\(b\.x\+1,b\.y\),new _\.Od\(b\.x-1,b\.y\+1\),new _\.Od\(b\.x,b\.y\+1\),new _\.Od\(b\.x\+1,b\.y\+1\)\];if\(e7\(a\.settings,4\)\)for\(var d of c\)i7\(a\.ka,d\);for\(let e of c\)m7\(a\.ka,/,
+          `E6E=function(a,b){n6E(a,b,{pos:b,wm:!0,m0:!1,Lh:!e7(a.settings,11)});var c=[new _.Od(b.x-1,b.y-1),new _.Od(b.x,b.y-1),new _.Od(b.x+1,b.y-1),new _.Od(b.x-1,b.y),new _.Od(b.x+1,b.y),new _.Od(b.x-1,b.y+1),new _.Od(b.x,b.y+1),new _.Od(b.x+1,b.y+1)];if(e7(a.settings,4))for(var d of c)i7(a.ka,d);{let __s=window.mouseSnakeRef&&window.mouseSnakeRef(),__dir=__s&&__s.direction,fx=__dir==="RIGHT"?1:__dir==="LEFT"?-1:0,fy=__dir==="DOWN"?1:__dir==="UP"?-1:0;if(fx||fy)c=c.filter(p=>{const dx=p.x-b.x,dy=p.y-b.y;return !(dx&&dy&&dx*fx+dy*fy>0);});}for(let e of c)m7(a.ka,`
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Shield mode Oba death: e7 → OaF (same as Shield under mouse); else rounded tile.
-  // Chess lethality while carrying is the eat-path Na() above — not Oba.has(direction).
+  // Shield death: d7 → F4E (same as Shield under mouse); else rounded tile.
+  // Chess lethality while carrying is the eat-path Oa() above — not nba.has(direction).
   {
     const next = step(
       "shieldTick",
       () =>
         code.assertReplace(
-          /\(e7\(this\.settings\)\?OaF\(this\.ka,a,f\.pos\)<1:f\.pos\.equals\(a\)\)&&\(\(g=f\.Oba\)==null\?0:g\.has\(d\)\)&&this\.Na\(\)/,
-          "(e7(this.settings)?OaF(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.Oba)==null?0:g.has(d))&&this.Na()"
+          /\(d7\(this\.settings\)\?F4E\(this\.ka,a,f\.pos\)<1:f\.pos\.equals\(a\)\)&&\(\(g=f\.nba\)==null\?0:g\.has\(d\)\)&&this\.Oa\(\)/,
+          "(d7(this.settings)?F4E(this.ka,a,f.pos)<1:(Math.round(f.pos.x)===Math.round(a.x)&&Math.round(f.pos.y)===Math.round(a.y)))&&((g=f.nba)==null?0:g.has(d))&&this.Oa()"
         ),
       true
     );
@@ -11659,8 +14866,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "shieldRender",
       () =>
         code.assertReplace(
-          /ae\.equals\(Qd\.pos\)&&\(\(ge=Qd\.Oba\)==null\?0:ge\.has\(xc\)\)&&\(Xc=!0\)/,
-          "Math.round(ae.x)===Math.round(Qd.pos.x)&&Math.round(ae.y)===Math.round(Qd.pos.y)&&((ge=Qd.Oba)==null?0:ge.has(xc))&&(Xc=!0)"
+          /ge\.equals\(Sd\.pos\)&&\(\(ne=Sd\.nba\)==null\?0:ne\.has\(Ec\)\)&&\(dd=!0\)/,
+          "Math.round(ge.x)===Math.round(Sd.pos.x)&&Math.round(ge.y)===Math.round(Sd.pos.y)&&((ne=Sd.nba)==null?0:ne.has(Ec))&&(dd=!0)"
         ),
       true
     );
@@ -11729,8 +14936,8 @@ window.mouseMode.alterSnakeCode = function (code) {
   // Force winged-style fruit proximity
   code = step("wingedFruit", () =>
     code.assertReplace(
-      /if\(e7\(this\.settings\)\)\{let ([$a-zA-Z0-9_]{0,8})=this\.oa\.ka\[0\]!==void 0/,
-      "if(true){let $1=this.oa.ka[0]!==void 0"
+      /if\(d7\(a\.settings\)\)\{var ([$a-zA-Z0-9_]{0,8})=a\.oa\.ka\[0\]!==void 0/,
+      "if(true){var $1=a.oa.ka[0]!==void 0"
     )
   );
 
@@ -11741,8 +14948,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "tallyWallTick",
       () =>
         code.assertReplace(
-          /\(e7\(this\.settings\)\?OaF\(this\.ka,a,d\.pos\)<1:d\.pos\.equals\(a\)\)&&n\$E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Na\(\)/,
-          "Math.hypot(a.x-d.pos.x,a.y-d.pos.y)<1&&n$E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Na()"
+          /\(d7\(this\.settings\)\?F4E\(this\.ka,a,d\.pos\)<1:d\.pos\.equals\(a\)\)&&c3E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Oa\(\)/,
+          "Math.hypot(a.x-d.pos.x,a.y-d.pos.y)<1&&c3E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Oa()"
         ),
       true
     );
@@ -11753,8 +14960,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "tallyWallYY",
       () =>
         code.assertReplace(
-          /\(f7\(this\.settings,6\)\?OaF\(this\.ka,b,d\.pos\)<1:d\.pos\.equals\(b\)\)&&n\$E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Na\(\)/,
-          "Math.hypot(b.x-d.pos.x,b.y-d.pos.y)<1&&n$E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Na()"
+          /\(e7\(this\.settings,6\)\?F4E\(this\.ka,b,d\.pos\)<1:d\.pos\.equals\(b\)\)&&c3E\(this\.settings\.ka,d\.sequenceNumber,this\.wa\.wa\)&&this\.Oa\(\)/,
+          "Math.hypot(b.x-d.pos.x,b.y-d.pos.y)<1&&c3E(this.settings.ka,d.sequenceNumber,this.wa.wa)&&this.Oa()"
         ),
       true
     );
@@ -11765,8 +14972,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "tallyWallRender",
       () =>
         code.assertReplace(
-          /Qd\.Gh&&Qd\.pos\.equals\(ae\)&&n\$E\(this\.settings\.ka,Qd\.sequenceNumber,this\.wb\.wa\.wa\)/,
-          "Qd.Gh&&Math.hypot(Qd.pos.x-ae.x,Qd.pos.y-ae.y)<1&&n$E(this.settings.ka,Qd.sequenceNumber,this.wb.wa.wa)"
+          /Sd\.Lh&&Sd\.pos\.equals\(ge\)&&c3E\(this\.settings\.ka,Sd\.sequenceNumber,this\.wb\.wa\.wa\)/,
+          "Sd.Lh&&Math.hypot(Sd.pos.x-ge.x,Sd.pos.y-ge.y)<1&&c3E(this.settings.ka,Sd.sequenceNumber,this.wb.wa.wa)"
         ),
       true
     );
@@ -11793,10 +15000,10 @@ window.mouseMode.alterSnakeCode = function (code) {
       "headRender",
       () => {
         const re =
-          /pb===0\?\(([a-zA-Z0-9_$]+)=this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\),[\s\S]{0,800}?\):\1=this\.\2\.\3\.\4\[/;
+          /rb===0\?\(([a-zA-Z0-9_$]+)=this\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\.([$a-zA-Z0-9_]{0,8})\[0\]\.clone\(\),[\s\S]{0,2000}?\):\1=this\.\2\.\3\.\4\[/;
         return code.assertReplace(
           re,
-          `pb===0?($1=this.$2.$3.$4[0].clone(),(aimTrainer?($1.x+=Math.cos(faceAngle),$1.y+=Math.sin(faceAngle)):(updateFaceCoordsAndRotation(this.$2.${window.blockyHeadCoord},this.$2.${window.tileWidth},this.$2.$3.$4),$1.x=nextHeadX,$1.y=nextHeadY))):$1=this.$2.$3.$4[`
+          `rb===0?($1=this.$2.$3.$4[0].clone(),(aimTrainer?($1.x+=Math.cos(faceAngle),$1.y+=Math.sin(faceAngle)):(updateFaceCoordsAndRotation(this.$2.${window.blockyHeadCoord},this.$2.${window.tileWidth},this.$2.$3.$4),$1.x=nextHeadX,$1.y=nextHeadY))):$1=this.$2.$3.$4[`
         );
       },
       true
@@ -11809,11 +15016,11 @@ window.mouseMode.alterSnakeCode = function (code) {
     const next = step(
       "curveOffset",
       () => {
-        // Neighbor segment vars (v12: yc closer-to-head, kc further).
+        // Neighbor segment vars (v13: yc closer-to-head, sc further).
         let closer = "yc";
-        let further = "kc";
+        let further = "sc";
         const named = code.match(
-          /let ([a-zA-Z0-9_$]+);pb===0\?\(\1=[\s\S]{0,400}?\):[\s\S]{0,80}?let [a-zA-Z0-9_$]+=this\.[\s\S]{0,120}?;([a-zA-Z0-9_$]+);\2=pb===/
+          /let ([a-zA-Z0-9_$]+);rb===0\?\(\1=[\s\S]{0,800}?\):[\s\S]{0,80}?let [a-zA-Z0-9_$]+=this\.[\s\S]{0,120}?,([a-zA-Z0-9_$]+);\2=rb===/
         );
         if (named) {
           closer = named[1];
@@ -11822,7 +15029,7 @@ window.mouseMode.alterSnakeCode = function (code) {
 
         // Replace cardinal-only corner math with fluid blends toward neighboring segments.
         const re =
-          /(let ([$a-zA-Z0-9_]+)=([$a-zA-Z0-9_]+)\.clone\(\),([$a-zA-Z0-9_]+)=\3\.clone\(\);\2\.x\*=(this\.[$a-zA-Z0-9_.]+);\2\.y\*=\5;\4\.x\*=\5;\4\.y\*=\5;)[\s\S]*?(?=if\(pb===0\))/;
+          /(let ([$a-zA-Z0-9_]+)=([$a-zA-Z0-9_]+)\.clone\(\),([$a-zA-Z0-9_]+)=\3\.clone\(\);\2\.x\*=(this\.[$a-zA-Z0-9_.]+);\2\.y\*=\5;\4\.x\*=\5;\4\.y\*=\5;)[\s\S]*?(?=if\(rb===0\))/;
         return code.assertReplace(
           re,
           `$1
@@ -11845,9 +15052,10 @@ window.mouseMode.alterSnakeCode = function (code) {
       "wallPause",
       () => {
         const patterns = [
+          /if\(!e7\(this\.settings,21\)\)/,
           /if\(![$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},17\)\)/,
           /if\(![$a-zA-Z0-9_]{0,8}\(this\.[$a-zA-Z0-9_]{0,8},17\)\)\{/,
-          /if\(!o7\(this\.settings\)\)/,
+          /if\(!n7\(this\.settings\)\)/,
         ];
         for (const p of patterns) {
           if (p.test(code)) return code.assertReplace(p, "if(false)");
@@ -11875,18 +15083,18 @@ window.mouseMode.alterSnakeCode = function (code) {
 
   // Chess: Remix owns score/lock/respawn. Mouse only bridges fractional heads.
   //
-  // wingedFruit already rewrote if(e7) → if(true) for mouse eat proximity.
-  // Chess still needs same-tile eat (OaF near-miss → findApple fruit path).
+  // wingedFruit already rewrote if(d7) → if(true) for mouse eat proximity.
+  // Chess still needs same-tile eat (F4E near-miss → findApple fruit path).
   {
     const next = step(
       "appleEatChessTile",
       () => {
         const patterns = [
-          /if\(true\)\{let dg=this\.oa\.ka\[0\]!==void 0&&this\.oa\.ka\[1\]!==void 0&&Wd\.pos!==void 0;\$d=dg&&\(OaF\(this\.ka,this\.oa\.ka\[0\],Wd\.pos\)<1\|\|OaF\(this\.ka,this\.oa\.ka\[1\],Wd\.pos\)<1\);if\(f7\(this\.settings,7\)&&dg\)\{let Cg=m7\(this\.oa,1\);He=OaF\(this\.ka,m7\(this\.oa,0\),Wd\.pos\)<1\|\|OaF\(this\.ka,Cg,Wd\.pos\)<1\}\}/,
-          /if\(e7\(this\.settings\)\)\{let dg=this\.oa\.ka\[0\]!==void 0&&this\.oa\.ka\[1\]!==void 0&&Wd\.pos!==void 0;\$d=dg&&\(OaF\(this\.ka,this\.oa\.ka\[0\],Wd\.pos\)<1\|\|OaF\(this\.ka,this\.oa\.ka\[1\],Wd\.pos\)<1\);if\(f7\(this\.settings,7\)&&dg\)\{let Cg=m7\(this\.oa,1\);He=OaF\(this\.ka,m7\(this\.oa,0\),Wd\.pos\)<1\|\|OaF\(this\.ka,Cg,Wd\.pos\)<1\}\}/,
+          /if\(true\)\{var g=a\.oa\.ka\[0\]!==void 0&&a\.oa\.ka\[1\]!==void 0&&d\.pos!==void 0;e=g&&\(F4E\(a\.ka,a\.oa\.ka\[0\],d\.pos\)<1\|\|F4E\(a\.ka,a\.oa\.ka\[1\],d\.pos\)<1\);e7\(a\.settings,7\)&&g&&\(g=l7\(a\.oa,1\),f=F4E\(a\.ka,l7\(a\.oa,0\),d\.pos\)<1\|\|F4E\(a\.ka,g,d\.pos\)<1\)\}/,
+          /if\(d7\(a\.settings\)\)\{var g=a\.oa\.ka\[0\]!==void 0&&a\.oa\.ka\[1\]!==void 0&&d\.pos!==void 0;e=g&&\(F4E\(a\.ka,a\.oa\.ka\[0\],d\.pos\)<1\|\|F4E\(a\.ka,a\.oa\.ka\[1\],d\.pos\)<1\);e7\(a\.settings,7\)&&g&&\(g=l7\(a\.oa,1\),f=F4E\(a\.ka,l7\(a\.oa,0\),d\.pos\)<1\|\|F4E\(a\.ka,g,d\.pos\)<1\)\}/,
         ];
         const rep =
-          "if(true){let dg=this.oa.ka[0]!==void 0&&this.oa.ka[1]!==void 0&&Wd.pos!==void 0;if(window.isChessActive&&window.isChessActive()){$d=!!dg&&Math.round(this.oa.ka[0].x)===Math.round(Wd.pos.x)&&Math.round(this.oa.ka[0].y)===Math.round(Wd.pos.y);if(f7(this.settings,7)&&dg){He=Math.round(m7(this.oa,0).x)===Math.round(Wd.pos.x)&&Math.round(m7(this.oa,0).y)===Math.round(Wd.pos.y)}}else{$d=dg&&(OaF(this.ka,this.oa.ka[0],Wd.pos)<1||OaF(this.ka,this.oa.ka[1],Wd.pos)<1);if(f7(this.settings,7)&&dg){let Cg=m7(this.oa,1);He=OaF(this.ka,m7(this.oa,0),Wd.pos)<1||OaF(this.ka,Cg,Wd.pos)<1}}}";
+          "if(true){var g=a.oa.ka[0]!==void 0&&a.oa.ka[1]!==void 0&&d.pos!==void 0;if(window.isChessActive&&window.isChessActive()){e=!!g&&Math.round(a.oa.ka[0].x)===Math.round(d.pos.x)&&Math.round(a.oa.ka[0].y)===Math.round(d.pos.y);if(e7(a.settings,7)&&g){f=Math.round(l7(a.oa,0).x)===Math.round(d.pos.x)&&Math.round(l7(a.oa,0).y)===Math.round(d.pos.y)}}else{e=g&&(F4E(a.ka,a.oa.ka[0],d.pos)<1||F4E(a.ka,a.oa.ka[1],d.pos)<1);e7(a.settings,7)&&g&&(g=l7(a.oa,1),f=F4E(a.ka,l7(a.oa,0),d.pos)<1||F4E(a.ka,g,d.pos)<1)}}";
         for (const p of patterns) {
           if (p.test(code)) return code.assertReplace(p, rep);
         }
@@ -11902,37 +15110,37 @@ window.mouseMode.alterSnakeCode = function (code) {
       "appleEatProx",
       () =>
         code.assertReplace(
-          /else \$d=this\.oa\.ka\[0\]\.equals\(Wd\.pos\),f7\(this\.settings,\s*7\)&&\(He=m7\(this\.oa,0\)\.equals\(Wd\.pos\)\)/,
-          "else $d=(Math.round(this.oa.ka[0].x)===Math.round(Wd.pos.x)&&Math.round(this.oa.ka[0].y)===Math.round(Wd.pos.y)),f7(this.settings,7)&&(He=(Math.round(m7(this.oa,0).x)===Math.round(Wd.pos.x)&&Math.round(m7(this.oa,0).y)===Math.round(Wd.pos.y)))"
+          /else e=a\.oa\.ka\[0\]\.equals\(d\.pos\),e7\(a\.settings,7\)&&\(f=l7\(a\.oa,0\)\.equals\(d\.pos\)\)/,
+          "else e=(Math.round(a.oa.ka[0].x)===Math.round(d.pos.x)&&Math.round(a.oa.ka[0].y)===Math.round(d.pos.y)),e7(a.settings,7)&&(f=(Math.round(l7(a.oa,0).x)===Math.round(d.pos.x)&&Math.round(l7(a.oa,0).y)===Math.round(d.pos.y)))"
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Chess eat: while locked/carrying, any eat attempt kills (generous $d||He hitreg).
-  // While OPEN, tag Wd and apply piece pickup immediately (don't trust findApple alone).
+  // Chess eat: while locked/carrying, any eat attempt kills (generous e||f hitreg).
+  // While OPEN, tag d and apply piece pickup immediately (don't trust findApple alone).
   {
     const next = step(
       "chessEatLockedDeath",
       () =>
         code.assertReplace(
-          /if\(\$d\|\|He\)\{let dg=Wd\.nla/,
-          "if($d||He){if(window.isChessActive&&window.isChessActive()&&(window.__chessCarrying||(window.head_state&&window.head_state!=='OPEN'))){this.Na();break;}window.__chessEatenApple=Wd;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(window.isChessActive&&window.isChessActive()&&Wd.isPiece){window.just_ate='piece';window.head_state=Wd.ChessPiece;window.head_color=Wd.ChessColor;window.__chessCarrying=true;window.__chessCarryPiece=Wd.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(Wd.type);if(typeof window.shield_all==='function')window.shield_all();}let dg=Wd.nla"
+          /if\(e\|\|f\)\{g=d\.Oka/,
+          "if(e||f){if(window.isChessActive&&window.isChessActive()&&(window.__chessCarrying||(window.head_state&&window.head_state!=='OPEN'))){a.Oa();break;}window.__chessEatenApple=d;if(a.wa&&a.wa.ka)window.appleArray=a.wa.ka;if(window.isChessActive&&window.isChessActive()&&d.isPiece){window.just_ate='piece';window.head_state=d.ChessPiece;window.head_color=d.ChessColor;window.__chessCarrying=true;window.__chessCarryPiece=d.ChessPiece;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(d.type);if(typeof window.shield_all==='function')window.shield_all();}g=d.Oka"
         ),
       true
     );
     if (next) code = next;
   }
 
-  // Score hook: honor pickup tag / just_ate / sticky carry; never Oh++ a piece.
+  // Score hook: honor pickup tag / just_ate / sticky carry; never Sh++ a piece.
   {
     const next = step(
       "chessScoreHarden",
       () =>
         code.assertReplace(
-          /if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';this\.Oh\+\+;/,
-          "if(window.just_ate!=='piece'&&!window.__chessCarrying&&!(window.__chessEatenApple&&window.__chessEatenApple.isPiece)&&_ae&&!_ae.isPiece){window.just_ate='fruit';this.Oh++;"
+          /if\(_ae&&!_ae\.isPiece\)\{window\.just_ate='fruit';a\.Sh\+\+;/,
+          "if(window.just_ate!=='piece'&&!window.__chessCarrying&&!(window.__chessEatenApple&&window.__chessEatenApple.isPiece)&&_ae&&!_ae.isPiece){window.just_ate='fruit';a.Sh++;"
         ),
       true
     );
@@ -11943,8 +15151,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "chessScoreHonorPickup",
       () =>
         code.assertReplace(
-          /else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';this\.Oh\+\+;/,
-          "else if((_ae&&_ae.isPiece)||(window.__chessEatenApple&&window.__chessEatenApple.isPiece)||window.just_ate==='piece'||window.__chessCarrying){window.just_ate='piece';{let _src=(_ae&&_ae.isPiece)?_ae:(window.__chessEatenApple&&window.__chessEatenApple.isPiece?window.__chessEatenApple:null);if(_src&&_src.isPiece){window.head_state=_src.ChessPiece;window.__chessCarryPiece=_src.ChessPiece;window.head_color=_src.ChessColor;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(_src.type);}window.__chessCarrying=true;if(this.wa&&this.wa.ka)window.appleArray=this.wa.ka;if(typeof window.shield_all==='function')window.shield_all();window.__chessEatenApple=null;}}else{window.just_ate='fruit';this.Oh++;"
+          /else if\(_ae&&_ae\.isPiece\)\{window\.just_ate='piece';window\.head_state=_ae\.ChessPiece;window\.updateTrophySRC\(_ae\.type\);window\.head_color=_ae\.ChessColor;window\.shield_all\(\);\}else\{window\.just_ate='fruit';a\.Sh\+\+;/,
+          "else if((_ae&&_ae.isPiece)||(window.__chessEatenApple&&window.__chessEatenApple.isPiece)||window.just_ate==='piece'||window.__chessCarrying){window.just_ate='piece';{let _src=(_ae&&_ae.isPiece)?_ae:(window.__chessEatenApple&&window.__chessEatenApple.isPiece?window.__chessEatenApple:null);if(_src&&_src.isPiece){window.head_state=_src.ChessPiece;window.__chessCarryPiece=_src.ChessPiece;window.head_color=_src.ChessColor;if(typeof window.updateTrophySRC==='function')window.updateTrophySRC(_src.type);}window.__chessCarrying=true;if(a.wa&&a.wa.ka)window.appleArray=a.wa.ka;if(typeof window.shield_all==='function')window.shield_all();window.__chessEatenApple=null;}}else{window.just_ate='fruit';a.Sh++;"
         ),
       true
     );
@@ -11992,7 +15200,7 @@ window.mouseMode.alterSnakeCode = function (code) {
     )
   );
 
-  // Start via turn (v12) — also assign directly so it works even if append marker misses
+  // Start via turn (v13) — also assign directly so it works even if append marker misses
   code = step("startGameAppend", () =>
     appendCodeWithinSnakeModule(
       code,
@@ -12020,7 +15228,7 @@ window.mouseMode.alterSnakeCode = function (code) {
       "wallOffset",
       () =>
         code.assertReplace(
-          /([a-z]=this\.Ca\.Ca\()([a-z])(\))/,
+          /([a-zA-Z0-9_$]+=this\.Ca\.Ca\()([a-zA-Z0-9_$]+)(\))/,
           "$1{x:Math.round($2.x),y:Math.round($2.y)}$3"
         ),
       true
@@ -12112,6 +15320,8 @@ window.mouseMode.alterSnakeCode = function (code) {
       "borderless",
       () => {
         const m = code.match(
+          /([A-Za-z0-9_$]+)=[$A-Za-z0-9_.]+\?-[^:]+:Math\.round\(this\.[$A-Za-z0-9_.]+\.canvas\.width\/2-this\.[$A-Za-z0-9_.]+\.x-this\.[$A-Za-z0-9_.]+\),([A-Za-z0-9_$]+)=[$A-Za-z0-9_.]+\?-[^:]+:Math\.round\(this\.[$A-Za-z0-9_.]+\.canvas\.height\/2-this\.[$A-Za-z0-9_.]+\.y-this\.[$A-Za-z0-9_.]+\)/
+        ) || code.match(
           /var ([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.width\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.x-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\),([$a-zA-Z0-9_]{0,8})=Math\.round\(this\.[$a-zA-Z0-9_]{0,8}\.canvas\.height\/2-this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.y-2\*this\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\.[$a-zA-Z0-9_]{0,8}\)/
         );
         if (!m) return null;

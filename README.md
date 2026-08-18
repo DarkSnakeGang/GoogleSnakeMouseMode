@@ -3,7 +3,7 @@
 Control the snake with your mouse. Move with full freedom without being confined to the grid.
 Toggle **Aim Trainer** in Pudding Settings to make the snake jump straight to the cursor.
 
-Built on **Remix Mod** (More Pudding + Candy / Chess / Burger) for game **v12**.
+Built on **Remix Mod** (More Pudding + Candy / Chess / Burger) for game **v13**.
 
 ## How to install
 
@@ -11,7 +11,7 @@ Built on **Remix Mod** (More Pudding + Candy / Chess / Burger) for game **v12**.
 
 See [Google Snake Mod Loader](https://github.com/DarkSnakeGang/GoogleSnakeModLoader).
 
-### Custom URL (v12 / current)
+### Custom URL (v13 / current)
 
 On [googlesnakemods.com/v/current/](https://googlesnakemods.com/v/current/), load this raw file as a custom mod URL:
 
@@ -21,7 +21,8 @@ Use custom mod name `mouseMode`.
 
 ### Older game versions
 
-Branch [`v5`](https://github.com/DarkSnakeGang/GoogleSnakeMouseMode/tree/v5) freezes the previous Pudding-based Mouse build for GSM v4/v5.
+- Branch [`v12`](https://github.com/DarkSnakeGang/GoogleSnakeMouseMode/tree/v12) freezes the Remix-based Mouse build for GSM v12.
+- Branch [`v5`](https://github.com/DarkSnakeGang/GoogleSnakeMouseMode/tree/v5) freezes the previous Pudding-based Mouse build for GSM v4/v5.
 
 ## Build
 
